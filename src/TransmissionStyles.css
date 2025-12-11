@@ -1,0 +1,136 @@
+/* Transmission System Styles */
+
+/* Container for all transmitted content */
+#transmitted-content {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Allow clicks to pass through to canvas */
+    z-index: 5; /* Below title (z-index: 10), above canvas */
+}
+
+/* Base styles for all transmitted elements */
+.transmitted-element {
+    position: fixed;
+    pointer-events: none; /* Initially disabled, enabled after materialization */
+    z-index: 1;
+    will-change: transform, opacity;
+}
+
+/* Materialized state */
+.transmitted-element.materialized {
+    pointer-events: auto;
+    animation: materialize-glow 1s ease-out;
+}
+
+/* Materialize glow animation */
+@keyframes materialize-glow {
+    0% {
+        filter: brightness(1.5) drop-shadow(0 0 20px rgba(255, 255, 255, 0.8));
+    }
+    100% {
+        filter: brightness(1) drop-shadow(0 0 0 transparent);
+    }
+}
+
+/* Logo specific styles */
+.transmitted-logo {
+    font-family: 'Arial', sans-serif;
+    user-select: none;
+}
+
+/* Card specific styles */
+.transmitted-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.transmitted-card:hover {
+    transform: translate(-50%, -50%) scale(1.05) !important;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 200, 255, 0.3) !important;
+}
+
+.transmitted-card .card-inner {
+    width: 100%;
+    height: 100%;
+    padding: 1.5rem;
+    box-sizing: border-box;
+}
+
+.transmitted-card .card-image {
+    width: 100%;
+    height: 150px;
+    background-size: cover;
+    background-position: center;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.transmitted-card .card-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    font-family: 'Arial', sans-serif;
+}
+
+.transmitted-card .card-description {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'Arial', sans-serif;
+}
+
+/* Text specific styles */
+.transmitted-text {
+    text-align: left;
+    padding: 0.5rem;
+}
+
+/* Image specific styles */
+.transmitted-image {
+    display: block;
+    object-fit: cover;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .transmitted-logo {
+        font-size: 1.5rem !important;
+    }
+
+    .transmitted-card {
+        width: 250px !important;
+        min-height: 150px !important;
+    }
+
+    .transmitted-card .card-inner {
+        padding: 1rem;
+    }
+
+    .transmitted-card .card-title {
+        font-size: 1.2rem;
+    }
+
+    .transmitted-card .card-description {
+        font-size: 0.85rem;
+    }
+
+    .transmitted-text {
+        font-size: 1rem !important;
+        max-width: 300px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .transmitted-logo {
+        font-size: 1.2rem !important;
+        letter-spacing: 0.2em !important;
+    }
+
+    .transmitted-card {
+        width: 200px !important;
+    }
+}

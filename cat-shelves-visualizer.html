@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Franchentine
+    </title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 10px;
+            color: #000;
+            max-width: 300px;
+            max-height: 90vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #000;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        input[type="number"],
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            background: #fff;
+            color: #000;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 5px;
+            background: #000;
+            color: #fff;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        button.danger {
+            background: #f44336;
+        }
+
+        button.danger:hover {
+            background: #da190b;
+        }
+
+        button.secondary {
+            background: #fff;
+            color: #000;
+            border: 2px solid #000;
+        }
+
+        button.secondary:hover {
+            background: #f0f0f0;
+        }
+
+        .shelf-item {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #000;
+        }
+
+        .shelf-item.selected {
+            border-left-color: #000;
+            background: #e0e0e0;
+        }
+
+        .shelf-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .shelf-item-name {
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .shelf-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .shelf-controls button {
+            width: auto;
+            padding: 5px 10px;
+            margin: 0;
+            font-size: 11px;
+        }
+
+        .info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        #info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 12px;
+            max-width: 300px;
+        }
+
+        .key-hint {
+            margin: 3px 0;
+        }
+
+        .key {
+            display: inline-block;
+            background: #444;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin-right: 5px;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .dimension-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 5px;
+        }
+
+        .dimension-inputs input {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="controls">
+        <h1>Franchentine</h1>
+        
+        <div class="control-group">
+            <h2> Dimensiones de la Sala (m)</h2>
+            <div class="dimension-inputs">
+                <div>
+                    <label>Ancho</label>
+                    <input type="number" id="roomWidth" value="4" step="0.1" min="1">
+                </div>
+                <div>
+                    <label>Largo</label>
+                    <input type="number" id="roomDepth" value="5" step="0.1" min="1">
+                </div>
+                <div>
+                    <label>Alto</label>
+                    <input type="number" id="roomHeight" value="2.5" step="0.1" min="1">
+                </div>
+            </div>
+            <button onclick="updateRoom()">Actualizar Sala</button>
+        </div>
+
+        <div class="control-group">
+            <h2>Fondo</h2>
+            <input type="file" id="backgroundImage" accept="image/*">
+            <label>
+                <input type="checkbox" id="showBackground" checked> Mostrar fondo
+            </label>
+        </div>
+
+        <div class="control-group">
+            <h2>➕ Nuevo Estante</h2>
+            <div class="dimension-inputs">
+                <div>
+                    <label>Ancho (cm)</label>
+                    <input type="number" id="shelfWidth" value="40" step="1" min="10">
+                </div>
+                <div>
+                    <label>Prof (cm)</label>
+                    <input type="number" id="shelfDepth" value="30" step="1" min="10">
+                </div>
+                <div>
+                    <label>Alto (cm)</label>
+                    <input type="number" id="shelfHeight" value="10" step="1" min="5">
+                </div>
+            </div>
+            <label>Color</label>
+            <input type="color" id="shelfColor" value="#8B4513">
+            <button onclick="addShelf()">Añadir Estante</button>
+            <button class="secondary" onclick="addDefaultShelves()">➕ Añadir Set Completo</button>
+        </div>
+
+        <div class="control-group">
+            <h2>Estantes en la Sala</h2>
+            <div id="shelvesList"></div>
+        </div>
+
+        <div class="control-group">
+            <button class="secondary" onclick="saveConfiguration()"> Guardar Config</button>
+            <button class="secondary" onclick="loadConfiguration()">Cargar Config</button>
+            <button class="danger" onclick="clearAll()">Borrar Todo</button>
+        </div>
+
+        <div class="info">
+            <strong>Controles:</strong><br>
+            • Click en estante para seleccionar<br>
+            • Click ratón + arrastra = rotar vista<br>
+            • Rueda ratón = zoom<br>
+            • Click derecho + arrastra = mover vista
+        </div>
+    </div>
+
+    <div id="info-panel">
+        <div class="key-hint"><span class="key">W</span> Modo mover</div>
+        <div class="key-hint"><span class="key">E</span> Modo rotar</div>
+        <div class="key-hint"><span class="key">R</span> Modo escalar</div>
+        <div class="key-hint"><span class="key">+</span> Tamaño mayor</div>
+        <div class="key-hint"><span class="key">-</span> Tamaño menor</div>
+        <div class="key-hint"><span class="key">Delete</span> Borrar seleccionado</div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+        // Variables globales
+        let scene, camera, renderer, controls, transformControl;
+        let room, shelves = [];
+        let selectedShelf = null;
+        let shelfCounter = 0;
+        let backgroundPlane = null;
+
+        // Inicializar escena
+        function init() {
+            // Escena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x2a2a2a);
+
+            // Cámara
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(3, 2, 3);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // Luces
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            // Controles de órbita
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Transform controls
+            transformControl = new TransformControls(camera, renderer.domElement);
+            transformControl.addEventListener('change', render);
+            transformControl.addEventListener('dragging-changed', function (event) {
+                controls.enabled = !event.value;
+            });
+            scene.add(transformControl);
+
+            // Crear sala inicial
+            createRoom();
+
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
+            scene.add(gridHelper);
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onKeyDown);
+            renderer.domElement.addEventListener('click', onMouseClick);
+
+            // Background image listener
+            document.getElementById('backgroundImage').addEventListener('change', loadBackgroundImage);
+            document.getElementById('showBackground').addEventListener('change', toggleBackground);
+
+            // Animate
+            animate();
+        }
+
+        function createRoom() {
+            if (room) scene.remove(room);
+
+            const width = parseFloat(document.getElementById('roomWidth').value);
+            const depth = parseFloat(document.getElementById('roomDepth').value);
+            const height = parseFloat(document.getElementById('roomHeight').value);
+
+            room = new THREE.Group();
+
+            // Material para las paredes (wireframe)
+            const wallMaterial = new THREE.LineBasicMaterial({ color: 0x666666 });
+
+            // Crear bordes de la sala
+            const edges = new THREE.EdgesGeometry(
+                new THREE.BoxGeometry(width, height, depth)
+            );
+            const wireframe = new THREE.LineSegments(edges, wallMaterial);
+            wireframe.position.y = height / 2;
+            room.add(wireframe);
+
+            // Suelo
+            const floorGeometry = new THREE.PlaneGeometry(width, depth);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x404040,
+                roughness: 0.8
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            room.add(floor);
+
+            scene.add(room);
+        }
+
+        function loadBackgroundImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load(e.target.result, function(texture) {
+                    // Eliminar plano anterior si existe
+                    if (backgroundPlane) {
+                        scene.remove(backgroundPlane);
+                    }
+
+                    // Crear plano con la imagen
+                    const aspectRatio = texture.image.width / texture.image.height;
+                    const planeWidth = 4;
+                    const planeHeight = planeWidth / aspectRatio;
+
+                    const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+                    const material = new THREE.MeshBasicMaterial({ 
+                        map: texture,
+                        transparent: true,
+                        opacity: 0.7,
+                        side: THREE.DoubleSide
+                    });
+                    
+                    backgroundPlane = new THREE.Mesh(geometry, material);
+                    backgroundPlane.position.set(0, planeHeight/2, -2);
+                    backgroundPlane.userData.isBackground = true;
+                    scene.add(backgroundPlane);
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function toggleBackground() {
+            if (backgroundPlane) {
+                backgroundPlane.visible = document.getElementById('showBackground').checked;
+            }
+        }
+
+        function addCylinder(length, circumference, color, name) {
+            const radius = (circumference / 100) / (2 * Math.PI); // cm to m
+            const height = length / 100; // cm to m
+            
+            const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const cylinder = new THREE.Mesh(geometry, material);
+            
+            cylinder.position.set(0, height/2 + 0.5, 0);
+            cylinder.castShadow = true;
+            cylinder.receiveShadow = true;
+            
+            shelfCounter++;
+            cylinder.userData = {
+                id: shelfCounter,
+                name: name || `Poste ${shelfCounter}`,
+                width: radius * 2,
+                depth: radius * 2,
+                height: height,
+                color: color,
+                type: 'cylinder'
+            };
+
+            scene.add(cylinder);
+            shelves.push(cylinder);
+            updateShelvesList();
+        }
+
+        function addShelf() {
+            const width = parseFloat(document.getElementById('shelfWidth').value) / 100; // cm to m
+            const depth = parseFloat(document.getElementById('shelfDepth').value) / 100;
+            const height = parseFloat(document.getElementById('shelfHeight').value) / 100;
+            const color = document.getElementById('shelfColor').value;
+
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color,
+                roughness: 0.7,
+                metalness: 0.2
+            });
+            const shelf = new THREE.Mesh(geometry, material);
+            
+            shelf.position.set(0, 1, 0);
+            shelf.castShadow = true;
+            shelf.receiveShadow = true;
+            
+            shelfCounter++;
+            shelf.userData = {
+                id: shelfCounter,
+                name: `Estante ${shelfCounter}`,
+                width: width,
+                depth: depth,
+                height: height,
+                color: color
+            };
+
+            scene.add(shelf);
+            shelves.push(shelf);
+            updateShelvesList();
+        }
+
+        function updateShelvesList() {
+            const list = document.getElementById('shelvesList');
+            list.innerHTML = '';
+
+            shelves.forEach(shelf => {
+                const item = document.createElement('div');
+                item.className = 'shelf-item';
+                if (selectedShelf === shelf) {
+                    item.className += ' selected';
+                }
+
+                const header = document.createElement('div');
+                header.className = 'shelf-item-header';
+
+                const name = document.createElement('div');
+                name.className = 'shelf-item-name';
+                name.textContent = shelf.userData.name;
+
+                const controlsDiv = document.createElement('div');
+                controlsDiv.className = 'shelf-controls';
+
+                const selectBtn = document.createElement('button');
+                selectBtn.textContent = '✓';
+                selectBtn.onclick = () => selectShelf(shelf);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'danger';
+                deleteBtn.textContent = '×';
+                deleteBtn.onclick = () => deleteShelf(shelf);
+
+                controlsDiv.appendChild(selectBtn);
+                controlsDiv.appendChild(deleteBtn);
+
+                header.appendChild(name);
+                header.appendChild(controlsDiv);
+
+                const info = document.createElement('div');
+                info.style.fontSize = '11px';
+                info.style.color = '#999';
+                info.style.marginTop = '5px';
+                info.textContent = `${(shelf.userData.width*100).toFixed(0)}×${(shelf.userData.depth*100).toFixed(0)}×${(shelf.userData.height*100).toFixed(0)} cm`;
+
+                item.appendChild(header);
+                item.appendChild(info);
+                list.appendChild(item);
+            });
+        }
+
+        function selectShelf(shelf) {
+            selectedShelf = shelf;
+            transformControl.attach(shelf);
+            updateShelvesList();
+        }
+
+        function deleteShelf(shelf) {
+            scene.remove(shelf);
+            shelves = shelves.filter(s => s !== shelf);
+            if (selectedShelf === shelf) {
+                selectedShelf = null;
+                transformControl.detach();
+            }
+            updateShelvesList();
+        }
+
+        function onMouseClick(event) {
+            const mouse = new THREE.Vector2();
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(shelves);
+            
+            if (intersects.length > 0) {
+                selectShelf(intersects[0].object);
+            }
+        }
+
+        function onKeyDown(event) {
+            switch (event.key.toLowerCase()) {
+                case 'w':
+                    transformControl.setMode('translate');
+                    break;
+                case 'e':
+                    transformControl.setMode('rotate');
+                    break;
+                case 'r':
+                    transformControl.setMode('scale');
+                    break;
+                case '+':
+                case '=':
+                    transformControl.setSize(transformControl.size + 0.1);
+                    break;
+                case '-':
+                case '_':
+                    transformControl.setSize(Math.max(0.1, transformControl.size - 0.1));
+                    break;
+                case 'delete':
+                case 'backspace':
+                    if (selectedShelf) {
+                        deleteShelf(selectedShelf);
+                    }
+                    break;
+                case 'escape':
+                    transformControl.detach();
+                    selectedShelf = null;
+                    updateShelvesList();
+                    break;
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            render();
+        }
+
+        function render() {
+            renderer.render(scene, camera);
+        }
+
+        // Funciones globales
+        window.updateRoom = createRoom;
+
+        window.clearAll = function() {
+            if (confirm('¿Borrar todos los estantes?')) {
+                shelves.forEach(shelf => scene.remove(shelf));
+                shelves = [];
+                selectedShelf = null;
+                transformControl.detach();
+                updateShelvesList();
+            }
+        };
+
+        window.saveConfiguration = function() {
+            const config = {
+                room: {
+                    width: parseFloat(document.getElementById('roomWidth').value),
+                    depth: parseFloat(document.getElementById('roomDepth').value),
+                    height: parseFloat(document.getElementById('roomHeight').value)
+                },
+                shelves: shelves.map(shelf => ({
+                    position: shelf.position.toArray(),
+                    rotation: shelf.rotation.toArray(),
+                    scale: shelf.scale.toArray(),
+                    userData: shelf.userData
+                }))
+            };
+
+            const dataStr = JSON.stringify(config, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'estantes-config.json';
+            link.click();
+        };
+
+        window.loadConfiguration = function() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const config = JSON.parse(event.target.result);
+                    
+                    // Actualizar sala
+                    document.getElementById('roomWidth').value = config.room.width;
+                    document.getElementById('roomDepth').value = config.room.depth;
+                    document.getElementById('roomHeight').value = config.room.height;
+                    createRoom();
+
+                    // Limpiar estantes actuales
+                    shelves.forEach(shelf => scene.remove(shelf));
+                    shelves = [];
+
+                    // Cargar estantes
+                    config.shelves.forEach(shelfData => {
+                        const geometry = new THREE.BoxGeometry(
+                            shelfData.userData.width,
+                            shelfData.userData.height,
+                            shelfData.userData.depth
+                        );
+                        const material = new THREE.MeshStandardMaterial({ 
+                            color: shelfData.userData.color,
+                            roughness: 0.7,
+                            metalness: 0.2
+                        });
+                        const shelf = new THREE.Mesh(geometry, material);
+                        
+                        shelf.position.fromArray(shelfData.position);
+                        shelf.rotation.fromArray(shelfData.rotation);
+                        shelf.scale.fromArray(shelfData.scale);
+                        shelf.userData = shelfData.userData;
+                        shelf.castShadow = true;
+                        shelf.receiveShadow = true;
+
+                        scene.add(shelf);
+                        shelves.push(shelf);
+                    });
+
+                    shelfCounter = Math.max(...shelves.map(s => s.userData.id), 0);
+                    updateShelvesList();
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        };
+
+        window.addShelf = addShelf;
+
+        window.addDefaultShelves = function() {
+            const woodColor = '#D2B48C'; // Color madera claro
+            const grayColor = '#808080'; // Color gris para plataformas
+            
+            // 1. Estante 27x19 cm (ancho x profundidad)
+            addShelfWithDimensions(27, 19, 2, woodColor, 'Estante 27×19');
+            
+            // 2. Estante 55x35 cm
+            addShelfWithDimensions(55, 35, 2, woodColor, 'Estante 55×35');
+            
+            // 3. Estante 22x16 cm
+            addShelfWithDimensions(22, 16, 2, woodColor, 'Estante 22×16');
+            
+            // 4. Cilindro 86cm largo, 24cm circunferencia
+            addCylinder(86, 24, '#F5F5DC', 'Poste Rascador');
+            
+            // 5. Estante 9x17 cm
+            addShelfWithDimensions(9, 17, 2, woodColor, 'Estante 9×17');
+            
+            alert('Set completo de estantes agregado! Muévelos a su posición.');
+        };
+
+        function addShelfWithDimensions(width, depth, height, color, name) {
+            const w = width / 100; // cm to m
+            const d = depth / 100;
+            const h = height / 100;
+            
+            const geometry = new THREE.BoxGeometry(w, h, d);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color,
+                roughness: 0.7,
+                metalness: 0.2
+            });
+            const shelf = new THREE.Mesh(geometry, material);
+            
+            // Posicionar en diferentes alturas para que no se superpongan
+            const randomOffset = Math.random() * 0.5;
+            shelf.position.set(randomOffset, 1 + (shelfCounter * 0.2), randomOffset);
+            shelf.castShadow = true;
+            shelf.receiveShadow = true;
+            
+            shelfCounter++;
+            shelf.userData = {
+                id: shelfCounter,
+                name: name || `Estante ${shelfCounter}`,
+                width: w,
+                depth: d,
+                height: h,
+                color: color
+            };
+
+            scene.add(shelf);
+            shelves.push(shelf);
+            updateShelvesList();
+        }
+
+        // Iniciar
+        init();
+    </script>
+</body>
+</html>

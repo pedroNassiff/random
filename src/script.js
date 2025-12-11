@@ -4,6 +4,10 @@ import GUI from 'lil-gui'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import holographicVertexShader from './shaders/holographic/vertex.glsl'
 import holographicFragmentShader from './shaders/holographic/fragment.glsl'
+import lightBeamVertexShader from './shaders/lightBeam/vertex.glsl'
+import lightBeamFragmentShader from './shaders/lightBeam/fragment.glsl'
+import TransmissionManager from './TransmissionManager.js'
+import TransmissionFactory from './TransmissionFactory.js'
 console.log(holographicFragmentShader, holographicVertexShader);
 
 /**
@@ -29,8 +33,7 @@ const sizes = {
     height: window.innerHeight
 }
 
-window.addEventListener('resize', () =>
-{
+window.addEventListener('resize', () => {
     // Update sizes
     sizes.width = window.innerWidth
     sizes.height = window.innerHeight
@@ -75,8 +78,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
 gui
     .addColor(rendererParameters, 'clearColor')
-    .onChange(() =>
-    {
+    .onChange(() => {
         renderer.setClearColor(rendererParameters.clearColor)
     })
 
@@ -91,15 +93,14 @@ materialParameters.color = '#ff0000'
 gui
     .addColor(materialParameters, 'color')
     .name('material color')
-    .onChange(() =>
-    {
+    .onChange(() => {
         material.uniforms.uColor.value = new THREE.Color(materialParameters.color)
     })
 const material = new THREE.ShaderMaterial(
     {
         vertexShader: holographicVertexShader,
         fragmentShader: holographicFragmentShader,
-        
+
         uniforms: {
             uTime: new THREE.Uniform(0),
             uColor: new THREE.Uniform(new THREE.Color('red')),
@@ -114,12 +115,14 @@ const material = new THREE.ShaderMaterial(
 /**
  * Objects
  */
+
+
 // Body Model
 const modelParameters = {
     initialScale: 0.02,  // Tamaño inicial cuando está dentro del ()
     finalScale: 0.15,     // Tamaño final cuando llega al centro abajo
     rotationSpeed: 0,
-    initialX: 1.123,  // Posición inicial X (dentro del paréntesis)
+    initialX: 1.25,  // Posición inicial X (dentro del paréntesis)
     initialY: -0.24,  // Posición inicial Y
     finalX: 0,        // Posición final X (centro de pantalla)
     finalY: -4.67,    // Posición final Y (ajustar para mostrar solo cabeza)
@@ -127,29 +130,88 @@ const modelParameters = {
     finalRotationY: Math.PI     // Rotación final (de espaldas) - 180 grados
 }
 
+/**
+ * Transmission System
+ */
+let transmissionManager = null
+const factory = new TransmissionFactory()
+let transmissionsStarted = false
+
+function startTransmissions() {
+    if (!transmissionManager || transmissionsStarted) return
+
+    transmissionsStarted = true
+
+    // Logo transmission to top-left
+    const logoConfig = factory.createLogoTransmission(
+        'RANDOM',
+        { x: 150, y: 60 }, // top-left position
+        { duration: 2000 }
+    )
+    transmissionManager.queueTransmission(logoConfig)
+
+    // Card transmissions - example cards
+    setTimeout(() => {
+        const card1 = factory.createCardTransmission(
+            {
+                title: 'Proyecto 01',
+                description: 'Explorando la creatividad a través del código generativo.'
+            },
+            { x: window.innerWidth / 2 - 350, y: window.innerHeight / 2 },
+            { duration: 2200 }
+        )
+        transmissionManager.queueTransmission(card1)
+    }, 800)
+
+    setTimeout(() => {
+        const card2 = factory.createCardTransmission(
+            {
+                title: 'Proyecto 02',
+                description: 'Rompiendo las reglas para descubrir nuevas formas.'
+            },
+            { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+            { duration: 2200 }
+        )
+        transmissionManager.queueTransmission(card2)
+    }, 1600)
+
+    setTimeout(() => {
+        const card3 = factory.createCardTransmission(
+            {
+                title: 'Proyecto 03',
+                description: 'La imperfección como fuente de belleza.'
+            },
+            { x: window.innerWidth / 2 + 350, y: window.innerHeight / 2 },
+            { duration: 2200 }
+        )
+        transmissionManager.queueTransmission(card3)
+    }, 2400)
+}
+
 let bodyModel = null
 gltfLoader.load(
     './malebase.glb',
-    (gltf) =>
-    {
+    (gltf) => {
         bodyModel = gltf.scene
-        
+
         // Position model inside the parentheses - offset to the right
         bodyModel.position.set(modelParameters.initialX, modelParameters.initialY, 0)
         bodyModel.scale.set(modelParameters.initialScale, modelParameters.initialScale, modelParameters.initialScale)
-        
+
         // Set initial rotation (facing front)
         bodyModel.rotation.y = modelParameters.initialRotationY
-        
+
         // Apply holographic material
-        bodyModel.traverse((child) =>
-        {
-            if(child.isMesh)
+        bodyModel.traverse((child) => {
+            if (child.isMesh)
                 child.material = material
         })
-        
+
         scene.add(bodyModel)
-        
+
+        // Initialize TransmissionManager after model loads
+        // transmissionManager = new TransmissionManager(scene, camera, bodyModel)
+
         // Add GUI controls for the model
         const modelFolder = gui.addFolder('Body Model')
         modelFolder.add(modelParameters, 'initialScale', 0.01, 0.2, 0.001)
@@ -160,10 +222,11 @@ gltfLoader.load(
         modelFolder.add(modelParameters, 'initialY', -3, 3, 0.01).name('Initial Y')
         modelFolder.add(modelParameters, 'finalX', -3, 3, 0.01).name('Final X (end)')
         modelFolder.add(modelParameters, 'finalY', -5, 1, 0.01).name('Final Y (end - head only)')
-        modelFolder.add(modelParameters, 'initialRotationY', 0, Math.PI * 2, 0.01).name('Initial Rotation Y')
+        modelFolder.add(modelParameters, 'initialRotationY', 0, Math.PI * 2, 0.00).name('Initial Rotation Y')
         modelFolder.add(modelParameters, 'finalRotationY', 0, Math.PI * 2, 0.01).name('Final Rotation Y (back)')
         modelFolder.add(modelParameters, 'rotationSpeed', 0, 2, 0.1).name('Rotation Speed')
-        modelFolder.open()
+
+
     }
 )
 
@@ -172,8 +235,7 @@ gltfLoader.load(
  */
 let scrollY = 0
 
-window.addEventListener('scroll', () =>
-{
+window.addEventListener('scroll', () => {
     scrollY = window.scrollY
 })
 
@@ -182,43 +244,47 @@ window.addEventListener('scroll', () =>
  */
 const clock = new THREE.Clock()
 
-const tick = () =>
-{
+const tick = () => {
     const elapsedTime = clock.getElapsedTime()
 
     // Update material time uniform
     material.uniforms.uTime.value = elapsedTime
-    
+    // lightBeamMaterial.uniforms.uTime.value = elapsedTime
+
+    // Update transmission system
+    if (transmissionManager) {
+        transmissionManager.update(elapsedTime)
+    }
+
     // Animate body model based on scroll
-    if(bodyModel)
-    {
+    if (bodyModel) {
         // Normalizar el scroll: dividir por el total scrollable (3 secciones de 100vh)
         const totalScrollHeight = document.body.scrollHeight - window.innerHeight
         const scrollProgress = Math.min(scrollY / totalScrollHeight, 1) // Clamp a 1
-        
+
         // Ease out cubic para movimiento suave curvo (aceleración al inicio, desaceleración al final)
         const easeProgress = 1 - Math.pow(1 - scrollProgress, 3)
-        
+
         // Movimiento en X: desde posición inicial hacia posición final
         const initialX = modelParameters.initialX
         const finalX = modelParameters.finalX // usa la variable configurable
         const targetX = initialX + (easeProgress * (finalX - initialX))
-        
+
         // Movimiento en Y: desde posición inicial hacia posición final (solo cabeza visible)
         const initialY = modelParameters.initialY
         const finalY = modelParameters.finalY // usa la variable configurable para debugear
         const targetY = initialY + (easeProgress * (finalY - initialY))
-        
+
         // Escalado: desde tamaño inicial (dentro del paréntesis) hasta tamaño final (centro)
         const initialScale = modelParameters.initialScale
         const finalScale = modelParameters.finalScale
         const targetScale = initialScale + (easeProgress * (finalScale - initialScale))
-        
+
         // Rotación: desde frente hacia espaldas
         const initialRotationY = modelParameters.initialRotationY
         const finalRotationY = modelParameters.finalRotationY
         const targetRotationY = initialRotationY - (easeProgress * (finalRotationY - initialRotationY))
-        
+
         // Suavizar el movimiento con lerp (linear interpolation)
         bodyModel.position.x += (targetX - bodyModel.position.x) * 0.1
         bodyModel.position.y += (targetY - bodyModel.position.y) * 0.1
@@ -226,6 +292,12 @@ const tick = () =>
         bodyModel.scale.y += (targetScale - bodyModel.scale.y) * 0.1
         bodyModel.scale.z += (targetScale - bodyModel.scale.z) * 0.1
         bodyModel.rotation.y += (targetRotationY - bodyModel.rotation.y) * 0.1
+
+        // Check if scroll is near completion to start transmissions
+        if (scrollProgress > 0.95 && !transmissionsStarted) {
+            startTransmissions()
+        }
+
     }
 
     // Update controls
