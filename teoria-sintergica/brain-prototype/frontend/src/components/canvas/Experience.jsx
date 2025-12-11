@@ -1,9 +1,19 @@
+
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import { Brain } from './Brain'
-import { Leva, useControls } from 'leva'
+import { Leva, useControls } from 'leva' // Import restaurado
+
+import { useBrainStore } from '../../store/brainStore'
+import { useEffect } from 'react'
 
 export const Experience = () => {
+
+    const connectToField = useBrainStore(state => state.connectToField)
+
+    useEffect(() => {
+        connectToField()
+    }, [])
 
     const { ambientIntensity, environmentPresets } = useControls('Lighting', {
         ambientIntensity: { value: 0.5, min: 0, max: 2 },

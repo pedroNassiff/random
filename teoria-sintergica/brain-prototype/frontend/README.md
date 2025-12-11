@@ -47,17 +47,14 @@ La conciencia tiene un "vector". Donde pones tu atención, colapsas la función 
 
 ---
 
+## 🔮 Estado Actual (v0.2)
+*   **Visualización:** Shader "Materia Oscura" implementado. Solo se ilumina la región activa por la atención.
+*   **Interfaz:** HUD Científico + Panel Educativo "Neuro-Syntergic Log".
+*   **Interactividad:** Selector de Modos (Relax/Focus) funcional.
+*   **Conexión:** WebSocket recibiendo inferencia de PyTorch en tiempo real.
+
 ## 🛠 Arquitectura del Sistema (El Patrón del Observador)
 
-Para respetar la naturaleza holográfica de la teoría, usamos un patrón de software específico:
-
-1.  **Estado (La Realidad Implicada):** `useBrainStore` contiene la verdad matemática del sistema (niveles de coherencia, coordenadas). Es invisible.
-2.  **Render (La Realidad Explicada):** `React Three Fiber` colapsa ese estado en una imagen visible cada 16ms (60fps).
-3.  **Bucle de Retroalimentación:** La API de Python (Backend) actuará como el "procesador biológico", inyectando entropía o neguentropía al sistema basada en datos reales, alterando el Estado y por ende, el Render.
-
----
-
-## 🔮 Próximos Pasos (Hoja de Ruta Técnica)
-
-*   [ ] **Colapso de Onda:** Hacer que los vértices del modelo "vibren" (vertex shader displacement) y se estabilicen solo cuando el mouse pasa por encima.
-*   [ ] **Conexión API:** Que la intensidad del brillo responda a ondas cerebrales simuladas (Alpha/Theta) enviadas desde Python.
+1.  **Estado (La Realidad Implicada):** `useBrainStore` contiene la verdad matemática del sistema.
+2.  **Render (La Realidad Explicada):** `Brain.jsx` + `SyntergicMaterial` colapsan ese estado en luz.
+3.  **Feedback:** El usuario puede cambiar el estímulo (`setMode`), alterando la fuente de datos en el Backend.
