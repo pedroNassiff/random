@@ -1,0 +1,214 @@
+# ============================================
+# Brain Prototype - .gitignore
+# ============================================
+
+# ============================================
+# DATASETS (PESADOS - NO SUBIR)
+# ============================================
+# PhysioNet EEG datasets
+backend/ds003969/
+backend/data/
+backend/datasets/
+backend/*.fif
+backend/*.edf
+backend/*.bdf
+backend/*.set
+backend/*.vhdr
+
+# Audio files generados (meditaciones)
+frontend/public/audio/meditations/*.mp3
+frontend/public/audio/meditations/*.wav
+frontend/public/audio/meditations/*.m4a
+# Mantener el README de instrucciones
+!frontend/public/audio/meditations/README.md
+
+# ============================================
+# PYTHON
+# ============================================
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+backend/venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# PyTorch models (pesos de redes neuronales)
+*.pth
+*.pt
+*.ckpt
+backend/ai/models/*.pth
+backend/ai/checkpoints/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# ============================================
+# NODE.JS / FRONTEND
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+
+# Frontend cache
+.vite/
+.turbo/
+
+# ============================================
+# DOCKER & DATABASES
+# ============================================
+# Docker volumes (datos persistentes)
+docker-compose.override.yml
+.docker/
+
+# Database data (se recrea con docker-compose)
+influxdb-data/
+postgres-data/
+redis-data/
+grafana-data/
+
+# Database backups (pueden ser grandes)
+*.sql.gz
+*.dump
+backups/
+
+# ============================================
+# LOGS
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# OS SPECIFIC
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ============================================
+# IDEs & EDITORS
+# ============================================
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# ============================================
+# ENVIRONMENT & SECRETS
+# ============================================
+.env
+.env.local
+.env.*.local
+.env.production
+*.pem
+
+# API keys (si hay)
+secrets/
+*.key
+
+# ============================================
+# TEMPORARY FILES
+# ============================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# ============================================
+# DOCUMENTATION BUILD
+# ============================================
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================
+# TESTS & COVERAGE
+# ============================================
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# ============================================
+# MISC
+# ============================================
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Large files (>50MB generalmente no van en repos)
+*.mov
+*.mp4
+*.avi
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
