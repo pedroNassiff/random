@@ -1,9 +1,18 @@
 import { Experience } from './components/canvas/Experience'
 import { useBrainStore } from './store/brainStore'
 import { useState } from 'react'
+import { FrequencySpectrum } from './components/hud/FrequencySpectrum'
+import { CoherenceMeter } from './components/hud/CoherenceMeter'
+import { StateIndicator } from './components/hud/StateIndicator'
+import { AudioControl } from './components/hud/AudioControl'
+import { DebugPanel } from './components/hud/DebugPanel'
+import SessionControl from './components/hud/SessionControl'
+import PracticeMode from './components/modes/PracticeMode'
+import AchievementsPanel from './components/hud/AchievementsPanel.jsx'
 
 function App() {
   const { isPlaying } = useBrainStore()
+  const [isPracticeMode, setIsPracticeMode] = useState(false)
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -15,23 +24,88 @@ function App() {
         top: 30,
         left: 30,
         color: 'white',
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
+        zIndex: 100,
         fontFamily: "'Courier New', Courier, monospace", // Estilo técnico/científico
         textShadow: '0 0 5px rgba(255,255,255,0.5)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px'
       }}>
-        <h1 style={{ fontSize: '1rem', margin: '0 0 10px 0', opacity: 0.8, letterSpacing: '2px' }}>
-          PROTOTIPO SINTÉRGICO <span style={{ fontSize: '0.6em' }}></span>
+        <h1 style={{ 
+          fontSize: '1rem', 
+          margin: '0 0 10px 0', 
+          opacity: 0.8, 
+          letterSpacing: '2px',
+          pointerEvents: 'none'
+        }}>
+          PROTOTIPO SINTÉRGICO
         </h1>
-
-        <DataMonitor />
+        <p style={{
+          fontSize: '0.7rem',
+          opacity: 0.5,
+          margin: '0',
+          fontFamily: 'monospace',
+          pointerEvents: 'none'
+        }}>
+          Esperando reproducción...
+        </p>
       </div>
 
-      {/* Mode Selector - Top Right */}
-      <div style={{ position: 'absolute', top: 30, right: 30, opacity: 1, transition: 'opacity 1s ease' }}>
-        <ModeSelector />
+      {/* Metrics Sidebar - Right Side */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        height: '100vh',
+        width: '320px',
+        background: 'linear-gradient(270deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 100%)',
+        backdropFilter: 'blur(10px)',
+        borderLeft: '1px solid rgba(100, 200, 255, 0.3)',
+        overflowY: 'auto',
+        padding: '20px',
+        paddingBottom: '80px',
+        zIndex: 100,
+        pointerEvents: 'auto'
+      }}>
+        <h2 style={{
+          margin: '0 0 20px 0',
+          fontSize: '0.9rem',
+          opacity: 0.7,
+          letterSpacing: '2px',
+          fontFamily: 'monospace',
+          color: '#fff',
+          borderBottom: '1px solid rgba(255,255,255,0.2)',
+          paddingBottom: '10px'
+        }}>
+          📊 MÉTRICAS EN TIEMPO REAL
+        </h2>
+        
+        <StateIndicator />
+        <div style={{ marginTop: '20px' }}>
+          <CoherenceMeter />
+        </div>
+        <div style={{ marginTop: '20px' }}>
+          <FrequencySpectrum />
+        </div>
+        <div style={{ marginTop: '20px' }}>
+          <AudioControl />
+        </div>
+        <div style={{ marginTop: '20px' }}>
+          <DebugPanel />
+        </div>
       </div>
+      
+      {/* Session Player - Bottom Center */}
+      <SessionControl />
+      
+      {/* Practice Mode Panel (conditional) - Top Left */}
+      {isPracticeMode && <PracticeMode onClose={() => setIsPracticeMode(false)} />}
+      
+      {/* Achievements Panel - Top Right, colapsable */}
+      <AchievementsPanel onPracticeModeToggle={() => setIsPracticeMode(!isPracticeMode)} isPracticeMode={isPracticeMode} />
 
-      {/* Narrative Context Panel */}
+      {/* Narrative Context Panel - Left sidebar, colapsable */}
       <ContextPanel />
     </div>
   )
@@ -56,27 +130,72 @@ const scrollStyles = `
       `
 
 function ContextPanel() {
+  const [isExpanded, setIsExpanded] = useState(false)
+  
   return (
     <>
       <style>{scrollStyles}</style>
+      
+      {/* Toggle Button */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          position: 'absolute',
+          left: isExpanded ? '400px' : '0',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '80px',
+          background: 'rgba(10,10,15,0.85)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          borderLeft: isExpanded ? '1px solid rgba(255,255,255,0.3)' : 'none',
+          borderRadius: isExpanded ? '0 8px 8px 0' : '0 8px 8px 0',
+          color: 'rgba(255,255,255,0.7)',
+          fontSize: '1.2rem',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease-out',
+          zIndex: 150,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'monospace',
+          pointerEvents: 'auto'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.background = 'rgba(0,220,255,0.2)'
+          e.target.style.borderColor = 'rgba(0,220,255,0.5)'
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.background = 'rgba(10,10,15,0.85)'
+          e.target.style.borderColor = 'rgba(255,255,255,0.3)'
+        }}
+      >
+        {isExpanded ? '◀' : '▶'}
+      </button>
+      
+      {/* Sidebar Panel */}
       <div style={{
         position: 'absolute',
-        bottom: 40,
-        right: 40,
-        width: '380px',
-        maxHeight: '400px', // Limitar altura para hacer scroll
+        left: isExpanded ? '0' : '-400px',
+        top: 0,
+        bottom: 0,
+        width: '400px',
         color: 'rgba(255,255,255,0.85)',
-        background: 'linear-gradient(180deg, rgba(10,10,13,0.5) 0%, rgba(10,10,15,0.1) 100%)', // Más transparencia 
+        background: 'linear-gradient(90deg, rgba(10,10,13,0.95) 0%, rgba(10,10,15,0.85) 100%)',
         padding: '25px',
+        paddingBottom: '100px',
         fontFamily: "'Courier New', Courier, monospace",
         fontSize: '0.75rem',
-        borderLeft: '2px solid rgba(255,255,255,0.5)',
-        backdropFilter: 'blur(5px)', // Reducir blur para ver mejor el fondo
+        borderRight: '2px solid rgba(0,220,255,0.5)',
+        backdropFilter: 'blur(10px)',
         lineHeight: '1.7',
-        pointerEvents: 'auto', // Permitir scroll
+        pointerEvents: isExpanded ? 'auto' : 'none',
         overflowY: 'auto',
         scrollBehavior: 'smooth',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+        boxShadow: isExpanded ? '0 0 40px rgba(0,220,255,0.2)' : 'none',
+        transition: 'left 0.3s ease-out, box-shadow 0.3s',
+        zIndex: 100
       }} className="scroller">
 
         <h3 style={{ margin: '0 0 15px 0', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '3px', color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '10px' }}>
@@ -92,10 +211,10 @@ function ContextPanel() {
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <h4 style={{ margin: '0 0 5px 0', color: '#ffb700' }}>2. DISTORSIÓN DEL CAMPO (Focal Point)</h4>
+          <h4 style={{ margin: '0 0 5px 0', color: '#ffb700' }}>2. FOCAL POINT (Punto de Atención)</h4>
           <p style={{ margin: 0, opacity: 0.8 }}>
-            Observa cómo la malla se <b>deforma físicamente</b> alrededor de la Orbe Blanca.
-            Esto es el <b>Factor de Direccionalidad</b>: La atención consciente curvando la estructura del espacio para crear una experiencia perceptual (un "quali").
+            Zonas de <b>luminosidad intensa</b> representan el <b>Focal Point</b>: donde la atención consciente está activa.
+            El <b>Factor de Direccionalidad</b> curvando la estructura del espacio para crear una experiencia perceptual (un "quali").
           </p>
         </div>
 
@@ -111,13 +230,15 @@ function ContextPanel() {
         </div>
 
         <div>
-          <h4 style={{ margin: '0 0 5px 0', color: '#ff0055' }}>4. EL EXPERIMENTO (Dataset)</h4>
+          <h4 style={{ margin: '0 0 5px 0', color: '#ff0055' }}>4. DATOS REALES (Sesiones EEG)</h4>
           <p style={{ margin: 0, opacity: 0.8 }}>
-            Datos del <b>PhysioNet EEG Database</b>.
+            Reproducción de <b>sesiones completas</b> de EEG:
             <br />
-            Switch <b>RELAX</b>: Visualiza ondas Alpha (Meditación/Calma).
+            • OpenNeuro ds003969: Meditación (10 min)
             <br />
-            Switch <b>FOCUS</b>: Visualiza ondas Beta/Gamma (Imaginación Motora Activa).
+            • PhysioNet Motor Imagery: Imaginación motora
+            <br />
+            Presiona <b>PLAY</b> para iniciar la reproducción cronológica.
           </p>
         </div>
 
@@ -161,39 +282,5 @@ function DataMonitor() {
 }
 
 
-
-function ModeSelector() {
-  const { setMode } = useBrainStore()
-  const [active, setActive] = useState('focus')
-
-  const handleMode = (mode) => {
-    setActive(mode)
-    setMode(mode)
-  }
-
-  const btnStyle = (mode) => ({
-    background: active === mode ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.5)',
-    color: active === mode ? 'black' : 'white',
-    border: '1px solid rgba(255,255,255,0.3)',
-    padding: '8px 16px',
-    cursor: 'pointer',
-    fontFamily: "'Courier New', Courier, monospace",
-    fontSize: '0.7rem',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    transition: 'all 0.3s ease'
-  })
-
-  return (
-    <div style={{ display: 'flex', gap: '10px' }}>
-      <button onClick={() => handleMode('relax')} style={btnStyle('relax')}>
-        RELAX (ALPHA)
-      </button>
-      <button onClick={() => handleMode('focus')} style={btnStyle('focus')}>
-        FOCUS (BETA/GAMMA)
-      </button>
-    </div>
-  )
-}
 
 export default App

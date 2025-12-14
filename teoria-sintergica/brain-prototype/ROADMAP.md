@@ -46,7 +46,7 @@
 3. **Experienciales**:
    - Visualización bonita pero no interactiva (el usuario no "controla" nada)
    - Sin feedback loop: usuario no puede entrenar su propia coherencia
-   - Sin gamificación de estados meditativos
+   - Sin gamificación de estados meditativos 
 
 ---
 

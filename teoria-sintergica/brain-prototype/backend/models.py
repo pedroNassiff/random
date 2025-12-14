@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import random
 import math
 
@@ -8,19 +8,38 @@ class Vector3(BaseModel):
     y: float
     z: float
 
+class FrequencyBands(BaseModel):
+    """Potencia relativa en cada banda de frecuencia"""
+    delta: float   # 0.5-4 Hz: Sueño profundo
+    theta: float   # 4-8 Hz: Meditación profunda
+    alpha: float   # 8-13 Hz: Relajación consciente (SINTERGIA)
+    beta: float    # 13-30 Hz: Concentración
+    gamma: float   # 30-50 Hz: Insight cognitivo
+
 class SyntergicState(BaseModel):
     """
     Representa el estado instantáneo del campo neuronal.
+    
+    Ahora incluye análisis espectral completo y métricas científicas.
     """
     timestamp: float
-    coherence: float  # 0.0 a 1.0 (Nivel de unificación hemisférica)
-    entropy: float    # Nivel de desorden/ruido en la percepción
+    coherence: float  # 0.0 a 1.0 (Coherencia inter-hemisférica Alpha)
+    entropy: float    # 0.0 a 1.0 (Entropía espectral)
     
     # Factor de Direccionalidad (Hacia dónde apunta la conciencia)
     focal_point: Vector3 
     
-    # Estado emocional/vibracional
+    # Frecuencia dominante
     frequency: float # Hz (ej: 10Hz Alpha, 40Hz Gamma)
+    
+    # NUEVO: Análisis espectral completo
+    bands: Optional[FrequencyBands] = None
+    
+    # NUEVO: Estado mental inferido
+    state: Optional[str] = "neutral"  # 'meditation', 'focused', 'relaxed', etc.
+    
+    # NUEVO: Phase Locking Value (métrica avanzada)
+    plv: Optional[float] = None
     
     @staticmethod
     def simulate_next(t: float):

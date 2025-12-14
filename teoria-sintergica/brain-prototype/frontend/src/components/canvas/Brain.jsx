@@ -1,19 +1,13 @@
 import React, { useRef, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useControls } from 'leva'
 import * as THREE from 'three'
 import { useBrainStore } from '../../store/brainStore'
-import '../../shaders/SyntergicMaterial' // Importar para registrar el shader con 'extend'
+import '../../shaders/SyntergicMaterial_v2' // Shader simplificado y claro
 
 export function Brain(props) {
     const { scene } = useGLTF('/models/brain/scene.gltf')
     const group = useRef()
-
-    // Controles manuales (Leva)
-    const { wireframe } = useControls('Brain Properties', {
-        wireframe: true
-    })
 
     // Inicialización del material
     useMemo(() => {
@@ -24,23 +18,12 @@ export function Brain(props) {
         })
     }, [scene])
 
-    const focalRef = useRef()
-
     useFrame((state, delta) => {
         // Rotación base suave
         if (group.current) group.current.rotation.y += delta * 0.05 // Un poco más rápido
 
         // LEER ESTADO DIRECTAMENTE (Transient Update)
         const { coherence, focalPoint } = useBrainStore.getState()
-
-        // Mover el marcador visual del foco (La "Luz de la Conciencia")
-        if (focalRef.current && focalPoint) {
-            // Suavizar movimiento del marcador (Factor 0.02 para movimiento fluido "subacuático")
-            focalRef.current.position.lerp(
-                new THREE.Vector3(focalPoint.x, focalPoint.y, focalPoint.z),
-                0.02
-            )
-        }
 
         // Sincronización del Shader con el Estado del Backend
         scene.traverse((obj) => {
@@ -70,7 +53,7 @@ export function Brain(props) {
                 const targetColor = new THREE.Color().setHSL(hue, sat, light)
                 obj.material.uniforms.uColor.value.lerp(targetColor, 0.05)
 
-                obj.material.wireframe = wireframe
+                obj.material.wireframe = false // Siempre sólido
             }
         })
     })
@@ -78,13 +61,6 @@ export function Brain(props) {
     return (
         <group ref={group} {...props} dispose={null}>
             <primitive object={scene} />
-
-            {/* Visualización del Foco de Atención (Marker) */}
-            <mesh ref={focalRef}>
-                <sphereGeometry args={[0.4, 16, 16]} />
-                <meshBasicMaterial color="white" transparent opacity={0.9} />
-                <pointLight intensity={1.5} distance={15} color="white" />
-            </mesh>
 
             {/* Instancia del Material Custom aplicado a la escena */}
             <mesh>

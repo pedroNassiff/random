@@ -7,6 +7,12 @@ export const useBrainStore = create((set) => ({
     focalPoint: { x: 0, y: 0, z: 0 },
     activeRegion: null,
     isPlaying: true, // Auto-start
+    
+    // New scientific metrics
+    bands: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
+    state: 'unknown',
+    plv: 0.0,
+    frequency: 0.0,
 
     // Actions
     togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })), // New action
@@ -14,7 +20,10 @@ export const useBrainStore = create((set) => ({
         coherence: newState.coherence,
         entropy: newState.entropy,
         focalPoint: newState.focal_point,
-        // frequency: newState.frequency
+        frequency: newState.frequency || 0,
+        bands: newState.bands || { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
+        state: newState.state || 'unknown',
+        plv: newState.plv || 0
     }),
 
     socket: null, // Guardamos referencia al socket
