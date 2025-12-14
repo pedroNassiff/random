@@ -15,6 +15,9 @@ backend/*.bdf
 backend/*.set
 backend/*.vhdr
 
+# Excepciones - mantener READMEs
+!backend/data/README.md
+
 # Audio files generados (meditaciones)
 frontend/public/audio/meditations/*.mp3
 frontend/public/audio/meditations/*.wav
