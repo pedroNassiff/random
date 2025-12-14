@@ -1,4 +1,4 @@
-# ✅ Backend Científico - IMPLEMENTADO
+# ✅ Backend 
 
 ## 📊 Lo que acabamos de construir
 

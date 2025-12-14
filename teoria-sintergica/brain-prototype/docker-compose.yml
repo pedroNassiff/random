@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Time-Series Database (EEG Metrics)
+  # ============================================
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: brain-influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=sintergic2024
+      - DOCKER_INFLUXDB_INIT_ORG=teoria-sintergica
+      - DOCKER_INFLUXDB_INIT_BUCKET=eeg-data
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+    networks:
+      - brain-network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Relational Database (Users/Sessions)
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: brain-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - POSTGRES_USER=brain_user
+      - POSTGRES_PASSWORD=sintergic2024
+      - POSTGRES_DB=brain_prototype
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
+    networks:
+      - brain-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brain_user -d brain_prototype"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Cache & Real-time State
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: brain-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    networks:
+      - brain-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Optional: Grafana for Monitoring
+  # ============================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: brain-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=sintergic2024
+      - GF_INSTALL_PLUGINS=
+    networks:
+      - brain-network
+    depends_on:
+      - influxdb
+      - postgres
+
+networks:
+  brain-network:
+    driver: bridge
+
+volumes:
+  influxdb-data:
+  influxdb-config:
+  postgres-data:
+  redis-data:
+  grafana-data:

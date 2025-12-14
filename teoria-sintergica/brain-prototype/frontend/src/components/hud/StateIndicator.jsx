@@ -17,35 +17,30 @@ export function StateIndicator() {
     'focused': {
       label: 'CONCENTRACIÓN',
       color: '#f59e0b',
-      icon: '🎯',
       description: 'Beta/Gamma activo',
       glow: '0 0 20px rgba(245, 158, 11, 0.5)'
     },
     'relaxed': {
       label: 'RELAJACIÓN',
       color: '#3b82f6',
-      icon: '🌊',
       description: 'Theta presente',
       glow: '0 0 20px rgba(59, 130, 246, 0.5)'
     },
     'insight': {
       label: 'INSIGHT',
       color: '#ef4444',
-      icon: '⚡',
       description: 'Gamma elevado',
       glow: '0 0 20px rgba(239, 68, 68, 0.5)'
     },
     'deep_relaxation': {
       label: 'RELAJACIÓN PROFUNDA',
       color: '#8b5cf6',
-      icon: '💤',
       description: 'Delta presente',
       glow: '0 0 20px rgba(139, 92, 246, 0.5)'
     },
     'unknown': {
       label: 'TRANSITORIO',
       color: '#6b7280',
-      icon: '⌛',
       description: 'Analizando...',
       glow: '0 0 20px rgba(107, 114, 128, 0.3)'
     }

@@ -1,6 +1,6 @@
 # Frontend de la Interfaz Sintérgica
 
-Esta aplicación hecha en **React + Three.js** visualiza el Campo Neuronal basándose en los datos simulados por el Backend.
+Esta aplicación hecha en **React + Three.js** visualiza el Campo Neuronal basándose en los datos servidos por el procesamiento del Backend.
 
 ## Estructura
 
