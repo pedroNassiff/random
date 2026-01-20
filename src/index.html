@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RANDOM - Holographic</title>
+    <title>.RANDOM()</title>
     <link rel="stylesheet" href="./style.css">
     <link rel="stylesheet" href="./TransmissionStyles.css">
 </head>
@@ -16,7 +16,14 @@
     <div id="transmitted-content"></div>
 
     <!-- Text overlay -->
-    <div class="title">RANDOM( )</div>
+    <div class="title">
+        <span class="title-static">.RANDOM(</span>
+        <span id="random-content"></span>
+        <span id="closing-paren" class="closing-paren">)</span>
+    </div>
+
+    <!-- Navigation buttons (populated dynamically) -->
+    <nav class="nav-buttons"></nav>
 
     <!-- Scrollable content to enable scrolling -->
     <section class="section"></section>

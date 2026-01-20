@@ -1,0 +1,3 @@
+# todo lo que tenga md
+*.md
+/models/*.md

@@ -52,6 +52,113 @@ body {
     pointer-events: none;
     z-index: 10;
     opacity: 1;
+    white-space: nowrap;
+}
+
+#random-content {
+    color: white;
+    /* text-shadow: 0 0 20px rgba(0, 255, 255, 0.5); */
+    min-width: 0ch;
+    display: inline-block;
+    animation: glow 2s ease-in-out infinite alternate;
+    transition: opacity 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    font-size: 2.5vw; /* Smaller size to fit in parenthesis */
+}
+
+.closing-paren {
+    display: inline-block;
+    position: relative;
+    transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.closing-paren.closing {
+    /* Animation is handled by JS */
+}
+
+.title-static {
+    display: inline-block;
+}
+
+/* @keyframes glow {
+    from { text-shadow: 0 0 20px rgba(0, 255, 255, 0.5); }
+    to { text-shadow: 0 0 30px rgba(0, 255, 255, 0.8), 0 0 40px rgba(0, 255, 255, 0.4); }
+} */
+
+/* Navigation buttons */
+.nav-buttons {
+    position: fixed;
+    bottom: 147px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    z-index: 10;
+    pointer-events: all;
+}
+
+.nav-btn {
+    background: none;
+    border: 2px solid white;
+    color: white;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    white-space: nowrap;
+}
+
+.nav-btn.materializing {
+    transition: none; /* Disable transitions during materialization */
+    pointer-events: none; /* Disable clicks during animation */
+}
+
+.nav-btn:hover {
+    /* background: rgba(0, 255, 255, 0.2);
+    border-color: #00ffff; */
+    /* box-shadow: 0 0 20px rgba(0, 255, 255, 0.5); */
+    transform: translateY(-2px);
+}
+
+.nav-btn:active {
+    transform: translateY(0);
+}
+
+/* Special button classes */
+.nav-btn.btn-proyectos {
+    border-color: white;
+    color: white;
+}
+
+.nav-btn.btn-proyectos:hover {
+    background: rgba(0, 255, 255, 0.1);
+    /* box-shadow: 0 0 15px rgba(0, 255, 255, 0.3); */
+}
+
+.nav-btn.btn-servicios {
+    border-color: white;
+    color: white;
+}
+
+.nav-btn.btn-servicios:hover {
+    background: rgba(255, 0, 255, 0.1);
+    /* box-shadow: 0 0 15px rgba(255, 0, 255, 0.3); */
+}
+
+.nav-btn.btn-sobre-mi {
+    border-color: white;
+    color: white;
+}
+
+.nav-btn.btn-sobre-mi:hover {
+    background: rgba(255, 255, 0, 0.1);
+    /* box-shadow: 0 0 15px rgba(255, 255, 0, 0.3); */
 }
 
 /* Hide lil-gui controls */

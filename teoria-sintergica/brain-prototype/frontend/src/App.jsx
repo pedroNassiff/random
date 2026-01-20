@@ -39,7 +39,7 @@ function App() {
           letterSpacing: '2px',
           pointerEvents: 'none'
         }}>
-          PROTOTIPO SINTÉRGICO
+          
         </h1>
         <p style={{
           fontSize: '0.7rem',
@@ -48,7 +48,7 @@ function App() {
           fontFamily: 'monospace',
           pointerEvents: 'none'
         }}>
-          Esperando reproducción...
+          
         </p>
       </div>
 
@@ -78,7 +78,7 @@ function App() {
           borderBottom: '1px solid rgba(255,255,255,0.2)',
           paddingBottom: '10px'
         }}>
-          📊 MÉTRICAS EN TIEMPO REAL
+           MÉTRICAS EN TIEMPO REAL
         </h2>
         
         <StateIndicator />
@@ -103,7 +103,7 @@ function App() {
       {isPracticeMode && <PracticeMode onClose={() => setIsPracticeMode(false)} />}
       
       {/* Achievements Panel - Top Right, colapsable */}
-      <AchievementsPanel onPracticeModeToggle={() => setIsPracticeMode(!isPracticeMode)} isPracticeMode={isPracticeMode} />
+      {/* <AchievementsPanel onPracticeModeToggle={() => setIsPracticeMode(!isPracticeMode)} isPracticeMode={isPracticeMode} /> */}
 
       {/* Narrative Context Panel - Left sidebar, colapsable */}
       <ContextPanel />
