@@ -1,168 +1,204 @@
-*
-{
+* {
     margin: 0;
     padding: 0;
 }
 
-html,
-body
-{
-    overflow-x: hidden; /* Changed from overflow: hidden to allow vertical scroll */
-    font-family: 'Arial', sans-serif;
+html, body {
+    overflow-x: hidden;
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    background-color: #0a0a0a;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
+/* Hide scrollbar */
 body::-webkit-scrollbar {
     display: none;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
 body {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
-.webgl
-{
+.webgl {
     position: fixed;
     top: 0;
     left: 0;
     outline: none;
+    cursor: grab;
 }
 
-/* Scrollable sections */
-.section
-{
+.webgl:active {
+    cursor: grabbing;
+}
+
+/* Scrollable sections for navigation */
+.section {
     height: 100vh;
     width: 100%;
 }
 
-/* Title text overlay */
-.title
-{
+/* Title overlay - .RANDOM() */
+.title {
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 6vw;
-    font-weight: 900;
+    font-size: 5vw;
+    font-weight: 700;
     color: #ffffff;
     text-transform: uppercase;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.1em;
     pointer-events: none;
     z-index: 10;
     opacity: 1;
     white-space: nowrap;
+    text-shadow: 0 0 30px rgba(212, 165, 116, 0.6);
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    transition: all 1s ease;
 }
 
-#random-content {
-    color: white;
-    /* text-shadow: 0 0 20px rgba(0, 255, 255, 0.5); */
-    min-width: 0ch;
-    display: inline-block;
-    animation: glow 2s ease-in-out infinite alternate;
-    transition: opacity 0.3s ease;
-    position: relative;
-    overflow: hidden;
-    font-size: 2.5vw; /* Smaller size to fit in parenthesis */
-}
-
-.closing-paren {
-    display: inline-block;
-    position: relative;
-    transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.closing-paren.closing {
-    /* Animation is handled by JS */
+.title.minimized {
+    top: 40px;
+    left: 40px;
+    transform: translate(0, 0);
+    font-size: 1.5vw;
+    text-shadow: 0 0 15px rgba(212, 165, 116, 0.4);
 }
 
 .title-static {
     display: inline-block;
 }
 
-/* @keyframes glow {
-    from { text-shadow: 0 0 20px rgba(0, 255, 255, 0.5); }
-    to { text-shadow: 0 0 30px rgba(0, 255, 255, 0.8), 0 0 40px rgba(0, 255, 255, 0.4); }
-} */
+#random-content {
+    color: #d4a574;
+    display: inline-block;
+    min-width: 0;
+}
 
-/* Navigation buttons */
-.nav-buttons {
+.closing-paren {
+    display: inline-block;
+}
+
+/* Loader */
+.loader {
     position: fixed;
-    bottom: 147px;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0a0a0a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: opacity 0.8s ease;
+}
+
+.loader.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loader-text {
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-size: 14px;
+    color: #d4a574;
+    letter-spacing: 0.2em;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+/* Hide debug GUI */
+.lil-gui {
+    display: none !important;
+}
+
+/* Drag indicator */
+.drag-indicator {
+    position: fixed;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    display: flex;
-    gap: 20px;
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-size: 12px;
+    color: rgba(212, 165, 116, 0.5);
+    letter-spacing: 0.1em;
+    pointer-events: none;
     z-index: 10;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.drag-indicator.visible {
+    opacity: 1;
+}
+
+/* Content portal (for future use) */
+.content-portal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 10, 10, 0.98);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+
+.content-portal.active {
+    opacity: 1;
     pointer-events: all;
 }
 
-.nav-btn {
+.content-portal-inner {
+    max-width: 900px;
+    max-height: 80vh;
+    padding: 60px;
+    color: white;
+    overflow-y: auto;
+    font-family: 'Courier Prime', 'Courier New', monospace;
+}
+
+.content-portal h1 {
+    font-size: 2em;
+    color: #d4a574;
+    margin-bottom: 20px;
+}
+
+.content-portal p {
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.content-portal-close {
+    position: absolute;
+    top: 30px;
+    right: 30px;
     background: none;
-    border: 2px solid white;
-    color: white;
-    padding: 12px 24px;
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+    border: 1px solid rgba(212, 165, 116, 0.5);
+    color: #d4a574;
+    width: 50px;
+    height: 50px;
+    border-radius: 0;
     cursor: pointer;
+    font-size: 24px;
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    white-space: nowrap;
 }
 
-.nav-btn.materializing {
-    transition: none; /* Disable transitions during materialization */
-    pointer-events: none; /* Disable clicks during animation */
-}
-
-.nav-btn:hover {
-    /* background: rgba(0, 255, 255, 0.2);
-    border-color: #00ffff; */
-    /* box-shadow: 0 0 20px rgba(0, 255, 255, 0.5); */
-    transform: translateY(-2px);
-}
-
-.nav-btn:active {
-    transform: translateY(0);
-}
-
-/* Special button classes */
-.nav-btn.btn-proyectos {
-    border-color: white;
-    color: white;
-}
-
-.nav-btn.btn-proyectos:hover {
-    background: rgba(0, 255, 255, 0.1);
-    /* box-shadow: 0 0 15px rgba(0, 255, 255, 0.3); */
-}
-
-.nav-btn.btn-servicios {
-    border-color: white;
-    color: white;
-}
-
-.nav-btn.btn-servicios:hover {
-    background: rgba(255, 0, 255, 0.1);
-    /* box-shadow: 0 0 15px rgba(255, 0, 255, 0.3); */
-}
-
-.nav-btn.btn-sobre-mi {
-    border-color: white;
-    color: white;
-}
-
-.nav-btn.btn-sobre-mi:hover {
-    background: rgba(255, 255, 0, 0.1);
-    /* box-shadow: 0 0 15px rgba(255, 255, 0, 0.3); */
-}
-
-/* Hide lil-gui controls */
-.lil-gui
-{
-    display: none !important;
+.content-portal-close:hover {
+    background: rgba(212, 165, 116, 0.2);
+    border-color: #d4a574;
 }

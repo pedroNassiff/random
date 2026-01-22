@@ -5,27 +5,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>.RANDOM()</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./style.css">
-    <link rel="stylesheet" href="./TransmissionStyles.css">
 </head>
 
 <body>
     <canvas class="webgl"></canvas>
 
-    <!-- Transmission content container -->
-    <div id="transmitted-content"></div>
-
-    <!-- Text overlay -->
+    <!-- Title overlay -->
     <div class="title">
-        <span class="title-static">.RANDOM(</span>
-        <span id="random-content"></span>
-        <span id="closing-paren" class="closing-paren">)</span>
+        <span class="title-static">.RANDOM(</span><span id="random-content"></span><span id="closing-paren" class="closing-paren">)</span>
     </div>
 
-    <!-- Navigation buttons (populated dynamically) -->
-    <nav class="nav-buttons"></nav>
+    <!-- Loading indicator -->
+    <div id="loader" class="loader">
+        <div class="loader-text">INITIALIZING LATTICE...</div>
+    </div>
 
-    <!-- Scrollable content to enable scrolling -->
+    <!-- Scrollable content to enable scroll navigation through lattice -->
     <section class="section"></section>
     <section class="section"></section>
     <section class="section"></section>
