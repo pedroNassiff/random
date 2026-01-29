@@ -17,7 +17,8 @@ class LatticeNode {
         this.data = data
         this.isContent = data !== null
         this.tier = data?.tier || 0
-        this.syntpiergy = this.isContent ? 0.8 : 0.3
+        // Tier 1: Very bright, Tier 2: Very dim
+        this.syntpiergy = data?.tier === 1 ? 1.5 : (data?.tier === 2 ? 0.08 : 0.3)
         this.resonance = 0
         this.connections = []
         this.activated = false
@@ -56,10 +57,10 @@ export default class Lattice {
         
         // Intro animation state
         this.introProgress = 0
-        this.introComplete = false
+        this.introComplete = true  // Start as complete, will be set to false when startIntro() is called
         this.introDuration = 2.5
         this.initialZ = -50  // Start far away
-        this.targetZ = -2    // End position
+        this.targetZ = -6    // End position (more distance for better view)
         
         // Zoom state
         this.isZooming = false
@@ -472,6 +473,55 @@ export default class Lattice {
         
         // Clamp zoom
         this.group.position.z = Math.max(-30, Math.min(5, newZ))
+    }
+    
+    /**
+     * Handle node hover - brighten tier 1 node and illuminate connected tier 2 nodes
+     */
+    onNodeHover(node) {
+        if (!node || !node.isContent) return
+        
+        // If it's a tier 1 node, brighten it and its connected tier 2 nodes
+        if (node.tier === 1) {
+            // Brighten the hovered tier 1 node
+            node.syntpiergy = 2.0  // Much brighter
+            
+            // Find and illuminate connected tier 2 nodes
+            const parentId = node.data?.id
+            if (parentId) {
+                for (const n of this.nodes) {
+                    if (n.isContent && n.tier === 2 && n.data?.parentId === parentId) {
+                        n.syntpiergy = 1.2  // Illuminate tier 2 connections (from 0.08 to 1.2)
+                    }
+                }
+            }
+        }
+        
+        this.hoveredNode = node
+    }
+    
+    /**
+     * Handle node hover end - restore original intensities
+     */
+    onNodeHoverEnd(node) {
+        if (!node || !node.isContent) return
+        
+        // Restore tier 1 node
+        if (node.tier === 1) {
+            node.syntpiergy = 1.5  // Back to normal bright
+            
+            // Restore all tier 2 nodes
+            const parentId = node.data?.id
+            if (parentId) {
+                for (const n of this.nodes) {
+                    if (n.isContent && n.tier === 2 && n.data?.parentId === parentId) {
+                        n.syntpiergy = 0.08  // Back to very dim
+                    }
+                }
+            }
+        }
+        
+        this.hoveredNode = null
     }
     
     /**

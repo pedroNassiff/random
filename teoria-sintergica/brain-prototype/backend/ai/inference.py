@@ -11,6 +11,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from analysis.metrics import SyntergicMetrics
 
+# Type hints para hardware (evitar import circular)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from hardware import MuseConnector
+
 class SyntergicBrain:
     """
     Clase principal que gestiona el "Cerebro Digital" en tiempo real.
@@ -50,7 +55,7 @@ class SyntergicBrain:
         self.iterators['relax'] = iter(self.loaders['relax'])
         
         # Modo FOCUS (Alta Actividad) -> Runs 6, 10, 14 (Motor Imagery)
-        self.datasets['focus'] = EEGDataset(subjects=[1], runs=[6, 10, 14]) 
+        self.datasets['focus'] = EEGDataset(subjects=[1], runs=[6, 10, 14])
         self.loaders['focus'] = torch.utils.data.DataLoader(self.datasets['focus'], batch_size=1, shuffle=False)
         self.iterators['focus'] = iter(self.loaders['focus'])
         
@@ -71,6 +76,11 @@ class SyntergicBrain:
         print("✓ Loading Playlist Manager (multi-session playback)...")
         self.playlist = PlaylistManager()
         
+        # --- MUSE 2 HARDWARE MODE ---
+        # Referencia al conector Muse (se asigna cuando se activa modo 'muse')
+        self.muse_connector = None
+        self.muse_mode_active = False
+        
         # --- SMOOTHING TEMPORAL ---
         # Buffers para promediar últimos N frames y evitar cambios bruscos
         self.smoothing_window = 5  # ~1 segundo a 5Hz
@@ -82,8 +92,30 @@ class SyntergicBrain:
         print("✓ Syntergic Brain ready. Default mode: FOCUS")
         print("✓ Scientific metrics module loaded (FFT, Coherence, Entropy)")
         print(f"✓ Playlist loaded with {len(self.playlist.get_playlist())} sessions")
+        print("✓ Muse 2 hardware mode available (use set_mode('muse', muse_connector))")
 
-    def set_mode(self, mode):
+    def set_mode(self, mode, muse_connector=None):
+        # Modo especial: MUSE 2 HARDWARE (EEG en vivo)
+        if mode == 'muse':
+            if muse_connector is None:
+                print("❌ Muse connector not provided")
+                return False
+            if not muse_connector.is_streaming:
+                print("❌ Muse not streaming. Start stream first.")
+                return False
+            
+            print(f"🎧 Switching to MUSE 2 LIVE MODE (real-time EEG)")
+            self.muse_connector = muse_connector
+            self.muse_mode_active = True
+            self.session_mode_active = False
+            self.current_mode = 'muse'
+            # Reset smoothing
+            self.coherence_history = []
+            self.entropy_history = []
+            self.bands_history = {'delta': [], 'theta': [], 'alpha': [], 'beta': [], 'gamma': []}
+            self.plv_history = []
+            return True
+        
         # Modo especial: reproducción de sesión completa
         if mode == 'session':
             print(f"📼 Switching to SESSION PLAYER mode (longitudinal playback)")
@@ -92,6 +124,9 @@ class SyntergicBrain:
             self.session_player.play()
             # Sincronizar playlist con session_player actual
             self.playlist.current_player = self.session_player
+            # Desactivar modo muse si estaba activo
+            self.muse_mode_active = False
+            self.muse_connector = None
             # Reset smoothing
             self.coherence_history = []
             self.entropy_history = []
@@ -104,6 +139,8 @@ class SyntergicBrain:
             print(f"→ Switching brain mode to: {mode.upper()}")
             self.current_mode = mode
             self.session_mode_active = False  # Desactivar session player
+            self.muse_mode_active = False  # Desactivar modo muse
+            self.muse_connector = None
             # Reset smoothing buffers al cambiar de modo
             self.coherence_history = []
             self.entropy_history = []
@@ -166,13 +203,36 @@ class SyntergicBrain:
             # Retornar info de la sesión (no el SessionPlayer)
             return self.playlist.get_current_session_info()
         return None
+    
+    def select_playlist_session(self, index: int):
+        """Selecciona una sesión específica del playlist por índice."""
+        if index < 0 or index >= len(self.playlist.sessions):
+            return None
+        
+        # Cargar sesión seleccionada
+        self.session_player = self.playlist.load_session(index)
+        if self.session_player:
+            self.session_player.restart()
+            # Sincronizar current_player con session_player
+            self.playlist.current_player = self.session_player
+            # Limpiar buffers de smoothing
+            self.coherence_history = []
+            self.entropy_history = []
+            self.bands_history = {'delta': [], 'theta': [], 'alpha': [], 'beta': [], 'gamma': []}
+            self.plv_history = []
+            return self.playlist.get_current_session_info()
+        return None
 
     def next_state(self):
         """
         Obtiene el siguiente estado sintérgico con análisis científico completo.
         
-        ACTUALIZADO: Soporta modo sesión (reproducción cronológica) y modo dataset.
+        ACTUALIZADO: Soporta modo muse (EEG en vivo), sesión y dataset.
         """
+        # --- MODO MUSE: EEG en tiempo real ---
+        if self.muse_mode_active and self.muse_connector:
+            return self._process_muse_window()
+        
         # --- MODO SESSION: Reproducción cronológica ---
         if self.session_mode_active:
             # Verificar si debemos auto-avanzar a la siguiente sesión del playlist
@@ -189,6 +249,14 @@ class SyntergicBrain:
                 print("⚠ Session playback error, falling back to dataset mode")
                 self.session_mode_active = False
             else:
+                # --- USAR MÉTRICAS PREGRABADAS SI ESTÁN DISPONIBLES ---
+                recorded_metrics = session_window.get('recorded_metrics')
+                
+                if recorded_metrics:
+                    # Usar métricas exactas que se grabaron
+                    return self._use_recorded_metrics(recorded_metrics, session_window['timestamp'])
+                
+                # --- FALLBACK: Recalcular desde samples (para sesiones antiguas) ---
                 # Convertir ventana MNE a tensor
                 # session_window['data'] shape: (n_channels, n_timepoints)
                 window_data = session_window['data']
@@ -339,3 +407,140 @@ class SyntergicBrain:
             result['session_progress'] = self.session_player.get_status()['progress_percent']
         
         return result
+
+    def _use_recorded_metrics(self, recorded_metrics: dict, session_timestamp: float):
+        """
+        Usa métricas pregrabadas en lugar de recalcularlas.
+        
+        Esto permite reproducir exactamente lo que se grabó durante una sesión.
+        
+        Args:
+            recorded_metrics: Dict con métricas guardadas en InfluxDB
+            session_timestamp: Posición temporal en la sesión
+            
+        Returns:
+            Dict con estado sintérgico usando métricas originales
+        """
+        # Extraer métricas guardadas
+        alpha = recorded_metrics.get('alpha', 0.2)
+        coherence = recorded_metrics.get('coherence', 0.5)
+        entropy = recorded_metrics.get('entropy', 0.5)
+        state = recorded_metrics.get('state', 'transitioning')
+        
+        # Bandas - pueden estar guardadas individualmente o no
+        bands = {
+            'delta': recorded_metrics.get('delta', 0.2),
+            'theta': recorded_metrics.get('theta', 0.2),
+            'alpha': alpha,
+            'beta': recorded_metrics.get('beta', 0.2),
+            'gamma': recorded_metrics.get('gamma', 0.2)
+        }
+        
+        # Generar focal point sintético basado en bandas grabadas
+        # (El focal point original del VAE no se guarda, así que lo reconstruimos)
+        focal_point = {
+            "x": (bands['alpha'] - 0.2) * 2,  # Alpha mueve hacia x positivo
+            "y": (bands['theta'] - 0.2) * 2,  # Theta mueve hacia y positivo  
+            "z": (bands['beta'] - 0.2) * 2    # Beta mueve hacia z positivo
+        }
+        
+        # Normalizar focal point a rango [-1, 1]
+        for key in focal_point:
+            focal_point[key] = max(-1, min(1, focal_point[key]))
+        
+        result = {
+            "coherence": coherence,
+            "entropy": entropy,
+            "focal_point": focal_point,
+            "bands": bands,
+            "dominant_frequency": recorded_metrics.get('dominant_frequency', 10.0),
+            "state": state,
+            "plv": recorded_metrics.get('plv', coherence),
+            "source": "recorded",  # Indicador de que son métricas pregrabadas
+            "session_timestamp": session_timestamp,
+            "session_progress": self.session_player.get_status()['progress_percent']
+        }
+        
+        return result
+
+    def _process_muse_window(self):
+        """
+        Procesa datos EEG en vivo desde Muse 2.
+        
+        Usa análisis espectral directo (no VAE) para métricas precisas,
+        ya que el VAE fue entrenado con 64 canales y Muse tiene 4.
+        """
+        # Importar adaptador
+        from hardware import MuseToSyntergicAdapter
+        
+        # Obtener ventana de 2 segundos
+        window = self.muse_connector.get_window(duration=2.0)
+        
+        if window is None:
+            # No hay suficientes datos aún, retornar estado neutral
+            return {
+                "coherence": 0.5,
+                "entropy": 0.5,
+                "focal_point": {"x": 0, "y": 0, "z": 0},
+                "bands": {"delta": 0.2, "theta": 0.2, "alpha": 0.2, "beta": 0.2, "gamma": 0.2},
+                "dominant_frequency": 10.0,
+                "state": "waiting_data",
+                "plv": 0.5,
+                "source": "muse2",
+                "buffer_status": self.muse_connector.get_buffer_status()
+            }
+        
+        # Preparar datos para análisis
+        eeg_data = MuseToSyntergicAdapter.prepare_for_analysis(window)
+        
+        # Calcular métricas científicas (256 Hz del Muse)
+        metrics = SyntergicMetrics.compute_all(eeg_data, fs=window.fs)
+        
+        # --- SMOOTHING TEMPORAL ---
+        smoothed_coherence = self._smooth_value(self.coherence_history, metrics['coherence'])
+        smoothed_entropy = self._smooth_value(self.entropy_history, metrics['entropy'])
+        smoothed_plv = self._smooth_value(self.plv_history, metrics.get('plv', metrics['coherence']))
+        
+        # Smooth de bandas
+        smoothed_bands = {}
+        for band_name in ['delta', 'theta', 'alpha', 'beta', 'gamma']:
+            smoothed_bands[band_name] = self._smooth_value(
+                self.bands_history[band_name], 
+                metrics['bands'][band_name]
+            )
+        
+        # Generar focal point sintético basado en bandas
+        # (No usamos VAE porque fue entrenado con 64 canales)
+        focal_point = MuseToSyntergicAdapter.compute_focal_point_from_bands(smoothed_bands)
+        
+        # Determinar estado mental
+        if smoothed_bands['alpha'] > 0.5:
+            state = "meditation"
+        elif smoothed_bands['beta'] + smoothed_bands['gamma'] > 0.6:
+            state = "focused"
+        elif smoothed_bands['theta'] > 0.4:
+            state = "relaxed"
+        elif smoothed_bands['gamma'] > 0.3:
+            state = "insight"
+        elif smoothed_bands['delta'] > 0.4:
+            state = "deep_relaxation"
+        else:
+            state = "transitioning"
+        
+        # Obtener calidad de señal
+        signal_quality = self.muse_connector.get_signal_quality()
+        avg_quality = np.mean(list(signal_quality.values())) if signal_quality else 0.5
+        
+        return {
+            "coherence": smoothed_coherence,
+            "entropy": smoothed_entropy,
+            "focal_point": focal_point,
+            "bands": smoothed_bands,
+            "dominant_frequency": metrics['dominant_frequency'],
+            "state": state,
+            "plv": smoothed_plv,
+            "source": "muse2",
+            "signal_quality": signal_quality,
+            "avg_quality": avg_quality,
+            "buffer_status": self.muse_connector.get_buffer_status()
+        }

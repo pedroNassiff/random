@@ -2,9 +2,11 @@
 Playlist Manager: Gestiona múltiples sesiones EEG para reproducción secuencial.
 
 Permite crear playlists de datasets y reproducirlas automáticamente.
+Ahora también incluye sesiones grabadas desde PostgreSQL + InfluxDB.
 """
 
 import os
+import asyncio
 from typing import List, Dict, Optional
 from .session_player import SessionPlayer
 
@@ -18,6 +20,7 @@ class PlaylistManager:
     - Transición automática entre sesiones
     - Control de playlist (next, previous, shuffle)
     - Metadata de cada sesión
+    - Integración con sesiones grabadas (PostgreSQL + InfluxDB)
     """
     
     def __init__(self):
@@ -29,6 +32,7 @@ class PlaylistManager:
         
         # Cargar sesiones disponibles
         self._discover_sessions()
+        self._load_recorded_sessions()
     
     def _discover_sessions(self):
         """
@@ -65,7 +69,75 @@ class PlaylistManager:
             }
         ])
         
-        print(f"✓ Playlist: Discovered {len(self.sessions)} sessions")
+        print(f"✓ Playlist: Discovered {len(self.sessions)} dataset sessions")
+    
+    def _load_recorded_sessions(self):
+        """
+        Carga sesiones grabadas desde PostgreSQL (eeg_recordings table).
+        """
+        try:
+            from database import get_postgres_client_sync
+            postgres = get_postgres_client_sync()
+            postgres.connect()
+            recordings = postgres.get_all_recordings(limit=100)
+            
+            for rec in recordings:
+                self.sessions.append({
+                    'name': rec.name or f"Recording #{rec.id}",
+                    'path': f"recorded:{rec.id}",  # ID especial para sesiones grabadas
+                    'type': 'recorded',
+                    'category': 'Mis Grabaciones',
+                    'db_id': rec.id,
+                    'duration': rec.duration_seconds,
+                    'date': rec.started_at.isoformat() if rec.started_at else '',
+                    'notes': rec.notes or '',
+                    'sample_count': rec.sample_count,
+                    'avg_alpha': rec.avg_alpha,
+                    'avg_coherence': rec.avg_coherence
+                })
+            
+            if recordings:
+                print(f"✓ Playlist: Loaded {len(recordings)} recorded sessions from PostgreSQL")
+        except Exception as e:
+            print(f"⚠ Could not load recorded sessions from PostgreSQL: {e}")
+            # Fallback to SQLite
+            self._load_recorded_sessions_sqlite()
+    
+    def _load_recorded_sessions_sqlite(self):
+        """
+        Fallback: Carga sesiones desde SQLite (legacy).
+        """
+        try:
+            from database import get_database
+            db = get_database()
+            recorded = db.list_sessions(limit=100)
+            
+            for session in recorded:
+                self.sessions.append({
+                    'name': session.get('name', f"Sesión #{session['id']}"),
+                    'path': f"sqlite:{session['id']}",  # ID para sesiones SQLite legacy
+                    'type': 'recorded_sqlite',
+                    'category': 'Mis Grabaciones (Legacy)',
+                    'db_id': session['id'],
+                    'duration': session.get('duration_seconds', 0),
+                    'date': session.get('start_time', ''),
+                    'notes': session.get('notes', '')
+                })
+            
+            if recorded:
+                print(f"✓ Playlist: Loaded {len(recorded)} recorded sessions from SQLite (legacy)")
+        except Exception as e:
+            print(f"⚠ Could not load recorded sessions from SQLite: {e}")
+    
+    def refresh_recorded_sessions(self):
+        """
+        Recarga las sesiones grabadas desde PostgreSQL.
+        Útil después de grabar una nueva sesión.
+        """
+        # Quitar sesiones grabadas existentes
+        self.sessions = [s for s in self.sessions if s['type'] not in ['recorded', 'recorded_sqlite']]
+        # Recargar
+        self._load_recorded_sessions()
     
     def get_playlist(self) -> List[Dict]:
         """
@@ -73,13 +145,23 @@ class PlaylistManager:
         """
         playlist = []
         for idx, session in enumerate(self.sessions):
-            playlist.append({
+            item = {
                 'index': idx,
                 'name': session['name'],
                 'type': session['type'],
                 'category': session['category'],
                 'is_current': idx == self.current_index
-            })
+            }
+            # Info adicional para sesiones grabadas
+            if session['type'] in ['recorded', 'recorded_sqlite']:
+                item['db_id'] = session.get('db_id')
+                item['duration'] = session.get('duration', 0)
+                item['date'] = session.get('date', '')
+                item['notes'] = session.get('notes', '')
+                item['sample_count'] = session.get('sample_count', 0)
+                item['avg_alpha'] = session.get('avg_alpha')
+                item['avg_coherence'] = session.get('avg_coherence')
+            playlist.append(item)
         return playlist
     
     def load_session(self, index: int) -> SessionPlayer:
@@ -114,6 +196,16 @@ class PlaylistManager:
                 player.load_default_session()
             elif session['path'] == 'physionet_runs_6-10-14':
                 player.load_physionet_extended()
+        elif session['type'] == 'recorded':
+            # Sesiones grabadas desde PostgreSQL + InfluxDB (nuevo)
+            db_id = session.get('db_id')
+            if db_id:
+                player.load_recorded_session_v2(db_id)
+        elif session['type'] == 'recorded_sqlite':
+            # Sesiones grabadas desde SQLite (legacy)
+            db_id = session.get('db_id')
+            if db_id:
+                player.load_recorded_session(db_id)
         
         self.current_player = player
         return player

@@ -9,3 +9,8 @@ scikit-learn>=1.0.0
 pandas>=2.0.0
 pooch>=1.6.0
 scipy>=1.9.0
+
+# Hardware - Muse 2 EEG
+muselsl>=2.2.0
+pylsl>=1.16.0
+bleak>=0.21.0

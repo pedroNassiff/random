@@ -7,12 +7,14 @@ import { StateIndicator } from './components/hud/StateIndicator'
 import { AudioControl } from './components/hud/AudioControl'
 import { DebugPanel } from './components/hud/DebugPanel'
 import SessionControl from './components/hud/SessionControl'
+import MuseControl from './components/hud/MuseControl'
 import PracticeMode from './components/modes/PracticeMode'
 import AchievementsPanel from './components/hud/AchievementsPanel.jsx'
 
 function App() {
   const { isPlaying } = useBrainStore()
   const [isPracticeMode, setIsPracticeMode] = useState(false)
+  const [dataSource, setDataSource] = useState('dataset') // 'dataset' | 'muse'
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -78,8 +80,59 @@ function App() {
           borderBottom: '1px solid rgba(255,255,255,0.2)',
           paddingBottom: '10px'
         }}>
-           MÉTRICAS EN TIEMPO REAL
+          {dataSource === 'muse' ? '🎧 EEG EN VIVO' : '📼 MÉTRICAS'} EN TIEMPO REAL
         </h2>
+        
+        {/* Source Selector Tabs */}
+        <div style={{
+          display: 'flex',
+          marginBottom: '15px',
+          background: 'rgba(0,0,0,0.3)',
+          borderRadius: '8px',
+          padding: '4px'
+        }}>
+          <button
+            onClick={() => setDataSource('dataset')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              background: dataSource === 'dataset' ? 'rgba(100, 100, 255, 0.3)' : 'transparent',
+              border: dataSource === 'dataset' ? '1px solid rgba(100, 100, 255, 0.5)' : '1px solid transparent',
+              borderRadius: '6px',
+              color: dataSource === 'dataset' ? '#fff' : 'rgba(255,255,255,0.5)',
+              fontSize: '0.7rem',
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            📼 Dataset
+          </button>
+          <button
+            onClick={() => setDataSource('muse')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              background: dataSource === 'muse' ? 'rgba(0, 255, 136, 0.3)' : 'transparent',
+              border: dataSource === 'muse' ? '1px solid rgba(0, 255, 136, 0.5)' : '1px solid transparent',
+              borderRadius: '6px',
+              color: dataSource === 'muse' ? '#00ff88' : 'rgba(255,255,255,0.5)',
+              fontSize: '0.7rem',
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            🎧 Muse EEG
+          </button>
+        </div>
+        
+        {/* Muse Control (when muse tab selected) */}
+        {dataSource === 'muse' && (
+          <div style={{ marginBottom: '20px' }}>
+            <MuseControl onModeChange={(mode) => setDataSource(mode === 'muse' ? 'muse' : 'dataset')} />
+          </div>
+        )}
         
         <StateIndicator />
         <div style={{ marginTop: '20px' }}>
@@ -92,12 +145,51 @@ function App() {
           <AudioControl />
         </div>
         <div style={{ marginTop: '20px' }}>
-          <DebugPanel />
+          {/* <DebugPanel /> */}
         </div>
       </div>
       
-      {/* Session Player - Bottom Center */}
-      <SessionControl />
+      {/* Session Player - Bottom Center (only show in dataset mode) */}
+      {dataSource === 'dataset' && <SessionControl />}
+      
+      {/* Live EEG indicator when Muse is active */}
+      {dataSource === 'muse' && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          background: 'rgba(0, 40, 30, 0.9)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(0, 255, 136, 0.4)',
+          borderRadius: '50px',
+          padding: '12px 30px',
+          fontFamily: 'monospace',
+          color: '#00ff88',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '15px'
+        }}>
+          <span style={{ 
+            display: 'inline-block',
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: '#00ff88',
+            animation: 'pulse 1.5s infinite'
+          }} />
+          <span style={{ fontSize: '12px', fontWeight: 'bold' }}>
+            🎧 MUSE 2 - EEG EN VIVO
+          </span>
+          <style>{`
+            @keyframes pulse {
+              0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
+              50% { opacity: 0.5; box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+            }
+          `}</style>
+        </div>
+      )}
       
       {/* Practice Mode Panel (conditional) - Top Left */}
       {isPracticeMode && <PracticeMode onClose={() => setIsPracticeMode(false)} />}

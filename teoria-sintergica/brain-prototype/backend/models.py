@@ -41,6 +41,13 @@ class SyntergicState(BaseModel):
     # NUEVO: Phase Locking Value (métrica avanzada)
     plv: Optional[float] = None
     
+    # NUEVO: Fuente de datos ('recorded', 'muse2', 'dataset', etc.)
+    source: Optional[str] = None
+    
+    # NUEVO: Progreso de reproducción de sesión
+    session_progress: Optional[float] = None
+    session_timestamp: Optional[float] = None
+    
     @staticmethod
     def simulate_next(t: float):
         """

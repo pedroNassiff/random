@@ -1,9 +1,8 @@
 {
   "meta": {
-    "version": "1.1.0",
-    "lastUpdated": "2026-01-21",
-    "author": "Pedro Nassiff",
-    "description": "Lattice data - Tier 1 centered front, Tier 2-3 behind"
+    "version": "2.0.0",
+    "lastUpdated": "2026-01-22",
+    "description": "Lattice data - Tier 1 horizontal row, Tier 2 back and down"
   },
   
   "nodes": [
@@ -12,71 +11,50 @@
       "slug": "proyectos",
       "type": "section",
       "tier": 1,
-      "parentId": null,
       "title": "PROYECTOS",
-      "subtitle": "Distorsiones en la Lattice",
       "description": "Portfolio de soluciones tecnológicas",
-      "tags": ["portfolio", "proyectos", "trabajo"],
-      "syntpiergy": {
-        "intensity": 0.95,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -4, "y": 1, "z": 0 },
-      "connections": []
+      "syntpiergy": { "intensity": 1.0 },
+      "position": { "x": -6, "y": 1.5, "z": 0 }
     },
-
     {
       "id": "sec-servicios",
       "slug": "servicios",
       "type": "section",
       "tier": 1,
-      "parentId": null,
       "title": "SERVICIOS",
-      "subtitle": "Capacidades",
-      "description": "Desarrollo de soluciones tecnológicas",
-      "tags": ["servicios", "desarrollo"],
-      "syntpiergy": {
-        "intensity": 0.95,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 0, "y": 2.5, "z": 0 },
-      "connections": []
+      "description": "Desarrollo de soluciones",
+      "syntpiergy": { "intensity": 1.0 },
+      "position": { "x": -2, "y": 1.5, "z": 0 }
     },
-
+    {
+      "id": "sec-lab",
+      "slug": "lab",
+      "type": "section",
+      "tier": 1,
+      "title": "LAB",
+      "description": "Experimentos y prototipos",
+      "syntpiergy": { "intensity": 1.0 },
+      "position": { "x": 2, "y": 1.5, "z": 0 }
+    },
     {
       "id": "sec-contacto",
       "slug": "contacto",
       "type": "section",
       "tier": 1,
-      "parentId": null,
       "title": "CONTACTO",
-      "subtitle": "Conexión",
-      "description": "Establece contacto directo",
-      "tags": ["contacto", "comunicación"],
-      "syntpiergy": {
-        "intensity": 0.95,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 4, "y": 1, "z": 0 },
-      "connections": []
+      "description": "Conexión directa",
+      "syntpiergy": { "intensity": 1.0 },
+      "position": { "x": 6, "y": 1.5, "z": 0 }
     },
-
     {
       "id": "sec-hermes",
       "slug": "hermes",
       "type": "section",
       "tier": 1,
-      "parentId": null,
       "title": "HERMES",
-      "subtitle": "El Guía",
-      "description": "Sistema de neurofeedback basado en Teoría Sintérgica",
-      "tags": ["hermes", "brain", "neurofeedback"],
-      "syntpiergy": {
-        "intensity": 0.98,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 0, "y": -1, "z": 0 },
-      "connections": []
+      "description": "Sistema de neurofeedback",
+      "syntpiergy": { "intensity": 0.95 },
+      "position": { "x": 5, "y": -2.5, "z": 0 }
     },
 
     {
@@ -86,17 +64,10 @@
       "tier": 2,
       "parentId": "sec-proyectos",
       "title": "HUB CITY GUIDES",
-      "subtitle": "B2B Tourism Platform",
-      "description": "Plataforma que conecta tour operators con guías profesionales",
-      "tags": ["vue", "nestjs", "ionic", "gps"],
-      "syntpiergy": {
-        "intensity": 0.85,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -7, "y": 2, "z": -5 },
-      "connections": []
+      "description": "B2B Tourism Platform",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": -8, "y": -1, "z": -6 }
     },
-
     {
       "id": "proj-calavera",
       "slug": "calavera-sur",
@@ -104,35 +75,10 @@
       "tier": 2,
       "parentId": "sec-proyectos",
       "title": "CALAVERA SUR",
-      "subtitle": "AI E-commerce",
-      "description": "Sistema de auto-tagging con IA para e-commerce",
-      "tags": ["ai", "ecommerce", "gpt4"],
-      "syntpiergy": {
-        "intensity": 0.88,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -5, "y": 0, "z": -5 },
-      "connections": []
+      "description": "AI E-commerce",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": -6, "y": -2, "z": -7 }
     },
-
-    {
-      "id": "proj-brain-prototype",
-      "slug": "brain-prototype",
-      "type": "project",
-      "tier": 2,
-      "parentId": "sec-hermes",
-      "title": "BRAIN PROTOTYPE",
-      "subtitle": "Neurofeedback 3D",
-      "description": "Sistema de neurofeedback en tiempo real con visualización 3D",
-      "tags": ["three.js", "neurofeedback", "eeg"],
-      "syntpiergy": {
-        "intensity": 0.92,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -2, "y": -3, "z": -5 },
-      "connections": []
-    },
-
     {
       "id": "proj-nds",
       "slug": "nds-ford",
@@ -140,15 +86,53 @@
       "tier": 2,
       "parentId": "sec-proyectos",
       "title": "NDS AUTOMOTIVE",
-      "subtitle": "Business Intelligence",
-      "description": "Proyectos de BI para el sector automotriz",
-      "tags": ["bi", "analytics", "etl"],
-      "syntpiergy": {
-        "intensity": 0.82,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -3, "y": 3, "z": -5 },
-      "connections": []
+      "description": "Business Intelligence",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": -4, "y": -1.5, "z": -6 }
+    },
+    {
+      "id": "proj-misia",
+      "slug": "misia",
+      "type": "project",
+      "tier": 2,
+      "parentId": "sec-proyectos",
+      "title": "MISIA",
+      "description": "E-commerce Platform",
+      "syntpiergy": { "intensity": 0.25 },
+      "position": { "x": -7, "y": -3, "z": -8 }
+    },
+    {
+      "id": "proj-shujman",
+      "slug": "shujman",
+      "type": "project",
+      "tier": 2,
+      "parentId": "sec-proyectos",
+      "title": "SHUJMAN",
+      "description": "Real Estate",
+      "syntpiergy": { "intensity": 0.25 },
+      "position": { "x": -5, "y": -3.5, "z": -9 }
+    },
+    {
+      "id": "proj-cenit",
+      "slug": "cenit",
+      "type": "project",
+      "tier": 2,
+      "parentId": "sec-proyectos",
+      "title": "CENIT",
+      "description": "Courses Platform",
+      "syntpiergy": { "intensity": 0.25 },
+      "position": { "x": -3, "y": -4, "z": -10 }
+    },
+    {
+      "id": "proj-lavaza",
+      "slug": "lavaza",
+      "type": "project",
+      "tier": 2,
+      "parentId": "sec-proyectos",
+      "title": "LAVAZA",
+      "description": "Corporate Landing",
+      "syntpiergy": { "intensity": 0.2 },
+      "position": { "x": -6, "y": -5, "z": -11 }
     },
 
     {
@@ -157,36 +141,22 @@
       "type": "service",
       "tier": 2,
       "parentId": "sec-servicios",
-      "title": "FULLSTACK DEV",
-      "subtitle": "End-to-End",
-      "description": "Desarrollo frontend y backend completo",
-      "tags": ["fullstack", "frontend", "backend"],
-      "syntpiergy": {
-        "intensity": 0.85,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 2, "y": 4, "z": -5 },
-      "connections": []
+      "title": "FULLSTACK",
+      "description": "End-to-End Development",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": -3, "y": -1, "z": -6 }
     },
-
     {
       "id": "serv-cloud",
       "slug": "cloud-devops",
       "type": "service",
       "tier": 2,
       "parentId": "sec-servicios",
-      "title": "CLOUD DEVOPS",
-      "subtitle": "Infrastructure",
-      "description": "Despliegue en GCP, AWS y Azure",
-      "tags": ["cloud", "devops", "docker"],
-      "syntpiergy": {
-        "intensity": 0.82,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -2, "y": 5, "z": -5 },
-      "connections": []
+      "title": "CLOUD",
+      "description": "DevOps & Infrastructure",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": -1, "y": -2, "z": -7 }
     },
-
     {
       "id": "serv-ai",
       "slug": "ai-ml",
@@ -194,185 +164,83 @@
       "tier": 2,
       "parentId": "sec-servicios",
       "title": "AI & ML",
-      "subtitle": "Intelligence",
-      "description": "GPT-4, reconocimiento de imágenes, NLP",
-      "tags": ["ai", "ml", "gpt"],
-      "syntpiergy": {
-        "intensity": 0.88,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 3, "y": 2, "z": -5 },
-      "connections": []
+      "description": "Machine Learning",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": -2, "y": -2.5, "z": -8 }
     },
-
     {
       "id": "serv-3d",
       "slug": "3d-webgl",
       "type": "service",
       "tier": 2,
       "parentId": "sec-servicios",
-      "title": "3D & WEBGL",
-      "subtitle": "Immersive",
-      "description": "Three.js, shaders GLSL, experiencias 3D",
-      "tags": ["3d", "three.js", "webgl"],
-      "syntpiergy": {
-        "intensity": 0.85,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 5, "y": 0, "z": -5 },
-      "connections": []
+      "title": "3D WEBGL",
+      "description": "Three.js & Shaders",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": -2, "y": -3, "z": -8 }
     },
 
     {
-      "id": "proj-misia",
-      "slug": "misia",
-      "type": "project",
+      "id": "lab-brain",
+      "slug": "brain-prototype",
+      "type": "experiment",
       "tier": 2,
-      "parentId": "sec-proyectos",
-      "title": "MISIA",
-      "subtitle": "E-commerce",
-      "description": "Plataforma e-commerce completa",
-      "tags": ["ecommerce", "vue"],
-      "syntpiergy": {
-        "intensity": 0.75,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -8, "y": -1, "z": -8 },
-      "connections": []
+      "parentId": "sec-lab",
+      "title": "BRAIN PROTO",
+      "description": "Neurofeedback 3D",
+      "syntpiergy": { "intensity": 0.35 },
+      "position": { "x": 2, "y": -1, "z": -6 }
     },
-
     {
-      "id": "proj-shujman",
-      "slug": "shujman",
-      "type": "project",
+      "id": "lab-lattice",
+      "slug": "lattice-theory",
+      "type": "experiment",
       "tier": 2,
-      "parentId": "sec-proyectos",
-      "title": "SHUJMAN",
-      "subtitle": "Real Estate",
-      "description": "Plataforma inmobiliaria",
-      "tags": ["inmobiliaria", "vue"],
-      "syntpiergy": {
-        "intensity": 0.75,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -6, "y": -3, "z": -8 },
-      "connections": []
+      "parentId": "sec-lab",
+      "title": "LATTICE",
+      "description": "Syntergic Theory",
+      "syntpiergy": { "intensity": 0.35 },
+      "position": { "x": 3, "y": -2, "z": -7 }
     },
-
     {
-      "id": "proj-cenit",
-      "slug": "cenit",
-      "type": "project",
+      "id": "lab-random",
+      "slug": "random-philosophy",
+      "type": "experiment",
       "tier": 2,
-      "parentId": "sec-proyectos",
-      "title": "CENIT",
-      "subtitle": "Courses",
-      "description": "Plataforma de cursos de programación",
-      "tags": ["educación", "cursos"],
-      "syntpiergy": {
-        "intensity": 0.72,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -4, "y": -5, "z": -8 },
-      "connections": []
+      "parentId": "sec-lab",
+      "title": "RANDOM()",
+      "description": "This website",
+      "syntpiergy": { "intensity": 0.35 },
+      "position": { "x": 1, "y": -2.5, "z": -8 }
     },
 
     {
-      "id": "proj-lavaza",
-      "slug": "lavaza",
-      "type": "project",
-      "tier": 2,
-      "parentId": "sec-proyectos",
-      "title": "LAVAZA",
-      "subtitle": "Corporate",
-      "description": "Landing page corporativa",
-      "tags": ["landing", "diseño"],
-      "syntpiergy": {
-        "intensity": 0.65,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 2, "y": -5, "z": -8 },
-      "connections": []
-    },
-
-    {
-      "id": "sec-textos",
-      "slug": "textos",
-      "type": "section",
-      "tier": 3,
-      "parentId": null,
-      "title": "TEXTOS",
-      "subtitle": "Fragmentos",
-      "description": "Escritos y reflexiones",
-      "tags": ["textos", "escritos"],
-      "syntpiergy": {
-        "intensity": 0.70,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -6, "y": 0, "z": -12 },
-      "connections": []
-    },
-
-    {
-      "id": "sec-respuestas",
-      "slug": "respuestas",
-      "type": "section",
-      "tier": 3,
-      "parentId": null,
-      "title": "RESPUESTAS",
-      "subtitle": "Creaciones",
-      "description": "Creaciones de visitantes",
-      "tags": ["respuestas", "interactivo"],
-      "syntpiergy": {
-        "intensity": 0.70,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": 6, "y": -2, "z": -12 },
-      "connections": []
-    },
-
-    {
-      "id": "text-grinberg",
+      "id": "hermes-teoria",
       "slug": "teoria-sintergica",
       "type": "text",
-      "tier": 3,
-      "parentId": "sec-textos",
-      "title": "TEORÍA SINTÉRGICA",
-      "subtitle": "Grinberg",
-      "description": "Fundamentos de la Teoría Sintérgica",
-      "tags": ["grinberg", "sintergía"],
-      "syntpiergy": {
-        "intensity": 0.65,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -8, "y": -2, "z": -15 },
-      "connections": []
+      "tier": 2,
+      "parentId": "sec-hermes",
+      "title": "SINTERGÍA",
+      "description": "Teoría de Grinberg",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": 6, "y": -4, "z": -6 }
     },
-
     {
-      "id": "text-random-philosophy",
-      "slug": "random-philosophy",
+      "id": "hermes-eeg",
+      "slug": "eeg-system",
       "type": "text",
-      "tier": 3,
-      "parentId": "sec-textos",
-      "title": "FILOSOFÍA RANDOM",
-      "subtitle": "El Concepto",
-      "description": "La filosofía detrás del nombre",
-      "tags": ["random", "filosofía"],
-      "syntpiergy": {
-        "intensity": 0.60,
-        "color": { "primary": "#d4a574" }
-      },
-      "position": { "x": -4, "y": -4, "z": -15 },
-      "connections": []
+      "tier": 2,
+      "parentId": "sec-hermes",
+      "title": "EEG",
+      "description": "Electroencephalography",
+      "syntpiergy": { "intensity": 0.3 },
+      "position": { "x": 7, "y": -3.5, "z": -7 }
     }
   ],
 
   "settings": {
-    "visual": {
-      "defaultIntensity": 0.15,
-      "hoverIntensity": 0.6,
-      "activeIntensity": 0.9
-    }
+    "tier1Intensity": 1.0,
+    "tier2Intensity": 0.15,
+    "hoverIntensity": 0.8
   }
 }

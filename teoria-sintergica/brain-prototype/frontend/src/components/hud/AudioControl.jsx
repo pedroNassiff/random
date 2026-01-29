@@ -2,6 +2,29 @@ import { useAudioFeedback } from '../../hooks/useAudioFeedback'
 import { useBrainStore } from '../../store/brainStore'
 import { useState } from 'react'
 
+// Iconos SVG modernos
+const PlayIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M8 5v14l11-7z"/>
+  </svg>
+)
+
+const PauseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+  </svg>
+)
+
+const WaveIcon = ({ animate }) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 3v18" style={{ animation: animate ? 'wave1 0.5s ease-in-out infinite' : 'none' }}/>
+    <path d="M8 7v10" style={{ animation: animate ? 'wave2 0.5s ease-in-out infinite 0.1s' : 'none' }}/>
+    <path d="M16 7v10" style={{ animation: animate ? 'wave2 0.5s ease-in-out infinite 0.2s' : 'none' }}/>
+    <path d="M4 10v4" style={{ animation: animate ? 'wave3 0.5s ease-in-out infinite 0.15s' : 'none' }}/>
+    <path d="M20 10v4" style={{ animation: animate ? 'wave3 0.5s ease-in-out infinite 0.25s' : 'none' }}/>
+  </svg>
+)
+
 export function AudioControl() {
   const { isPlaying, toggleAudio } = useAudioFeedback()
   const coherence = useBrainStore((state) => state.coherence)
@@ -96,76 +119,103 @@ export function AudioControl() {
         onClick={toggleAudio}
         style={{
           width: '100%',
-          padding: '12px',
+          padding: '12px 16px',
           background: isPlaying 
-            ? 'linear-gradient(135deg, #00ff9d 0%, #00dcff 100%)'
-            : 'rgba(255,255,255,0.1)',
+            ? 'rgba(29, 185, 84, 0.15)'
+            : 'rgba(255,255,255,0.08)',
           border: isPlaying 
-            ? 'none'
-            : '1px solid rgba(255,255,255,0.3)',
-          borderRadius: '6px',
-          color: isPlaying ? '#000' : '#fff',
-          fontSize: '0.85rem',
-          fontWeight: 'bold',
-          fontFamily: "'Courier New', Courier, monospace",
+            ? '1px solid rgba(29, 185, 84, 0.4)'
+            : '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '8px',
+          color: isPlaying ? '#1db954' : '#fff',
+          fontSize: '13px',
+          fontWeight: '500',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           cursor: 'pointer',
-          transition: 'all 0.3s',
+          transition: 'all 0.2s ease',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '8px',
-          boxShadow: isPlaying 
-            ? '0 0 20px rgba(0,255,157,0.3)'
-            : 'none'
+          gap: '10px'
         }}
         onMouseEnter={(e) => {
           if (!isPlaying) {
-            e.target.style.background = 'rgba(255,255,255,0.2)'
+            e.currentTarget.style.background = 'rgba(255,255,255,0.12)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'
+          } else {
+            e.currentTarget.style.background = 'rgba(29, 185, 84, 0.25)'
           }
         }}
         onMouseLeave={(e) => {
           if (!isPlaying) {
-            e.target.style.background = 'rgba(255,255,255,0.1)'
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'
+          } else {
+            e.currentTarget.style.background = 'rgba(29, 185, 84, 0.15)'
           }
         }}
       >
-        <span style={{ fontSize: '1.2rem' }}>
-          {isPlaying ? '🔊' : '🔇'}
-        </span>
-        {isPlaying ? 'PLAYING' : 'START AUDIO'}
+        {isPlaying ? (
+          <>
+            <WaveIcon animate={true} />
+            <span>Playing</span>
+          </>
+        ) : (
+          <>
+            <PlayIcon />
+            <span>Start Audio</span>
+          </>
+        )}
       </button>
 
-      {isPlaying && (
-        <div style={{
-          marginTop: '10px',
-          fontSize: '0.7rem',
-          fontFamily: "'Courier New', Courier, monospace",
-          color: 'rgba(255,255,255,0.7)',
-          display: 'flex',
-          justifyContent: 'space-between'
-        }}>
-          <div>
-            L: <span style={{ color: '#00dcff', fontWeight: 'bold' }}>
-              {baseFreq.toFixed(1)} Hz
-            </span>
-          </div>
-          <div>
-            R: <span style={{ color: '#00ff9d', fontWeight: 'bold' }}>
-              {(baseFreq + binauralOffset).toFixed(1)} Hz
-            </span>
-          </div>
-        </div>
-      )}
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes wave1 {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(0.5); }
+        }
+        @keyframes wave2 {
+          0%, 100% { transform: scaleY(0.7); }
+          50% { transform: scaleY(1); }
+        }
+        @keyframes wave3 {
+          0%, 100% { transform: scaleY(0.5); }
+          50% { transform: scaleY(0.8); }
+        }
+      `}</style>
 
       {isPlaying && (
         <div style={{
-          marginTop: '6px',
-          fontSize: '0.6rem',
-          color: 'rgba(255,255,255,0.4)',
-          fontFamily: "'Courier New', Courier, monospace",
-          textAlign: 'center'
+          marginTop: '12px',
+          fontSize: '11px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          color: 'rgba(255,255,255,0.6)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          background: 'rgba(255,255,255,0.03)',
+          borderRadius: '6px'
         }}>
-          Δf = {binauralOffset.toFixed(1)} Hz
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>L</span>
+            <span style={{ color: '#00dcff', fontWeight: '500', fontVariantNumeric: 'tabular-nums' }}>
+              {baseFreq.toFixed(0)} Hz
+            </span>
+          </div>
+          <div style={{ 
+            color: 'rgba(255,255,255,0.3)', 
+            fontSize: '10px',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            Δ {binauralOffset.toFixed(1)} Hz
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: '#1db954', fontWeight: '500', fontVariantNumeric: 'tabular-nums' }}>
+              {(baseFreq + binauralOffset).toFixed(0)} Hz
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>R</span>
+          </div>
         </div>
       )}
     </div>

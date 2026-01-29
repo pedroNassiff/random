@@ -12,31 +12,31 @@ export function StateIndicator() {
       color: '#10b981',
       icon: '🧘',
       description: 'Alpha dominante',
-      glow: '0 0 20px rgba(16, 185, 129, 0.5)'
+      // glow: '0 0 20px rgba(16, 185, 129, 0.5)'
     },
     'focused': {
       label: 'CONCENTRACIÓN',
       color: '#f59e0b',
       description: 'Beta/Gamma activo',
-      glow: '0 0 20px rgba(245, 158, 11, 0.5)'
+      // glow: '0 0 20px rgba(245, 158, 11, 0.5)'
     },
     'relaxed': {
       label: 'RELAJACIÓN',
       color: '#3b82f6',
       description: 'Theta presente',
-      glow: '0 0 20px rgba(59, 130, 246, 0.5)'
+      // glow: '0 0 20px rgba(59, 130, 246, 0.5)'
     },
     'insight': {
       label: 'INSIGHT',
       color: '#ef4444',
       description: 'Gamma elevado',
-      glow: '0 0 20px rgba(239, 68, 68, 0.5)'
+      // glow: '0 0 20px rgba(239, 68, 68, 0.5)'
     },
     'deep_relaxation': {
       label: 'RELAJACIÓN PROFUNDA',
       color: '#8b5cf6',
       description: 'Delta presente',
-      glow: '0 0 20px rgba(139, 92, 246, 0.5)'
+      // glow: '0 0 20px rgba(139, 92, 246, 1)'
     },
     'unknown': {
       label: 'TRANSITORIO',
@@ -60,7 +60,7 @@ export function StateIndicator() {
       borderRadius: '8px',
       border: `2px solid ${config.color}`,
       backdropFilter: 'blur(10px)',
-      boxShadow: config.glow,
+      // boxShadow: config.glow,
       transition: 'all 0.5s ease',
       position: 'relative'
     }}>
@@ -76,7 +76,7 @@ export function StateIndicator() {
           borderRadius: '50%',
           border: '1px solid rgba(255,255,255,0.3)',
           background: 'rgba(255,255,255,0.1)',
-          color: 'rgba(255,255,255,0.6)',
+          color: 'rgba(255,255,255)',
           fontSize: '11px',
           fontWeight: 'bold',
           cursor: 'help',
@@ -98,7 +98,7 @@ export function StateIndicator() {
           marginLeft: '12px',
           padding: '12px',
           background: 'rgba(0,0,0,0.95)',
-          border: '1px solid rgba(255,255,255,0.2)',
+          border: '1px solid rgba(255,255,255)',
           borderRadius: '8px',
           minWidth: '280px',
           maxWidth: '320px',
@@ -114,11 +114,11 @@ export function StateIndicator() {
             Detectado automáticamente desde patrones de frecuencia:
           </div>
           <ul style={{ margin: '8px 0', paddingLeft: '20px', color: 'rgba(255,255,255,0.7)' }}>
-            <li style={{ margin: '4px 0' }}><strong>🧘 MEDITACIÓN:</strong> Dominancia Alpha (8-13 Hz)</li>
-            <li style={{ margin: '4px 0' }}><strong>🎯 CONCENTRACIÓN:</strong> Beta/Gamma activo (13-50 Hz)</li>
-            <li style={{ margin: '4px 0' }}><strong>🌊 RELAJACIÓN:</strong> Theta elevado (4-8 Hz)</li>
-            <li style={{ margin: '4px 0' }}><strong>⚡ INSIGHT:</strong> Gamma activo (30-50 Hz)</li>
-            <li style={{ margin: '4px 0' }}><strong>💤 PROFUNDO:</strong> Delta presente (0.5-4 Hz)</li>
+            <li style={{ margin: '4px 0' }}><strong> MEDITACIÓN:</strong> Dominancia Alpha (8-13 Hz)</li>
+            <li style={{ margin: '4px 0' }}><strong> CONCENTRACIÓN:</strong> Beta/Gamma activo (13-50 Hz)</li>
+            <li style={{ margin: '4px 0' }}><strong> RELAJACIÓN:</strong> Theta elevado (4-8 Hz)</li>
+            <li style={{ margin: '4px 0' }}><strong> INSIGHT:</strong> Gamma activo (30-50 Hz)</li>
+            <li style={{ margin: '4px 0' }}><strong> PROFUNDO:</strong> Delta presente (0.5-4 Hz)</li>
           </ul>
         </div>
       )}

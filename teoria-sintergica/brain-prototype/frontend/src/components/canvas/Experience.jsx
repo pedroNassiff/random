@@ -41,7 +41,7 @@ export const Experience = () => {
                 {useRegionalView ? (
                     <>
                         <RegionalBrainActivity scale={0.2} />
-                        <BrainRegionLabels visible={showLabels} />
+                        {/* <BrainRegionLabels visible={showLabels} /> */}
                     </>
                 ) : (
                     <Brain scale={0.2} />

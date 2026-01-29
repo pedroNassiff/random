@@ -219,10 +219,14 @@ async function initLatticeData() {
         let addedNodes = 0
         
         for (const nodeConfig of contentNodes) {
+            const tier = nodeConfig.data.tier || 2
+            // Tier 1: Very bright, Tier 2: Very dim
+            const intensity = tier === 1 ? 1.5 : 0.08
+            
             const addedNode = lattice.addContentNode(
                 nodeConfig.position, 
                 nodeConfig.data,
-                { intensity: nodeConfig.syntpiergy?.intensity || 0.9 }
+                { intensity }
             )
             if (addedNode) addedNodes++
         }
@@ -278,9 +282,16 @@ canvas.addEventListener('mousemove', (event) => {
     const node = lattice.getNodeAtPosition(mouseX, mouseY)
     
     if (node !== hoveredNode) {
+        // Clear previous hover effect
+        if (hoveredNode) {
+            lattice.onNodeHoverEnd(hoveredNode)
+        }
+        
         hoveredNode = node
         
+        // Apply new hover effect
         if (node && node.isContent) {
+            lattice.onNodeHover(node)
             canvas.style.cursor = 'pointer'
         } else {
             canvas.style.cursor = isMouseDown ? 'grabbing' : 'grab'
@@ -380,10 +391,10 @@ window.addEventListener('keydown', (event) => {
  * ═══════════════════════════════════════════════════════════════
  */
 const modelParameters = {
-    initialScale: 0.018,
+    initialScale: 0.015,
     finalScale: 0.15,
-    initialX: 0,        // Centered in RANDOM()
-    initialY: -0.15,
+    initialX: 0.863,        // Centered in RANDOM()
+    initialY: -0.15,     // Inside the parenthesis
     finalX: 0,
     finalY: -4.67,
     initialRotationY: 0,

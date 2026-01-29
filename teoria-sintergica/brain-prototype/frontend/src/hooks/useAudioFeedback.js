@@ -17,8 +17,10 @@ import { useBrainStore } from '../store/brainStore'
 export function useAudioFeedback() {
   const coherence = useBrainStore((state) => state.coherence)
   const bands = useBrainStore((state) => state.bands)
+  const sessionPaused = useBrainStore((state) => state.sessionPaused)
   
   const [isPlaying, setIsPlaying] = useState(false)
+  const [wasPlayingBeforePause, setWasPlayingBeforePause] = useState(false)
   const audioContextRef = useRef(null)
   const leftOscillatorRef = useRef(null)
   const rightOscillatorRef = useRef(null)
@@ -39,6 +41,19 @@ export function useAudioFeedback() {
       }
     }
   }, [])
+
+  // Pausar/reanudar audio cuando la sesión se pausa
+  useEffect(() => {
+    if (sessionPaused && isPlaying) {
+      // Guardar que estaba sonando y pausar
+      setWasPlayingBeforePause(true)
+      stopAudio()
+    } else if (!sessionPaused && wasPlayingBeforePause) {
+      // Reanudar si estaba sonando antes de la pausa
+      setWasPlayingBeforePause(false)
+      startAudio()
+    }
+  }, [sessionPaused])
 
   // Actualizar frecuencias según coherencia
   useEffect(() => {

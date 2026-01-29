@@ -2,22 +2,77 @@
  * SessionControl - Control de reproducción de sesiones EEG completas
  * 
  * Permite reproducir sesiones longitudinales cronológicamente con controles
- * tipo media player (play/pause/seek/speed).
+ * tipo media player moderno (Spotify/YouTube style).
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useBrainStore } from '../../store/brainStore';
 
 const API_BASE = 'http://localhost:8000';
 
+// Hook para barra de progreso suave
+function useSmoothProgress(targetPercent, duration, isPlaying) {
+  const [smoothPercent, setSmoothPercent] = useState(targetPercent);
+  const animationRef = useRef(null);
+  const lastUpdateRef = useRef(Date.now());
+  const lastPercentRef = useRef(targetPercent);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      setSmoothPercent(targetPercent);
+      return;
+    }
+
+    // Calcular velocidad de interpolación
+    const now = Date.now();
+    const elapsed = now - lastUpdateRef.current;
+    lastUpdateRef.current = now;
+    lastPercentRef.current = targetPercent;
+
+    // Interpolar suavemente
+    const animate = () => {
+      setSmoothPercent(prev => {
+        const diff = targetPercent - prev;
+        // Interpolación suave: avanzar 10% de la diferencia por frame
+        const step = diff * 0.1;
+        if (Math.abs(diff) < 0.01) return targetPercent;
+        return prev + step;
+      });
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [targetPercent, isPlaying]);
+
+  return smoothPercent;
+}
+
 export default function SessionControl() {
+  const setSessionPaused = useBrainStore((state) => state.setSessionPaused);
   const [sessionActive, setSessionActive] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sessionStatus, setSessionStatus] = useState(null);
   const [timeline, setTimeline] = useState(null);
   const [playlist, setPlaylist] = useState(null);
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const [hoveredSession, setHoveredSession] = useState(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPercent, setDragPercent] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Estado local para velocidad
+  const progressBarRef = useRef(null);
   
-  // Fetch session status cada 2 segundos si está activo
+  // Progreso suave
+  const targetProgress = sessionStatus?.progress_percent || 0;
+  const smoothProgress = useSmoothProgress(targetProgress, sessionStatus?.total_duration || 0, isPlaying && !isDragging);
+
+  // Fetch session status cada 500ms para progreso más fluido
   useEffect(() => {
     if (!sessionActive) return;
     
@@ -27,15 +82,18 @@ export default function SessionControl() {
         const data = await res.json();
         if (data.session_active) {
           setSessionStatus(data);
-          // Sincronizar estado de reproducción desde backend
           if (data.is_playing !== undefined) {
             setIsPlaying(data.is_playing);
+          }
+          // Sincronizar velocidad desde backend
+          if (data.playback_speed !== undefined) {
+            setPlaybackSpeed(data.playback_speed);
           }
         }
       } catch (err) {
         console.error('Error fetching session status:', err);
       }
-    }, 2000);
+    }, 500); // Más frecuente para mejor fluidez
     
     return () => clearInterval(interval);
   }, [sessionActive]);
@@ -89,24 +147,22 @@ export default function SessionControl() {
   
   const togglePlayPause = async () => {
     if (!sessionActive) {
-      // Si no está activo, activar sesión
       await activateSessionMode();
     } else {
-      // Toggle pause/play
       try {
         if (isPlaying) {
-          // Pausar
           const res = await fetch(`${API_BASE}/session/pause`, { method: 'POST' });
           const data = await res.json();
           if (data.status === 'success') {
             setIsPlaying(false);
+            setSessionPaused(true);  // Notificar al store para pausar audio binaural
           }
         } else {
-          // Reanudar
           const res = await fetch(`${API_BASE}/session/play`, { method: 'POST' });
           const data = await res.json();
           if (data.status === 'success') {
             setIsPlaying(true);
+            setSessionPaused(false);  // Notificar al store para reanudar audio binaural
           }
         }
       } catch (err) {
@@ -119,8 +175,9 @@ export default function SessionControl() {
     try {
       setSessionActive(false);
       setIsPlaying(false);
+      setSessionPaused(true);  // Pausar audio binaural al detener
       setSessionStatus(null);
-      // No hacer petición al backend, simplemente detener el polling
+      setShowPlaylist(false);
     } catch (err) {
       console.error('Error stopping session:', err);
     }
@@ -135,19 +192,46 @@ export default function SessionControl() {
   };
   
   const setSpeed = async (speed) => {
+    setPlaybackSpeed(speed); // Actualizar UI inmediatamente
     try {
       await fetch(`${API_BASE}/session/speed/${speed}`, { method: 'POST' });
     } catch (err) {
       console.error('Error setting speed:', err);
     }
   };
+
+  // Seleccionar sesión directamente por índice
+  const selectSession = async (index) => {
+    setIsLoadingSession(true);
+    try {
+      const res = await fetch(`${API_BASE}/playlist/select/${index}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'success') {
+        // Refresh playlist
+        const playlistRes = await fetch(`${API_BASE}/playlist`);
+        const playlistData = await playlistRes.json();
+        if (playlistData.status === 'success') {
+          setPlaylist(playlistData);
+        }
+        // Auto-play la sesión seleccionada
+        if (!isPlaying) {
+          const playRes = await fetch(`${API_BASE}/session/play`, { method: 'POST' });
+          if (playRes.ok) setIsPlaying(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error selecting session:', err);
+    } finally {
+      setIsLoadingSession(false);
+    }
+  };
   
   const nextSession = async () => {
+    setIsLoadingSession(true);
     try {
       const res = await fetch(`${API_BASE}/playlist/next`, { method: 'POST' });
       const data = await res.json();
       if (data.status === 'success') {
-        // Refresh playlist
         const playlistRes = await fetch(`${API_BASE}/playlist`);
         const playlistData = await playlistRes.json();
         if (playlistData.status === 'success') {
@@ -156,15 +240,17 @@ export default function SessionControl() {
       }
     } catch (err) {
       console.error('Error advancing to next session:', err);
+    } finally {
+      setIsLoadingSession(false);
     }
   };
   
   const previousSession = async () => {
+    setIsLoadingSession(true);
     try {
       const res = await fetch(`${API_BASE}/playlist/previous`, { method: 'POST' });
       const data = await res.json();
       if (data.status === 'success') {
-        // Refresh playlist
         const playlistRes = await fetch(`${API_BASE}/playlist`);
         const playlistData = await playlistRes.json();
         if (playlistData.status === 'success') {
@@ -173,6 +259,8 @@ export default function SessionControl() {
       }
     } catch (err) {
       console.error('Error going to previous session:', err);
+    } finally {
+      setIsLoadingSession(false);
     }
   };
   
@@ -181,6 +269,53 @@ export default function SessionControl() {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Progress bar drag handling
+  const handleProgressMouseDown = useCallback((e) => {
+    if (!sessionStatus) return;
+    setIsDragging(true);
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    setDragPercent(percent);
+  }, [sessionStatus]);
+
+  const handleProgressMouseMove = useCallback((e) => {
+    if (!isDragging || !progressBarRef.current) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    setDragPercent(percent);
+  }, [isDragging]);
+
+  const handleProgressMouseUp = useCallback((e) => {
+    if (!isDragging || !sessionStatus) return;
+    setIsDragging(false);
+    const seekTime = (dragPercent / 100) * sessionStatus.total_duration;
+    seekTo(seekTime);
+  }, [isDragging, dragPercent, sessionStatus]);
+
+  // Global mouse events for drag
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleProgressMouseMove);
+      window.addEventListener('mouseup', handleProgressMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleProgressMouseMove);
+        window.removeEventListener('mouseup', handleProgressMouseUp);
+      };
+    }
+  }, [isDragging, handleProgressMouseMove, handleProgressMouseUp]);
+
+  // Click to seek
+  const handleProgressClick = (e) => {
+    if (!sessionStatus) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const percent = ((e.clientX - rect.left) / rect.width) * 100;
+    const seekTime = (percent / 100) * sessionStatus.total_duration;
+    seekTo(seekTime);
+  };
+
+  // Current progress (drag or smooth)
+  const displayProgress = isDragging ? dragPercent : smoothProgress;
   
   if (!sessionActive) {
     return (
@@ -190,38 +325,43 @@ export default function SessionControl() {
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 100,
-        background: 'rgba(0, 0, 0, 0.85)',
+        background: 'rgba(18, 18, 18, 0.95)',
         backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(100, 200, 255, 0.3)',
-        borderRadius: '50px',
-        padding: '12px 30px',
-        fontFamily: 'monospace',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '8px',
+        padding: '12px 24px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: '#fff',
         display: 'flex',
         alignItems: 'center',
-        gap: '15px'
+        gap: '15px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
       }}>
-        <div style={{ fontSize: '10px', opacity: 0.6 }}>
+        <div style={{ fontSize: '11px', opacity: 0.5, letterSpacing: '0.5px' }}>
           📼 SESSION PLAYER
         </div>
         <button
           onClick={togglePlayPause}
           style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'white',
             border: 'none',
-            padding: '8px 20px',
-            borderRadius: '20px',
-            color: 'white',
+            padding: '10px 24px',
+            borderRadius: '24px',
+            color: 'black',
             cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '12px',
-            fontFamily: 'monospace',
+            fontWeight: '600',
+            fontSize: '13px',
+            fontFamily: 'inherit',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            transition: 'all 0.15s ease',
+            transform: 'scale(1)'
           }}
+          onMouseEnter={(e) => e.target.style.transform = 'scale(1.04)'}
+          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
         >
-          ▶️ PLAY
+          ▶ PLAY
         </button>
       </div>
     );
@@ -232,121 +372,230 @@ export default function SessionControl() {
       position: 'fixed',
       bottom: '0',
       left: '0',
-      right: '320px', // Dejar espacio para el sidebar
+      right: '320px',
       zIndex: 100,
-      background: 'rgba(0, 0, 0, 0.92)',
-      backdropFilter: 'blur(10px)',
-      borderTop: '1px solid rgba(100, 200, 255, 0.3)',
-      padding: '15px 25px',
-      fontFamily: 'monospace',
+      background: 'linear-gradient(180deg, rgba(18, 18, 18, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%)',
+      backdropFilter: 'blur(20px)',
+      borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+      padding: '12px 20px 16px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: '#fff'
     }}>
-      {/* Controles principales en una fila */}
+      {/* Progress bar - Top (Spotify style) */}
+      {sessionStatus && (
+        <div style={{ marginBottom: '12px' }}>
+          <div 
+            ref={progressBarRef}
+            style={{
+              width: '100%',
+              height: '4px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '2px',
+              position: 'relative',
+              cursor: 'pointer',
+              transition: 'height 0.1s ease'
+            }}
+            onMouseDown={handleProgressMouseDown}
+            onClick={handleProgressClick}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.height = '6px';
+              const knob = e.currentTarget.querySelector('.progress-knob');
+              if (knob) knob.style.opacity = '1';
+            }}
+            onMouseLeave={(e) => {
+              if (!isDragging) {
+                e.currentTarget.style.height = '4px';
+                const knob = e.currentTarget.querySelector('.progress-knob');
+                if (knob) knob.style.opacity = '0';
+              }
+            }}
+          >
+            {/* Loaded/buffered indicator (subtle) */}
+            <div style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '2px'
+            }} />
+            
+            {/* Progress fill */}
+            <div style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: `${displayProgress}%`,
+              height: '100%',
+              background: 'white',
+              borderRadius: '2px',
+              transition: isDragging ? 'none' : 'width 0.1s linear'
+            }} />
+            
+            {/* Draggable knob */}
+            <div 
+              className="progress-knob"
+              style={{
+                position: 'absolute',
+                left: `${displayProgress}%`,
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '12px',
+                height: '12px',
+                background: '#fff',
+                borderRadius: '50%',
+                opacity: isDragging ? 1 : 0,
+                transition: 'opacity 0.15s ease',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                cursor: 'grab'
+              }}
+            />
+          </div>
+          
+          {/* Time indicators */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: '4px',
+            fontSize: '11px',
+            color: 'rgba(255, 255, 255, 0.5)',
+            fontVariantNumeric: 'tabular-nums'
+          }}>
+            <span>{formatTime(isDragging ? (dragPercent / 100) * sessionStatus.total_duration : sessionStatus.current_position)}</span>
+            <span>{formatTime(sessionStatus.total_duration)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Main controls row */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '20px'
+        gap: '16px'
       }}>
-        {/* Play/Pause y Stop */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        {/* Session info */}
+        <div style={{ 
+          flex: '0 0 200px',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            fontSize: '13px',
+            fontWeight: '500',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {sessionStatus?.session_metadata?.name || 'Loading...'}
+          </div>
+          <div style={{
+            fontSize: '11px',
+            color: 'rgba(255, 255, 255, 0.5)',
+            marginTop: '2px'
+          }}>
+            {playlist?.current?.category || 'Session'}
+          </div>
+        </div>
+
+        {/* Playback controls - Center */}
+        <div style={{ 
+          flex: 1,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          {/* Previous */}
+          <button
+            onClick={previousSession}
+            disabled={isLoadingSession}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '8px',
+              color: isLoadingSession ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)',
+              cursor: isLoadingSession ? 'not-allowed' : 'pointer',
+              fontSize: '16px',
+              transition: 'color 0.15s ease'
+            }}
+            onMouseEnter={(e) => !isLoadingSession && (e.target.style.color = '#fff')}
+            onMouseLeave={(e) => e.target.style.color = 'rgba(255,255,255,0.7)'}
+          >
+            ⏮
+          </button>
+
+          {/* Play/Pause */}
           <button
             onClick={togglePlayPause}
             style={{
-              background: isPlaying ? 'rgba(255, 200, 0, 0.2)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: isPlaying ? '1px solid rgba(255, 200, 0, 0.5)' : 'none',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              color: 'white',
+              background: '#fff',
+              border: 'none',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              color: '#000',
               cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              fontFamily: 'monospace',
-              minWidth: '80px'
-            }}
-          >
-            {isPlaying ? '⏸️ PAUSE' : '▶️ PLAY'}
-          </button>
-          <button
-            onClick={stopSession}
-            style={{
-              background: 'rgba(255, 0, 0, 0.2)',
-              border: '1px solid rgba(255, 0, 0, 0.4)',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              color: '#ff6b6b',
-              cursor: 'pointer',
-              fontSize: '11px',
-              fontFamily: 'monospace'
-            }}
-          >
-            ⏹️ STOP
-          </button>
-        </div>
-        
-        {/* Progress bar expandido */}
-        {sessionStatus && (
-          <div style={{ flex: 1, minWidth: '300px' }}>
-            <div style={{
+              fontSize: '14px',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              fontSize: '9px',
-              opacity: 0.6,
-              marginBottom: '5px'
-            }}>
-              <span>{sessionStatus?.session_metadata?.name || 'Loading...'}</span>
-              <span style={{ marginLeft: 'auto' }}>
-                {formatTime(sessionStatus.current_position)} / {formatTime(sessionStatus.total_duration)}
-              </span>
-            </div>
-            <div style={{
-              width: '100%',
-              height: '6px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '3px',
-              overflow: 'hidden',
-              position: 'relative',
-              cursor: 'pointer'
+              justifyContent: 'center',
+              transition: 'transform 0.1s ease'
             }}
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const percent = x / rect.width;
-              const seekTime = percent * sessionStatus.total_duration;
-              seekTo(seekTime);
-            }}>
-              <div style={{
-                width: `${sessionStatus.progress_percent}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-                transition: 'width 0.2s ease'
-              }} />
-            </div>
-          </div>
-        )}
-        
-        {/* Speed y Playlist compactos */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {/* Speed selector mini */}
+            onMouseEnter={(e) => e.target.style.transform = 'scale(1.06)'}
+            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+          >
+            {isPlaying ? '⏸' : '▶'}
+          </button>
+
+          {/* Next */}
+          <button
+            onClick={nextSession}
+            disabled={isLoadingSession}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '8px',
+              color: isLoadingSession ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)',
+              cursor: isLoadingSession ? 'not-allowed' : 'pointer',
+              fontSize: '16px',
+              transition: 'color 0.15s ease'
+            }}
+            onMouseEnter={(e) => !isLoadingSession && (e.target.style.color = '#fff')}
+            onMouseLeave={(e) => e.target.style.color = 'rgba(255,255,255,0.7)'}
+          >
+            ⏭
+          </button>
+        </div>
+
+        {/* Right controls */}
+        <div style={{ 
+          flex: '0 0 200px',
+          display: 'flex', 
+          gap: '12px', 
+          alignItems: 'center',
+          justifyContent: 'flex-end'
+        }}>
+          {/* Speed selector */}
           {sessionStatus && (
             <select
               onChange={(e) => setSpeed(parseFloat(e.target.value))}
-              value={sessionStatus.playback_speed}
+              value={playbackSpeed}
               style={{
                 background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 padding: '6px 10px',
                 borderRadius: '4px',
                 color: '#fff',
-                fontSize: '10px',
-                fontFamily: 'monospace',
-                cursor: 'pointer'
+                fontSize: '11px',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                outline: 'none'
               }}
             >
-              <option value="0.5">0.5x</option>
-              <option value="1.0">1.0x</option>
-              <option value="2.0">2.0x</option>
-              <option value="5.0">5.0x</option>
+              <option value={0.5}>0.5x</option>
+              <option value={1.0}>1.0x</option>
+              <option value={2.0}>2.0x</option>
+              <option value={5.0}>5.0x</option>
             </select>
           )}
           
@@ -354,121 +603,225 @@ export default function SessionControl() {
           <button
             onClick={() => setShowPlaylist(!showPlaylist)}
             style={{
-              background: showPlaylist ? 'rgba(100, 200, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              padding: '6px 12px',
+              background: showPlaylist ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+              border: showPlaylist ? '1px solid rgba(29, 185, 84, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '6px 14px',
               borderRadius: '4px',
-              color: '#fff',
+              color: showPlaylist ? '#1db954' : '#fff',
               cursor: 'pointer',
-              fontSize: '10px',
-              fontFamily: 'monospace'
+              fontSize: '11px',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease'
             }}
           >
-            {showPlaylist ? '▼' : '▶'} PLAYLIST
+            ☰ Queue
+          </button>
+
+          {/* Stop */}
+          <button
+            onClick={stopSession}
+            style={{
+              background: 'none',
+              border: '1px solid rgba(255, 100, 100, 0.3)',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              color: '#ff6b6b',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'rgba(255, 100, 100, 0.1)';
+              e.target.style.borderColor = 'rgba(255, 100, 100, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'none';
+              e.target.style.borderColor = 'rgba(255, 100, 100, 0.3)';
+            }}
+          >
+            ✕
           </button>
         </div>
       </div>
       
-      {/* Playlist expandible popup */}
+      {/* Playlist popup */}
       {showPlaylist && playlist && (
         <div style={{
           position: 'absolute',
           bottom: '100%',
-          right: '25px',
-          marginBottom: '10px',
-          width: '350px',
-          background: 'rgba(0, 0, 0, 0.95)',
-          border: '1px solid rgba(100, 200, 255, 0.3)',
+          right: '20px',
+          marginBottom: '8px',
+          width: '380px',
+          maxHeight: '400px',
+          background: 'rgba(24, 24, 24, 0.98)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '8px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
         }}>
-          {/* Current session */}
+          {/* Header */}
+          <div style={{
+            padding: '16px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '14px', fontWeight: '600' }}>Queue</span>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
+              {playlist.playlist?.length || 0} sessions
+            </span>
+          </div>
+
+          {/* Now playing */}
           {playlist.current && (
             <div style={{
-              padding: '12px',
-              background: 'linear-gradient(90deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2))',
-              borderBottom: '1px solid rgba(100, 200, 255, 0.3)'
+              padding: '12px 16px',
+              background: 'rgba(29, 185, 84, 0.1)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
             }}>
-              <div style={{ fontSize: '8px', opacity: 0.6, marginBottom: '4px' }}>NOW PLAYING:</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{playlist.current.name}</div>
-              <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '3px' }}>
-                {playlist.current.category} • {playlist.current.index}/{playlist.current.total}
+              <div style={{ fontSize: '10px', color: '#1db954', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Now Playing
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: '500' }}>{playlist.current.name}</div>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                {playlist.current.category}
               </div>
             </div>
           )}
           
-          {/* Nav buttons */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '8px',
-            padding: '10px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            <button
-              onClick={previousSession}
-              style={{
-                flex: 1,
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                padding: '6px',
-                borderRadius: '4px',
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: '10px',
-                fontFamily: 'monospace'
-              }}
-            >
-              ⏮️ PREV
-            </button>
-            <button
-              onClick={nextSession}
-              style={{
-                flex: 1,
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                padding: '6px',
-                borderRadius: '4px',
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: '10px',
-                fontFamily: 'monospace'
-              }}
-            >
-              NEXT ⏭️
-            </button>
-          </div>
-          
-          {/* Session list */}
+          {/* Session list - Scrollable */}
           <div style={{
-            maxHeight: '150px',
+            maxHeight: '280px',
             overflowY: 'auto'
           }}>
-            {playlist.playlist?.map((session, idx) => (
-              <div
-                key={idx}
-                style={{
-                  padding: '8px 12px',
-                  borderBottom: idx < playlist.playlist.length - 1 
-                    ? '1px solid rgba(255, 255, 255, 0.05)' 
-                    : 'none',
-                  background: idx === (playlist.current?.index - 1)
-                    ? 'rgba(100, 200, 255, 0.1)' 
-                    : 'transparent',
-                  fontSize: '9px'
-                }}
-              >
-                <div style={{ fontWeight: idx === (playlist.current?.index - 1) ? 'bold' : 'normal' }}>
-                  {idx === (playlist.current?.index - 1) ? '▶️ ' : `${idx + 1}. `}
-                  {session.name}
+            {playlist.playlist?.map((session, idx) => {
+              const isCurrent = idx === (playlist.current?.index - 1);
+              const isHovered = hoveredSession === idx;
+              
+              return (
+                <div
+                  key={idx}
+                  onClick={() => !isCurrent && selectSession(idx)}
+                  onMouseEnter={() => setHoveredSession(idx)}
+                  onMouseLeave={() => setHoveredSession(null)}
+                  style={{
+                    padding: '10px 16px',
+                    borderBottom: idx < playlist.playlist.length - 1 
+                      ? '1px solid rgba(255, 255, 255, 0.03)' 
+                      : 'none',
+                    background: isCurrent 
+                      ? 'rgba(29, 185, 84, 0.15)' 
+                      : isHovered 
+                        ? 'rgba(255, 255, 255, 0.08)'
+                        : 'transparent',
+                    cursor: isCurrent ? 'default' : 'pointer',
+                    transition: 'background 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}
+                >
+                  {/* Index or playing indicator */}
+                  <div style={{
+                    width: '24px',
+                    textAlign: 'center',
+                    fontSize: '12px',
+                    color: isCurrent ? '#1db954' : 'rgba(255,255,255,0.4)'
+                  }}>
+                    {isCurrent ? (
+                      <span style={{ 
+                        display: 'inline-block',
+                        animation: isPlaying ? 'pulse 1s infinite' : 'none'
+                      }}>♫</span>
+                    ) : isHovered ? (
+                      '▶'
+                    ) : (
+                      idx + 1
+                    )}
+                  </div>
+                  
+                  {/* Session info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ 
+                      fontSize: '13px',
+                      fontWeight: isCurrent ? '500' : '400',
+                      color: isCurrent ? '#1db954' : '#fff',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {session.name}
+                    </div>
+                    <div style={{ 
+                      fontSize: '11px',
+                      color: 'rgba(255,255,255,0.4)',
+                      marginTop: '2px'
+                    }}>
+                      {session.category}
+                      {session.duration > 0 && ` • ${formatTime(session.duration)}`}
+                    </div>
+                  </div>
+
+                  {/* Type badge */}
+                  <div style={{
+                    fontSize: '9px',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    background: session.type === 'recorded' 
+                      ? 'rgba(147, 112, 219, 0.2)' 
+                      : 'rgba(255,255,255,0.1)',
+                    color: session.type === 'recorded' 
+                      ? '#b19cd9' 
+                      : 'rgba(255,255,255,0.5)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.3px'
+                  }}>
+                    {session.type === 'recorded' ? 'REC' : session.type === 'meditation' ? 'MED' : 'DS'}
+                  </div>
                 </div>
-                <div style={{ opacity: 0.4, marginTop: '2px', fontSize: '8px' }}>
-                  {session.category}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
+          {/* Loading overlay */}
+          {isLoadingSession && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(2px)'
+            }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                border: '2px solid rgba(29, 185, 84, 0.3)',
+                borderTopColor: '#1db954',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite'
+              }} />
+            </div>
+          )}
         </div>
       )}
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

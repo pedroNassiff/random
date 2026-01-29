@@ -36,8 +36,8 @@ export function DebugPanel() {
   return (
     <div style={{
       position: 'absolute',
-      bottom: 40,
-      left: 40,
+      bottom: 120,
+      left: 30,
       width: '280px',
       background: 'rgba(0,0,0,0.85)',
       padding: '12px',
@@ -55,11 +55,11 @@ export function DebugPanel() {
         marginBottom: '8px', 
         paddingBottom: '8px', 
         borderBottom: '1px solid rgba(255,255,255,0.2)',
-        color: '#00dcff',
+        color: 'white',
         fontWeight: 'bold',
         fontSize: '0.75rem'
       }}>
-        🔬 DEBUG
+         DEBUG
       </div>
       {/* Current Values - Collapsible */}
       <div style={{ marginBottom: '8px' }}>
@@ -84,8 +84,8 @@ export function DebugPanel() {
           onMouseEnter={(e) => e.target.style.background = 'rgba(255,183,0,0.1)'}
           onMouseLeave={(e) => e.target.style.background = 'transparent'}
         >
-          <span>📊 METRICS</span>
-          <span style={{ fontSize: '0.8rem' }}>{expandedSections.metrics ? '▼' : '▶'}</span>
+          <span style={{color: 'white'}}> METRICS</span>
+          <span style={{ fontSize: '0.8rem', color: 'white' }}>{expandedSections.metrics ? '▼' : '▶'}</span>
         </button>
         
         {expandedSections.metrics && (
@@ -156,7 +156,7 @@ export function DebugPanel() {
             width: '100%',
             background: 'transparent',
             border: 'none',
-            color: '#ff00ff',
+            color: 'white',
             fontWeight: 'bold',
             fontSize: '0.7rem',
             cursor: 'pointer',
@@ -171,7 +171,7 @@ export function DebugPanel() {
           onMouseEnter={(e) => e.target.style.background = 'rgba(255,0,255,0.1)'}
           onMouseLeave={(e) => e.target.style.background = 'transparent'}
         >
-          <span>🎨 SHADER</span>
+          <span> SHADER</span>
           <span style={{ fontSize: '0.8rem' }}>{expandedSections.shader ? '▼' : '▶'}</span>
         </button>
         
@@ -241,8 +241,8 @@ export function DebugPanel() {
           onMouseEnter={(e) => e.target.style.background = 'rgba(0,220,255,0.1)'}
           onMouseLeave={(e) => e.target.style.background = 'transparent'}
         >
-          <span>📡 BANDS</span>
-          <span style={{ fontSize: '0.8rem' }}>{expandedSections.bands ? '▼' : '▶'}</span>
+          <span style={{color: 'white'}}> BANDS</span>
+          <span style={{ fontSize: '0.8rem', color: 'white' }}>{expandedSections.bands ? '▼' : '▶'}</span>
         </button>
         
         {expandedSections.bands && bands && (
@@ -303,7 +303,7 @@ export function DebugPanel() {
             width: '100%',
             background: 'transparent',
             border: 'none',
-            color: '#ffd700',
+            color: 'white',
             fontWeight: 'bold',
             fontSize: '0.7rem',
             cursor: 'pointer',
@@ -318,7 +318,7 @@ export function DebugPanel() {
           onMouseEnter={(e) => e.target.style.background = 'rgba(255,215,0,0.1)'}
           onMouseLeave={(e) => e.target.style.background = 'transparent'}
         >
-          <span>📜 LOG</span>
+          <span style={{color: 'white'}}> LOG</span>
           <span style={{ fontSize: '0.8rem' }}>{expandedSections.log ? '▼' : '▶'}</span>
         </button>
         
