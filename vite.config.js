@@ -1,6 +1,18 @@
 import restart from 'vite-plugin-restart'
 import glsl from 'vite-plugin-glsl'
 import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
+import fs from 'fs'
+
+// Auto-copy brain model if not exists
+const brainModelPath = resolve(__dirname, 'static/models/brain')
+const brainModelSource = resolve(__dirname, 'teoria-sintergica/brain-prototype/frontend/public/models/brain')
+
+if (!fs.existsSync(brainModelPath) && fs.existsSync(brainModelSource)) {
+  fs.mkdirSync(resolve(__dirname, 'static/models'), { recursive: true })
+  fs.cpSync(brainModelSource, brainModelPath, { recursive: true })
+  console.log('✅ Brain model copied to static/models/brain')
+}
 
 export default {
     root: 'src/',

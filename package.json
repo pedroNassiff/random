@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "setup:lab": "node -e \"const fs=require('fs');const src='teoria-sintergica/brain-prototype/frontend/public/models/brain';const dest='static/models/brain';if(!fs.existsSync(dest)&&fs.existsSync(src)){fs.mkdirSync('static/models',{recursive:true});fs.cpSync(src,dest,{recursive:true});console.log('✅ Brain model copied')}else{console.log('ℹ️ Already exists or source not found')}\""
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.2",

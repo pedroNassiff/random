@@ -1,7 +1,7 @@
 uniform float uTime;
 uniform vec3 uColor;
 varying vec3 vPosition;
-
+uniform float uOpacity;
 varying vec3 vNormal;
 
 // Función para obtener el color del chakra según el tiempo
@@ -61,7 +61,7 @@ void main()
     // Obtener color del chakra animado
     vec3 chakraColor = getChakraColor(uTime);
 
-    gl_FragColor = vec4(chakraColor, holographic);
+    gl_FragColor = vec4(chakraColor, holographic * uOpacity);
     //  gl_FragColor = vec4(vNormal, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>

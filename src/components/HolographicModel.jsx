@@ -7,23 +7,23 @@ import holographicFragmentShader from '../shaders/holographic/fragment.glsl';
 
 export default function HolographicModel({ 
   scale = 0.1, 
-  position = [0, -0.5, 0], 
+  position = [0, -0.2, 0], 
   rotation = [0, 0, 0],
-  autoRotate = true 
+  autoRotate = false,
+  opacity = 1.0
 }) {
   const modelRef = useRef();
 
-  // Load GLTF model
   const gltf = useLoader(GLTFLoader, '/malebase.glb');
 
-  // Create holographic material - memoized to avoid recreating
   const material = useMemo(() => {
     return new THREE.ShaderMaterial({
       vertexShader: holographicVertexShader,
       fragmentShader: holographicFragmentShader,
       uniforms: {
         uTime: { value: 0 },
-        uColor: { value: new THREE.Color('#70c1ff') }
+        uColor: { value: new THREE.Color('#70c1ff') },
+        uOpacity: { value: 1.0 }
       },
       transparent: true,
       side: THREE.DoubleSide,
@@ -32,42 +32,29 @@ export default function HolographicModel({
     });
   }, []);
 
-  // Clone model and apply material - only once
   const model = useMemo(() => {
     const clonedScene = gltf.scene.clone();
     clonedScene.traverse((child) => {
       if (child.isMesh) {
         child.material = material;
+        child.frustumCulled = false;
       }
     });
     return clonedScene;
   }, [gltf.scene, material]);
 
-  // Animation loop
-  useFrame((state) => {
-    // Update shader time
-    material.uniforms.uTime.value = state.clock.elapsedTime;
+useFrame((state) => {
+  material.uniforms.uTime.value = state.clock.elapsedTime;
+  material.uniforms.uOpacity.value = opacity;
+  
+  if (modelRef.current) {
+    // 🔥 QUITAR ESTO - no usar visible
+    // modelRef.current.visible = opacity > 0.01;
     
-    if (modelRef.current) {
-      // Apply position from props
-      modelRef.current.position.set(position[0], position[1], position[2]);
-      
-      // Apply scale from props
-      modelRef.current.scale.set(scale, scale, scale);
-      
-      // Apply rotation from props or auto-rotate
-      if (autoRotate) {
-        modelRef.current.rotation.y = state.clock.elapsedTime * 0.3;
-      } else {
-        modelRef.current.rotation.set(rotation[0], rotation[1], rotation[2]);
-      }
-    }
-  });
+    modelRef.current.position.set(position[0], position[1], position[2]);
+    modelRef.current.scale.set(scale, scale, scale);
+  }
+});
 
-  return (
-    <primitive 
-      ref={modelRef}
-      object={model}
-    />
-  );
+  return <primitive ref={modelRef} object={model} />;
 }

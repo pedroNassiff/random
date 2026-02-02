@@ -1,4 +1,4 @@
-# 🧠 Brain Prototype - Teoría Sintérgica
+#  HERMES Brain Prototype - Teoría Sintérgica
 ## Sistema de Neurofeedback en Tiempo Real con Visualización 3D
 
 > *"La cualidad de la experiencia depende de la coherencia del campo neuronal"* — Jacobo Grinberg-Zylberbaum

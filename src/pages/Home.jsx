@@ -1,10 +1,13 @@
-import React, { Suspense, useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowDown, Github, Linkedin, Mail } from 'lucide-react';
 import GlitchButton from '../components/GlitchButton';
 import ScrollingText from '../components/ScrollingText';
 import ChaosGlitchBadge from '../components/ChaosGlitchBadge';
 import Scene3D from '../components/Scene3D';
 import HolographicModel from '../components/HolographicModel';
+import { WaterEffect } from '../components/WaterEffect';
+import HeroGalaxy from '../components/HeroGalaxy';
+import LabModelViewer from '../lab/LabModelViewer';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -13,6 +16,11 @@ import hermesDashboard from '../img/hermes/dashboard.png';
 import calaveraHome from '../img/calavera/home.png';
 import misiaHome from '../img/Misia/photos/home.png';
 import hcgHome from '../img/hcg/home.png';
+import { Water } from 'three/examples/jsm/Addons.js';
+
+import MatrixRain from '../components/MatrixRain';
+
+
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -28,13 +36,133 @@ export default function Home() {
   const project3Ref = useRef(null);
   const project4Ref = useRef(null);
   
+  // State para controlar la secuencia de efectos del hero
+  const [heroPhase, setHeroPhase] = useState('water'); // 'water' | 'galaxy' | 'holographic' | 'idle'
+  const [waterOpacity, setWaterOpacity] = useState(1.0);
+  const [galaxyOpacity, setGalaxyOpacity] = useState(0.0);
+  const [holographicOpacity, setHolographicOpacity] = useState(0.0);
+
+  const [shouldRenderWater, setShouldRenderWater] = useState(true);
+const [shouldRenderGalaxy, setShouldRenderGalaxy] = useState(false);
+const [shouldRenderHolographic, setShouldRenderHolographic] = useState(false);
+
+const [matrixOpacity, setMatrixOpacity] = useState(0.0);
+const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
+
+  
+  // Debug: Track phase and opacity changes
+  useEffect(() => {
+    console.log('🔄 PHASE CHANGE:', heroPhase);
+  }, [heroPhase]);
+  
+  useEffect(() => {
+    const shouldRenderWater = (heroPhase === 'water' || (heroPhase === 'galaxy' && waterOpacity > 0));
+    console.log('💧 Water:', { opacity: waterOpacity.toFixed(3), phase: heroPhase, shouldRender: shouldRenderWater });
+  }, [waterOpacity, heroPhase]);
+  
+  useEffect(() => {
+    const shouldRenderGalaxy = (heroPhase === 'galaxy' || (heroPhase === 'holographic' && galaxyOpacity > 0));
+    console.log('🌌 Galaxy:', { opacity: galaxyOpacity.toFixed(3), phase: heroPhase, shouldRender: shouldRenderGalaxy });
+  }, [galaxyOpacity, heroPhase]);
+  
   // State para las props animadas del modelo
   const [modelProps, setModelProps] = React.useState({
     scale: 0.12,
     position: [0, -1.1, 0],
     rotation: [0, 0, 0],
-    opacity: 1 // Agregar opacity
+    opacity: 1
   });
+
+  // Memoizar props para evitar re-renders
+  const holographicPosition = React.useMemo(() => [0, -1.3, 0], []);
+  const holographicRotation = React.useMemo(() => [0, 0, 0], []);
+
+  // Manejo de la secuencia de efectos del hero con transiciones suaves
+  useEffect(() => {
+  // Pre-cargar galaxy
+  const preloadGalaxyTimer = setTimeout(() => {
+    setShouldRenderGalaxy(true);
+  }, 5900);
+
+  // Transición water -> galaxy
+  const waterToGalaxyTimer = setTimeout(() => {
+    setHeroPhase('galaxy');
+    const startTime = Date.now();
+    const duration = 2000;
+    
+    const transitionInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+      
+      setWaterOpacity(1.0 - eased);
+      setGalaxyOpacity(eased);
+      
+      if (progress >= 1) clearInterval(transitionInterval);
+    }, 16);
+  }, 6000);
+
+  const unmountWaterTimer = setTimeout(() => setShouldRenderWater(false), 8100);
+
+  // Pre-cargar holographic
+  const preloadHolographicTimer = setTimeout(() => {
+    setShouldRenderHolographic(true);
+  }, 17900);
+
+  // Transición galaxy -> holographic
+  const galaxyToHolographicTimer = setTimeout(() => {
+    setHeroPhase('holographic');
+    const startTime = Date.now();
+    const duration = 2000;
+    
+    const transitionInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+      
+      setGalaxyOpacity(1.0 - eased);
+      setHolographicOpacity(eased);
+      
+      if (progress >= 1) clearInterval(transitionInterval);
+    }, 16);
+  }, 18000);
+
+  const unmountGalaxyTimer = setTimeout(() => setShouldRenderGalaxy(false), 20100);
+  const idleTimer = setTimeout(() => setHeroPhase('idle'), 45000);
+
+  //  efecto matrix
+  const preloadMatrixTimer = setTimeout(() => {
+    setShouldRenderMatrix(true);
+  }, 27900);
+
+  const matrixFadeInTimer = setTimeout(() => {
+    const startTime = Date.now();
+    const duration = 2000;
+    
+    const fadeInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+      
+      setMatrixOpacity(eased * 0.8); // Max opacity 0.8 para que no tape todo
+      
+      if (progress >= 1) clearInterval(fadeInterval);
+    }, 16);
+  }, 28000);
+
+
+  return () => {
+    clearTimeout(preloadGalaxyTimer);
+    clearTimeout(waterToGalaxyTimer);
+    clearTimeout(unmountWaterTimer);
+    clearTimeout(preloadHolographicTimer);
+    clearTimeout(galaxyToHolographicTimer);
+    clearTimeout(unmountGalaxyTimer);
+    clearTimeout(idleTimer);
+    clearTimeout(preloadMatrixTimer);
+    clearTimeout(matrixFadeInTimer);
+  };
+}, []);
 
   useEffect(() => {
     console.log('🔍 useEffect ejecutado');
@@ -203,45 +331,76 @@ export default function Home() {
         </nav>
       </header>
 
-      {/* Hero Section */}
+       {/* Hero Section */}
       <section 
         ref={heroSectionRef}
         className="relative flex items-center justify-between gap-20 px-22 pt-[150px] pb-[100px] max-w-[1400px] mx-auto min-h-screen"
       >
         {/* Hero Left - Text */}
         <div className="flex flex-col gap-12 w-[980px] py-5">
-          {/* Badge con efecto de caos */}
           <ChaosGlitchBadge text="Donde fluye ciencia y arte" />
-
-          {/* Title */}
           <h1 className="text-[63px] font-semibold text-[#1A1A1A] leading-[1.1]">
             <span className="block">Explorando el caos</span>
             <span className="block">para encontrar ORDEN</span>
           </h1>
         </div>
 
-        {/* Hero Right - 3D Model Container */}
-        <div 
-          ref={modelContainerRef}
-          className="relative w-[600px] h-[700px] bg-[#0a0a0a] rounded-3xl overflow-hidden border border-[#1a1a1a]"
-          style={{ opacity: modelProps.opacity }}
-        >
-          <Suspense fallback={
-            <div className="flex items-center justify-center w-full h-full">
-            
-            </div>
-          }>
-            <Scene3D camera={{ position: [0, 0, 5], fov: 50 }} controls={false}>
-              <HolographicModel 
-                scale={modelProps.scale} 
-                position={modelProps.position} 
-                rotation={modelProps.rotation}
-                autoRotate={false} 
-              />
-            </Scene3D>
-          </Suspense>
-        </div>
+       {/* Hero Right - 3D Model Container */}
+<div 
+  ref={modelContainerRef}
+  className="relative w-[600px] h-[700px] bg-[#0a0a0a] rounded-3xl overflow-hidden border border-[#1a1a1a]"
+  style={{ opacity: modelProps.opacity }}
+>
+  {/* Scene3D con los modelos 3D */}
+  <Suspense fallback={
+    <div className="flex items-center justify-center w-full h-full">
+      <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+    </div>
+  }>
+    <Scene3D 
+      camera={{ position: [0, 0, 5], fov: 50 }} 
+      controls={heroPhase === 'idle'}
+      lookAt={[0, 0, 0]}
+    >
+      {shouldRenderWater && (
+        <Suspense fallback={null}>
+          <WaterEffect scale={0.4} position={[0, 0, 0]} opacity={waterOpacity} />
+        </Suspense>
+      )}
+
+      {shouldRenderGalaxy && (
+        <Suspense fallback={null}>
+          <HeroGalaxy 
+            scale={4.0} 
+            position={[0, 0, 0]} 
+            rotation={[Math.PI * 0.6, 0, 0]} 
+            startReveal={heroPhase === 'galaxy' || heroPhase === 'holographic'} 
+            opacity={galaxyOpacity} 
+          />
+        </Suspense>
+      )}
+
+      {shouldRenderHolographic && (
+        <Suspense fallback={null}>
+          <HolographicModel 
+            scale={0.12} 
+            position={holographicPosition} 
+            rotation={holographicRotation} 
+            autoRotate={true} 
+            opacity={holographicOpacity} 
+          />
+        </Suspense>
+      )}
+    </Scene3D>
+  </Suspense>
+
+  {/*  Matrix Rain - SE SUPERPONE SOBRE TODO */}
+  {shouldRenderMatrix && (
+    <MatrixRain opacity={matrixOpacity} />
+  )}
+</div>
       </section>
+
 
       {/* Scroll Button */}
       <div className="flex justify-center py-10">
@@ -267,7 +426,7 @@ export default function Home() {
           />
           
           {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/90"></div>
+          <div className="absolute inset-0 bg-black/50"></div>
 
           {/* Contenido */}
           <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
@@ -290,7 +449,7 @@ export default function Home() {
           />
           
           {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/90"></div>
+          <div className="absolute inset-0 bg-black/80"></div>
 
           {/* Contenido */}
           <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
@@ -313,7 +472,7 @@ export default function Home() {
           />
           
           {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/90"></div>
+          <div className="absolute inset-0 bg-black/80"></div>
 
           {/* Contenido */}
           <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
@@ -336,7 +495,7 @@ export default function Home() {
           />
           
           {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/90"></div>
+          <div className="absolute inset-0 bg-black/80"></div>
 
           {/* Contenido */}
           <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
@@ -352,7 +511,7 @@ export default function Home() {
         {/* CTA Section */}
         <div className="absolute top-[2561px] left-16 max-w-[800px] flex flex-col gap-10">
           <p className="text-2xl text-[#1A1A1A] leading-[1.6]">
-            En cada proyecto tratamos de deconstruir para construir, de romper para crear, desde la creación de la marca y concepto, identidad, creación de sitio web y experiencias interactivas
+            Deconstruir para construir, romper para crear, creación de marca y concepto, identidad, creación de sitio web y experiencias interactivas, unicas, random.
           </p>
           <GlitchButton variant="secondary" className="self-start w-[300px]">
             <ScrollingText text="descubrir todos los proyectos" speed={10} textColor="text-white" />
@@ -463,64 +622,57 @@ export default function Home() {
           <h2 className="text-[50px] font-semibold text-[#1A1A1A]">LAB</h2>
         </div>
 
-        {/* Lab Grid - 4 Models with black background */}
+        {/* Lab Grid - 4 Different Experiments */}
         <div className="bg-[#0a0a0a] rounded-3xl p-10">
           <div className="grid grid-cols-4 gap-6">
-            {/* Model 1 */}
-            <div className="h-[400px]">
-              <Suspense fallback={null}>
-                <Scene3D camera={{ position: [0, 0, 3], fov: 50 }} controls={false}>
-                  <HolographicModel 
-                    scale={0.08} 
-                    position={[0, -0.5, 0]} 
-                    rotation={[0, 0, 0]}
-                    autoRotate={true} 
-                  />
-                </Scene3D>
-              </Suspense>
-            </div>
+            {/* Experiment 1 - Brain/Hermes */}
+            <Suspense fallback={
+              <div className="h-[400px] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            }>
+              <LabModelViewer 
+                experimentId="brain" 
+                className="h-[400px] rounded-xl overflow-hidden cursor-pointer"
+                onClick={() => console.log('Navigate to Hermes project')}
+              />
+            </Suspense>
 
-            {/* Model 2 */}
-            <div className="h-[400px]">
-              <Suspense fallback={null}>
-                <Scene3D camera={{ position: [0, 0, 3], fov: 50 }} controls={false}>
-                  <HolographicModel 
-                    scale={0.08} 
-                    position={[0, -0.5, 0]} 
-                    rotation={[0, 0, 0]}
-                    autoRotate={true} 
-                  />
-                </Scene3D>
-              </Suspense>
-            </div>
+            {/* Experiment 2 - Retratarte */}
+            <Suspense fallback={
+              <div className="h-[400px] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            }>
+              <LabModelViewer 
+                experimentId="retratarte" 
+                className="h-[400px] rounded-xl overflow-hidden cursor-pointer"
+              />
+            </Suspense>
 
-            {/* Model 3 */}
-            <div className="h-[400px]">
-              <Suspense fallback={null}>
-                <Scene3D camera={{ position: [0, 0, 3], fov: 50 }} controls={false}>
-                  <HolographicModel 
-                    scale={0.08} 
-                    position={[0, -0.5, 0]} 
-                    rotation={[0, 0, 0]}
-                    autoRotate={true} 
-                  />
-                </Scene3D>
-              </Suspense>
-            </div>
+            {/* Experiment 3 - Tesseract */}
+            <Suspense fallback={
+              <div className="h-[400px] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            }>
+              <LabModelViewer 
+                experimentId="tesseract" 
+                className="h-[400px] rounded-xl overflow-hidden cursor-pointer"
+              />
+            </Suspense>
 
-            {/* Model 4 */}
-            <div className="h-[400px]">
-              <Suspense fallback={null}>
-                <Scene3D camera={{ position: [0, 0, 3], fov: 50 }} controls={false}>
-                  <HolographicModel 
-                    scale={0.08} 
-                    position={[0, -0.5, 0]} 
-                    rotation={[0, 0, 0]}
-                    autoRotate={true} 
-                  />
-                </Scene3D>
-              </Suspense>
-            </div>
+            {/* Experiment 4 - Galaxy */}
+            <Suspense fallback={
+              <div className="h-[400px] flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            }>
+              <LabModelViewer 
+                experimentId="galaxy" 
+                className="h-[400px] rounded-xl overflow-hidden cursor-pointer"
+              />
+            </Suspense>
           </div>
         </div>
 
@@ -549,13 +701,13 @@ export default function Home() {
               <div className="flex flex-col gap-4">
                 <h4 className="text-sm font-semibold text-white">Proyectos</h4>
                 <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Generativos
+                  Modelado 3D
                 </a>
                 <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Visualizaciones
+                  IA
                 </a>
                 <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Experimentos
+                  Web
                 </a>
               </div>
 
