@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowDown, Github, Linkedin, Mail } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowDown } from 'lucide-react';
 import GlitchButton from '../components/GlitchButton';
 import ScrollingText from '../components/ScrollingText';
 import ChaosGlitchBadge from '../components/ChaosGlitchBadge';
@@ -8,6 +9,8 @@ import HolographicModel from '../components/HolographicModel';
 import { WaterEffect } from '../components/WaterEffect';
 import HeroGalaxy from '../components/HeroGalaxy';
 import LabModelViewer from '../lab/LabModelViewer';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -25,6 +28,7 @@ import MatrixRain from '../components/MatrixRain';
 gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
+  const navigate = useNavigate();
   const containerRef = useRef(null);
   const heroSectionRef = useRef(null);
   const modelContainerRef = useRef(null);
@@ -312,24 +316,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
   return (
     <div ref={containerRef} className="w-full min-h-screen bg-[#FDFCFB] font-['Inter',sans-serif]">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-end px-22 py-10 max-w-[1400px] mx-auto bg-[#FDFCFB]/80 backdrop-blur-sm">
-        <div className="absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-[#1A1A1A]">.RANDOM()</div>
-        <nav className="flex gap-3">
-          <GlitchButton variant="nav" onClick={() => document.getElementById('proyectos')?.scrollIntoView({ behavior: 'smooth' })}>
-            Proyectos
-          </GlitchButton>
-            <GlitchButton variant="nav" onClick={() => document.getElementById('servicios')?.scrollIntoView({ behavior: 'smooth' })}>
-            Servicios
-          </GlitchButton>
-          <GlitchButton variant="nav" onClick={() => document.getElementById('lab')?.scrollIntoView({ behavior: 'smooth' })}>
-            Lab
-          </GlitchButton>
-          <GlitchButton variant="nav" onClick={() => document.getElementById('info')?.scrollIntoView({ behavior: 'smooth' })}>
-            Info
-          </GlitchButton>
-        </nav>
-      </header>
+      <Navbar />
 
        {/* Hero Section */}
       <section 
@@ -373,7 +360,8 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           <HeroGalaxy 
             scale={4.0} 
             position={[0, 0, 0]} 
-            rotation={[Math.PI * 0.6, 0, 0]} 
+            rotation={[0, 0, 0]} 
+            autoRotate={true}
             startReveal={heroPhase === 'galaxy' || heroPhase === 'holographic'} 
             opacity={galaxyOpacity} 
           />
@@ -509,11 +497,15 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         </div>
 
         {/* CTA Section */}
-        <div className="absolute top-[2561px] left-16 max-w-[800px] flex flex-col gap-10">
+        <div className="absolute top-[2561px] left-16 max-w-[800px] flex flex-col gap-10 z-50">
           <p className="text-2xl text-[#1A1A1A] leading-[1.6]">
             Deconstruir para construir, romper para crear, creación de marca y concepto, identidad, creación de sitio web y experiencias interactivas, unicas, random.
           </p>
-          <GlitchButton variant="secondary" className="self-start w-[300px]">
+          <GlitchButton 
+            variant="secondary" 
+            className="self-start w-[300px] relative z-50 cursor-pointer"
+            onClick={() => navigate('/work')}
+          >
             <ScrollingText text="descubrir todos los proyectos" speed={10} textColor="text-white" />
           </GlitchButton>
         </div>
@@ -687,65 +679,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         </div>
       </section>
 
-      {/* Footer */}
-      <footer id="info" className="w-full bg-[#1A1A1A] px-16 py-[80px]">
-        <div className="flex flex-col gap-10 max-w-[1600px] mx-auto">
-          {/* Footer Top */}
-          <div className="flex justify-between px-4">
-            <div className="flex flex-col gap-4">
-              <div className="text-xl font-semibold text-white">.RANDOM()</div>
-            </div>
-
-            <div className="flex gap-20">
-              {/* Column 1 */}
-              <div className="flex flex-col gap-4">
-                <h4 className="text-sm font-semibold text-white">Proyectos</h4>
-                <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Modelado 3D
-                </a>
-                <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  IA
-                </a>
-                <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Web
-                </a>
-              </div>
-
-              {/* Column 2 */}
-              <div className="flex flex-col gap-4">
-                <h4 className="text-sm font-semibold text-white">Info</h4>
-                <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Sobre mí
-                </a>
-                <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Proceso
-                </a>
-                <a href="#" className="text-sm text-[#999999] hover:text-white transition-colors">
-                  Contacto
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Bottom */}
-          <div className="flex items-center justify-between pt-8 border-t border-[#333333] px-4">
-            <p className="text-[13px] text-[#666666]">
-              © 2024 .RANDOM() — Todos los derechos reservados
-            </p>
-            <div className="flex gap-6">
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-[#999999] hover:text-white transition-colors">
-                <Github className="w-5 h-5" />
-              </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-[#999999] hover:text-white transition-colors">
-                <Linkedin className="w-5 h-5" />
-              </a>
-              <a href="mailto:contact@random.com" className="text-[#999999] hover:text-white transition-colors">
-                <Mail className="w-5 h-5" />
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

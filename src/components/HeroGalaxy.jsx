@@ -210,17 +210,37 @@ const GalaxyModel = memo(function GalaxyModel({
     // Posición/escala solo primera vez
     if (!groupRef.current.userData.initialized) {
       groupRef.current.position.set(...position)
-    //   const s = scale * 0.4
-    //   groupRef.current.scale.set(s, s, s)
-    //   pointsRef.current.rotation.x = Math.PI * 1
-    //   pointsRef.current.rotation.y = Math.PI * 1
       groupRef.current.userData.initialized = true
     }
     
-    // Rotación
-    // if (autoRotate) {
-    //   groupRef.current.rotation.y += delta * 0.1
-    // }
+    // 🔄 ROTACIÓN PARA VISTA FRONTAL DE GALAXIA PLANA
+    if (autoRotate) {
+      // La galaxia está generada en plano XZ (horizontal)
+      // X=-90° la rota para ponerla vertical (frente a cámara)
+      groupRef.current.rotation.x = -Math.PI * 0.5  // -90° - pone la galaxia vertical
+      
+      // Z rota la galaxia en su propio plano (como un disco girando)
+      groupRef.current.rotation.z += delta * 0.2
+      
+      // Y fijo en 0
+      groupRef.current.rotation.y = 0
+      
+      // 📊 LOG DETALLADO cada 30 frames (~0.5 segundo)
+      if (Math.floor(state.clock.elapsedTime * 60) % 30 === 0) {
+        const rx = groupRef.current.rotation.x
+        const ry = groupRef.current.rotation.y
+        const rz = groupRef.current.rotation.z
+        
+        console.log('🌌 GALAXY ROTATION DEBUG (Vista Frontal):')
+        console.log(`   📐 Rotation X: ${rx.toFixed(3)} rad (${(rx * 180 / Math.PI).toFixed(1)}°) [FIJO - Galaxia vertical]`)
+        console.log(`   📐 Rotation Y: ${ry.toFixed(3)} rad (${(ry * 180 / Math.PI).toFixed(1)}°) [FIJO]`)
+        console.log(`   📐 Rotation Z: ${rz.toFixed(3)} rad (${(rz * 180 / Math.PI).toFixed(1)}°) [Girando como disco]`)
+        console.log(`   ⏱️  Time: ${state.clock.elapsedTime.toFixed(1)}s`)
+        console.log('   💡 Para usar esta rotación:')
+        console.log(`      rotation={[${rx.toFixed(3)}, ${ry.toFixed(3)}, ${rz.toFixed(3)}]}`)
+        console.log('---')
+      }
+    }
   })
 
   return (

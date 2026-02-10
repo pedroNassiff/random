@@ -1,0 +1,81 @@
+/* Page Transition - Efecto de barras verticales blanco/negro */
+
+.page-transition {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  display: flex;
+}
+
+.transition-bar {
+  flex: 1;
+  height: 100%;
+  background: #000;
+  transform: translateY(-100%);
+  transition: transform 1.4s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Animación de entrada (barras bajan) */
+.page-transition.active .transition-bar {
+  transform: translateY(0);
+  transition-delay: var(--delay);
+}
+
+/* Animación de salida (barras suben) */
+.page-transition.active .transition-bar {
+  animation: slideDown 1.4s cubic-bezier(0.77, 0, 0.175, 1) forwards var(--delay),
+             slideUp 1.4s cubic-bezier(0.77, 0, 0.175, 1) forwards 1.4s var(--reverse-delay);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* Fade del contenido durante la transición */
+.page-content {
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+.page-content.transitioning {
+  opacity: 0;
+}
+
+/* Variante blanca (opcional) */
+.page-transition.white .transition-bar {
+  background: #fff;
+}
+
+/* Variante alternando blanco/negro */
+.page-transition.alternate .transition-bar:nth-child(odd) {
+  background: #000;
+}
+
+.page-transition.alternate .transition-bar:nth-child(even) {
+  background: #fff;
+}
+
+/* Responsive - Menos barras en móvil */
+@media (max-width: 768px) {
+  .transition-bar:nth-child(n+5) {
+    display: none;
+  }
+}
