@@ -84,7 +84,7 @@ export default function Navbar() {
             </>
           )}
           {/* Analytics Dashboard Link */}
-          <button
+          {/* <button
             onClick={() => navigate('/analytics')}
             className={`ml-2 p-2 rounded-lg transition-all duration-300 hover:scale-110 ${
               isScrolled || !isProjectPage 
@@ -94,7 +94,7 @@ export default function Navbar() {
             title="Analytics Dashboard"
           >
             <BarChart3 className="w-5 h-5" />
-          </button>
+          </button> */}
         </nav>
 
         {/* Mobile Hamburger */}
