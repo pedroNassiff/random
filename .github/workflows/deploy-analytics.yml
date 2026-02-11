@@ -1,0 +1,59 @@
+name: Deploy Analytics to Production
+
+on:
+  workflow_dispatch:  # Solo ejecución manual
+    inputs:
+      confirm:
+        description: '¿Confirmas el deployment de analytics?'
+        required: true
+        default: 'yes'
+
+jobs:
+  deploy-analytics:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Deploy Analytics Module
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          echo "🔄 Actualizando código completo..."
+          cd /home/brain/random
+          git pull origin main
+          
+          echo "📦 Verificando módulo analytics..."
+          cd teoria-sintergica/brain-prototype/backend
+          ls -la analytics/
+          
+          echo "📦 Instalando dependencias de analytics..."
+          source venv/bin/activate
+          pip install asyncpg influxdb-client psycopg2-binary --quiet
+          
+          echo "📋 Actualizando requirements.txt..."
+          pip freeze > requirements.txt
+          
+          echo "♻️  Reiniciando servicio backend..."
+          sudo systemctl restart brain-backend
+          
+          echo "⏳ Esperando a que el servicio inicie..."
+          sleep 8
+          
+          echo "✅ Verificando estado del servicio..."
+          sudo systemctl status brain-backend --no-pager | head -15
+          
+          echo "🧪 Probando endpoint de analytics..."
+          sleep 2
+          curl -s http://localhost:8000/analytics/health || echo "⚠️  Endpoint aún no responde"
+
+    - name: 🎉 Deployment Success
+      run: |
+        echo "✅ Analytics deployed successfully!"
+        echo "🌐 Test: http://api.random-studio.io/analytics/health"

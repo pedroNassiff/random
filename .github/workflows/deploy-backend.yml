@@ -1,0 +1,48 @@
+name: Deploy Backend to Digital Ocean
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'teoria-sintergica/brain-prototype/backend/**'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🚀 Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          echo "🔄 Actualizando código..."
+          cd /home/brain/random
+          git pull origin main
+          
+          echo "📦 Instalando dependencias..."
+          cd teoria-sintergica/brain-prototype/backend
+          source venv/bin/activate
+          pip install -r requirements.txt --quiet
+          
+          echo "♻️  Reiniciando servicio..."
+          sudo systemctl restart brain-backend
+          
+          echo "⏳ Esperando a que el servicio inicie..."
+          sleep 5
+          
+          echo "✅ Verificando estado del servicio..."
+          sudo systemctl status brain-backend --no-pager | head -10
+          
+          echo "🧪 Probando health check..."
+          curl -s http://localhost:8000/ || echo "⚠️  Backend aún no responde"
+
+    - name: 🎉 Deployment Success
+      run: |
+        echo "✅ Backend deployed successfully!"
+        echo "🌐 API: http://api.random-studio.io"

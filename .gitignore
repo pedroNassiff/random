@@ -1,3 +1,7 @@
 node_modules/
 dist/
 .vercel
+
+# Environment variables
+.env
+**/.env
