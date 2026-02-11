@@ -115,14 +115,19 @@ export function usePageTracking(section) {
     window.addEventListener('scroll', handleScroll, { passive: true });
     document.addEventListener('click', handleClick);
 
-    // NO trackeamos pageview al entrar - solo al salir con métricas completas
+    // Trackear pageview inicial al entrar
+    analyticsService.trackPageview({
+      time_on_page: 0,
+      scroll_depth: 0,
+      clicks: 0,
+    });
 
     // Cleanup
     return () => {
       window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('click', handleClick);
 
-      // Track pageview con todas las métricas acumuladas
+      // Track pageview final con todas las métricas acumuladas
       if (pageStartTime.current) {
         const timeOnPage = Math.floor((Date.now() - pageStartTime.current) / 1000);
         analyticsService.trackPageview({
