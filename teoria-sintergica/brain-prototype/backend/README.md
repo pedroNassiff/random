@@ -43,6 +43,39 @@ uvicorn main:app --reload --port 8000
 
 3.  **Output:** Parámetros sintérgicos hacia el Frontend.
 
+## 🚀 Despliegue en Producción
+
+Para desplegar este backend en Digital Ocean (producción), consulta la guía completa:
+
+📘 **[DEPLOY-DIGITAL-OCEAN.md](./DEPLOY-DIGITAL-OCEAN.md)**
+
+La guía incluye:
+- Configuración de Droplet (Ubuntu)
+- Instalación de PostgreSQL + InfluxDB
+- Configuración de Nginx + SSL
+- Systemd service para auto-inicio
+- WebSocket configuration
+- Monitoreo y troubleshooting
+
+### 🤖 Script de Deploy Automatizado
+
+También puedes usar el script de deploy para automatizar muchos pasos:
+
+```bash
+# Hacer el script ejecutable (solo primera vez)
+chmod +x deploy.sh
+
+# Ejecutar
+./deploy.sh
+```
+
+El script ofrece:
+1. **Deploy inicial** - Configura un servidor nuevo automáticamente
+2. **Actualizar código** - Push y restart del servicio
+3. **Ver logs** - Consulta logs en tiempo real
+4. **Verificar estado** - Muestra estado de todos los servicios
+5. **Generar .env** - Asistente para crear archivo de configuración
+
 ### Guía de Entrenamiento de IA (Manual)
 
 Para entrenar tu propia "Lattice Artificial", sigue estos pasos en tu terminal:

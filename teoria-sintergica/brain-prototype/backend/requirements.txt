@@ -10,6 +10,9 @@ pandas>=2.0.0
 pooch>=1.6.0
 scipy>=1.9.0
 
+# Database - Analytics
+asyncpg>=0.29.0
+
 # Hardware - Muse 2 EEG
 muselsl>=2.2.0
 pylsl>=1.16.0

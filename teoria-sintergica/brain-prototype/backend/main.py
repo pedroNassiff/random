@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import Optional
 import time
 import asyncio
+import asyncpg
+import os
 from models import SyntergicState, FrequencyBands, Vector3
 from ai.inference import SyntergicBrain
 from hardware import MuseConnector, MuseToSyntergicAdapter
@@ -11,6 +13,9 @@ from hardware import MuseConnector, MuseToSyntergicAdapter
 from database import get_database, get_recorder, SessionRecorder
 # New PostgreSQL + InfluxDB
 from database import get_recorder_v2, SessionRecorderV2
+# Analytics
+from analytics.router import router as analytics_router
+from analytics.service import AnalyticsService
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -46,11 +51,49 @@ print("=" * 60)
 # Allow CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://random-studio.io",
+        "https://www.random-studio.io"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ============================================
+# Analytics Integration
+# ============================================
+@app.on_event("startup")
+async def startup():
+    """Initialize analytics database connection pool"""
+    analytics_pool = await asyncpg.create_pool(
+        host=os.getenv("ANALYTICS_DB_HOST", "localhost"),
+        port=int(os.getenv("ANALYTICS_DB_PORT", "5432")),
+        user=os.getenv("ANALYTICS_DB_USER", "analytics_user"),
+        password=os.getenv("ANALYTICS_DB_PASSWORD", "random_sanyi_mapuche"),
+        database=os.getenv("ANALYTICS_DB_NAME", "random_analytics"),
+        min_size=10,
+        max_size=20,
+    )
+    app.state.analytics_pool = analytics_pool
+    app.state.analytics_service = AnalyticsService(analytics_pool)
+    print("✓ Analytics database pool created")
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Close analytics database connection pool"""
+    if hasattr(app.state, "analytics_pool"):
+        await app.state.analytics_pool.close()
+        print("✓ Analytics database pool closed")
+
+# Include analytics router
+app.include_router(analytics_router)
+
+# ============================================
+# Brain Endpoints
+# ============================================
 
 @app.get("/")
 def read_root():

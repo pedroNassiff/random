@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model weights (pueden ser grandes)
+*.pth
+*.h5
+*.ckpt
+models/*.pth
+checkpoints/
+
+# Data (datasets pueden ser grandes)
+data/raw/
+data/processed/
+ds003969/
+*.edf
+*.fif
+
+# InfluxDB
+.influxdb/
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb

@@ -14,6 +14,8 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+// Analytics
+import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
 
 // Project images
 import hermesDashboard from '../img/hermes/dashboard.png';
@@ -36,6 +38,15 @@ export default function Home() {
   const heroSectionRef = useRef(null);
   const modelContainerRef = useRef(null);
   const projectsSectionRef = useRef(null);
+  
+  // Analytics tracking
+  usePageTracking('home');
+  const { trackClick } = useEventTracking();
+  const heroRef = useEngagementTracking('home-hero');
+  const projectsRef = useEngagementTracking('home-projects');
+  const servicesRef = useEngagementTracking('home-services');
+  const labRef = useEngagementTracking('home-lab');
+  const aboutRef = useEngagementTracking('home-about');
   
   // Refs para proyectos
   const project1Ref = useRef(null);
@@ -310,7 +321,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
        {/* Hero Section */}
       <section 
-        ref={heroSectionRef}
+        ref={(el) => {
+          heroSectionRef.current = el;
+          heroRef.current = el;
+        }}
         className="relative flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-20 px-6 md:px-16 lg:px-22 pt-32 md:pt-[150px] pb-16 md:pb-[100px] max-w-[1400px] mx-auto min-h-screen"
       >
         {/* Hero Left - Text */}
@@ -380,7 +394,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       </section>
 
       {/* Projects Section */}
-      <section id="proyectos" className="relative w-full min-h-[3200px] md:min-h-[3600px] bg-[#F8F8F7] px-6 md:px-16 py-24 pb-32 md:pb-24 max-w-[1600px] mx-auto mt-20">
+      <section id="proyectos" ref={projectsRef} className="relative w-full min-h-[3200px] md:min-h-[3600px] bg-[#F8F8F7] px-6 md:px-16 py-24 pb-32 md:pb-24 max-w-[1600px] mx-auto mt-20">
         {/* Title */}
         <div className="absolute top-0 left-6 md:left-16">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.work_title')}</h2>
@@ -389,7 +403,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         {/* Project 1 - Hermes */}
         <div 
           ref={project1Ref} 
-          onClick={() => navigate('/work/hermes')}
+          onClick={() => {
+            trackClick('project_card_click', 'hermes', '.project-card');
+            navigate('/work/hermes');
+          }}
           className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
@@ -416,7 +433,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         {/* Project 2 - Calavera Sur */}
         <div 
           ref={project2Ref} 
-          onClick={() => navigate('/work/calavera-sur')}
+          onClick={() => {
+            trackClick('project_card_click', 'calavera-sur', '.project-card');
+            navigate('/work/calavera-sur');
+          }}
           className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
@@ -443,7 +463,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         {/* Project 3 - Misia */}
         <div 
           ref={project3Ref} 
-          onClick={() => navigate('/work/misia')}
+          onClick={() => {
+            trackClick('project_card_click', 'misia', '.project-card');
+            navigate('/work/misia');
+          }}
           className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
@@ -470,7 +493,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         {/* Project 4 - Hub City Guides */}
         <div 
           ref={project4Ref} 
-          onClick={() => navigate('/work/hub-city-guides')}
+          onClick={() => {
+            trackClick('project_card_click', 'hub-city-guides', '.project-card');
+            navigate('/work/hub-city-guides');
+          }}
           className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
@@ -497,7 +523,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         {/* Project 5 - NDS */}
         <div 
           ref={project5Ref} 
-          onClick={() => navigate('/work/nds')}
+          onClick={() => {
+            trackClick('project_card_click', 'nds', '.project-card');
+            navigate('/work/nds');
+          }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
@@ -529,7 +558,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           <GlitchButton 
             variant="secondary" 
             className="self-start md:self-start mx-auto md:mx-0 w-[300px] relative z-50 cursor-pointer"
-            onClick={() => navigate('/work')}
+            onClick={() => {
+              trackClick('cta_click', 'discover_all_projects', '.cta-button');
+              navigate('/work');
+            }}
           >
             <ScrollingText text={t('home.discover_all')} speed={10} textColor="text-white" />
           </GlitchButton>
@@ -538,7 +570,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
 
       {/* Services Section */}
-      <section id="servicios" className="w-full px-6 md:px-16 py-20 md:py-[120px] mt-16 md:mt-0 max-w-[1600px] mx-auto">
+      <section id="servicios" ref={servicesRef} className="w-full px-6 md:px-16 py-20 md:py-[120px] mt-16 md:mt-0 max-w-[1600px] mx-auto">
         <div className="flex items-center gap-3 mb-12 md:mb-16 pl-0 md:pl-4">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.services_title')}</h2>
         </div>
@@ -604,7 +636,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       </section>
 
       {/* Lab Section */}
-      <section id="lab" className="w-full px-6 md:px-16 py-20 md:py-[120px] max-w-[1600px] mx-auto">
+      <section id="lab" ref={labRef} className="w-full px-6 md:px-16 py-20 md:py-[120px] max-w-[1600px] mx-auto">
         <div className="flex items-center justify-start md:justify-end gap-3 mb-12 md:mb-16 pr-0 md:pr-4">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.lab_title')}</h2>
         </div>
@@ -621,7 +653,10 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
               <LabModelViewer 
                 experimentId="brain" 
                 className="h-[400px] rounded-xl overflow-hidden cursor-pointer"
-                onClick={() => console.log('Navigate to Hermes project')}
+                onClick={() => {
+                  trackClick('lab_experiment_click', 'brain', '.lab-experiment');
+                  navigate('/work/hermes');
+                }}
               />
             </Suspense>
 
@@ -668,14 +703,18 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           <p className="text-2xl text-[#1A1A1A] leading-[1.6] max-w-[800px] text-center md:text-right">
             
           </p>
-          <GlitchButton variant="secondary" className="w-[250px] mx-auto md:mx-0">
+          <GlitchButton 
+            variant="secondary" 
+            className="w-[250px] mx-auto md:mx-0"
+            onClick={() => trackClick('lab_cta_click', 'go_to_lab', '.lab-button')}
+          >
             <ScrollingText text={t('home.go_to_lab')} speed={10} textColor="text-white" />
           </GlitchButton>
         </div>
       </section>
 
       {/* About Section */}
-      <section id="about" className="w-full px-6 md:px-16 py-20 md:py-[120px] max-w-[1400px] mx-auto">
+      <section id="about" ref={aboutRef} className="w-full px-6 md:px-16 py-20 md:py-[120px] max-w-[1400px] mx-auto">
         <div className="flex items-center gap-3 mb-12 md:mb-16 pl-0 md:pl-4">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.about_title')}</h2>
         </div>

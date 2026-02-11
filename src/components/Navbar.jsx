@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import GlitchButton from './GlitchButton';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, BarChart3 } from 'lucide-react';
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -51,7 +51,7 @@ export default function Navbar() {
         }`}>.RANDOM()</div>
         
         {/* Desktop Nav */}
-        <nav className="hidden md:flex gap-3">
+        <nav className="hidden md:flex gap-3 items-center">
           {isHome ? (
             <>
               <GlitchButton variant="nav" isWhiteText={!isScrolled && isProjectPage} onClick={() => handleNavClick('proyectos')}>
@@ -83,6 +83,18 @@ export default function Navbar() {
               </GlitchButton>
             </>
           )}
+          {/* Analytics Dashboard Link */}
+          <button
+            onClick={() => navigate('/analytics')}
+            className={`ml-2 p-2 rounded-lg transition-all duration-300 hover:scale-110 ${
+              isScrolled || !isProjectPage 
+                ? 'text-[#1A1A1A] hover:bg-[#1A1A1A]/10' 
+                : 'text-white hover:bg-white/10'
+            }`}
+            title="Analytics Dashboard"
+          >
+            <BarChart3 className="w-5 h-5" />
+          </button>
         </nav>
 
         {/* Mobile Hamburger */}
@@ -131,6 +143,14 @@ export default function Navbar() {
             </button>
           </>
         )}
+        {/* Analytics link in mobile menu */}
+        <button 
+          onClick={() => { setMobileMenuOpen(false); navigate('/analytics'); }} 
+          className="flex items-center gap-2 text-xl font-medium text-[#1A1A1A] hover:opacity-70 transition-opacity"
+        >
+          <BarChart3 className="w-5 h-5" />
+          Analytics
+        </button>
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
 import { projects } from '../data/projects';
 import GlitchButton from '../components/GlitchButton';
 import ScrollingText from '../components/ScrollingText';
@@ -14,6 +15,9 @@ gsap.registerPlugin(ScrollTrigger);
 export default function Work() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  usePageTracking('work');
+  const { trackClick } = useEventTracking();
+  const portfolioRef = useEngagementTracking('work-portfolio');
   const project1Ref = useRef(null);
   const project2Ref = useRef(null);
   const project3Ref = useRef(null);
@@ -180,7 +184,7 @@ export default function Work() {
       <Navbar />
 
       {/* Work Section */}
-      <section className="relative w-full min-h-[3700px] bg-[#F8F8F7] px-6 md:px-16 py-24 max-w-[1600px] mx-auto mt-20">
+      <section ref={portfolioRef} className="relative w-full min-h-[3700px] bg-[#F8F8F7] px-6 md:px-16 py-24 max-w-[1600px] mx-auto mt-20">
         {/* Title */}
         <div className="absolute top-10 left-6 md:left-16">
           <h1 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">
@@ -191,7 +195,10 @@ export default function Work() {
         {/* Project 1 */}
         <div 
           ref={project1Ref} 
-          onClick={() => navigate(`/work/${projects[0].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[0].id, '.work-project-card');
+            navigate(`/work/${projects[0].id}`);
+          }}
           className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
@@ -213,7 +220,10 @@ export default function Work() {
         {/* Project 2 */}
         <div 
           ref={project2Ref} 
-          onClick={() => navigate(`/work/${projects[1].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[1].id, '.work-project-card');
+            navigate(`/work/${projects[1].id}`);
+          }}
           className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
@@ -235,7 +245,10 @@ export default function Work() {
         {/* Project 3 */}
         <div 
           ref={project3Ref} 
-          onClick={() => navigate(`/work/${projects[2].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[2].id, '.work-project-card');
+            navigate(`/work/${projects[2].id}`);
+          }}
           className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
@@ -257,7 +270,10 @@ export default function Work() {
         {/* Project 4 */}
         <div 
           ref={project4Ref} 
-          onClick={() => navigate(`/work/${projects[3].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[3].id, '.work-project-card');
+            navigate(`/work/${projects[3].id}`);
+          }}
           className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
@@ -279,7 +295,10 @@ export default function Work() {
          {/* Project 5 */}
         <div 
           ref={project5Ref} 
-          onClick={() => navigate(`/work/${projects[4].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[4].id, '.work-project-card');
+            navigate(`/work/${projects[4].id}`);
+          }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
@@ -301,7 +320,10 @@ export default function Work() {
         {/* Project 6 */}
         <div 
           ref={project6Ref} 
-          onClick={() => navigate(`/work/${projects[5].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[5].id, '.work-project-card');
+            navigate(`/work/${projects[5].id}`);
+          }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
@@ -323,7 +345,10 @@ export default function Work() {
         {/* Project 7 */}
         <div 
           ref={project7Ref} 
-          onClick={() => navigate(`/work/${projects[6].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[6].id, '.work-project-card');
+            navigate(`/work/${projects[6].id}`);
+          }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
@@ -345,7 +370,10 @@ export default function Work() {
         {/* Project 8 */}
         <div 
           ref={project8Ref} 
-          onClick={() => navigate(`/work/${projects[7].id}`)}
+          onClick={() => {
+            trackClick('work_project_click', projects[7].id, '.work-project-card');
+            navigate(`/work/${projects[7].id}`);
+          }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 

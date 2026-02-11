@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { usePageTracking, useConversionTracking, useEventTracking } from '../lib/useAnalytics.jsx'
 import { projects } from '../data/projects'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -14,6 +15,10 @@ const ProjectDetail = () => {
   const [project, setProject] = useState(null)
   const [nextProject, setNextProject] = useState(null)
   const imageRefs = useRef([])
+  
+  usePageTracking(`work/${projectId}`);
+  const { trackProjectView } = useConversionTracking();
+  const { trackClick } = useEventTracking();
 
   useEffect(() => {
     // Buscar proyecto actual
@@ -24,6 +29,9 @@ const ProjectDetail = () => {
     }
     setProject(currentProject)
 
+    // Track project view as conversion
+    trackProjectView(projectId);
+
     // Buscar siguiente proyecto
     const currentIndex = projects.findIndex(p => p.id === projectId)
     const nextIndex = (currentIndex + 1) % projects.length
@@ -31,7 +39,7 @@ const ProjectDetail = () => {
 
     // Scroll to top
     window.scrollTo(0, 0)
-  }, [projectId, navigate])
+  }, [projectId, navigate, trackProjectView])
 
   useEffect(() => {
     if (!project || !project.images) return
@@ -72,7 +80,8 @@ const ProjectDetail = () => {
 
   const handleNextProject = () => {
     if (nextProject) {
-      navigate(`/work/${nextProject.id}`)
+      trackClick('next_project_click', nextProject.id, '.next-project-button');
+      navigate(`/work/${nextProject.id}`);
     }
   }
 
