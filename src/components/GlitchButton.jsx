@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function GlitchButton({ children, className = '', variant = 'nav', ...props }) {
+export default function GlitchButton({ children, className = '', variant = 'nav', isWhiteText = false, ...props }) {
   // Si children es un componente React (como ScrollingText), no aplicar glitch
   const isReactElement = React.isValidElement(children);
   
@@ -53,7 +53,9 @@ export default function GlitchButton({ children, className = '', variant = 'nav'
   };
 
   const variants = {
-    nav: "px-5 py-2.5 text-[15px] text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] rounded-lg transition-all duration-200",
+    nav: isWhiteText 
+      ? "px-5 py-2.5 text-[15px] text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+      : "px-5 py-2.5 text-[15px] text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] rounded-lg transition-all duration-200",
     primary: isReactElement 
       ? "py-[14px] bg-white rounded-full text-[15px] font-medium text-[#1A1A1A] hover:bg-gray-100 transition-all duration-200 overflow-hidden"
       : "px-8 py-[14px] bg-white rounded-full text-[15px] font-medium text-[#1A1A1A] hover:bg-gray-100 transition-all duration-200 overflow-hidden",
