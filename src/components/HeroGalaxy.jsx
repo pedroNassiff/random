@@ -230,15 +230,6 @@ const GalaxyModel = memo(function GalaxyModel({
         const rx = groupRef.current.rotation.x
         const ry = groupRef.current.rotation.y
         const rz = groupRef.current.rotation.z
-        
-        console.log('🌌 GALAXY ROTATION DEBUG (Vista Frontal):')
-        console.log(`   📐 Rotation X: ${rx.toFixed(3)} rad (${(rx * 180 / Math.PI).toFixed(1)}°) [FIJO - Galaxia vertical]`)
-        console.log(`   📐 Rotation Y: ${ry.toFixed(3)} rad (${(ry * 180 / Math.PI).toFixed(1)}°) [FIJO]`)
-        console.log(`   📐 Rotation Z: ${rz.toFixed(3)} rad (${(rz * 180 / Math.PI).toFixed(1)}°) [Girando como disco]`)
-        console.log(`   ⏱️  Time: ${state.clock.elapsedTime.toFixed(1)}s`)
-        console.log('   💡 Para usar esta rotación:')
-        console.log(`      rotation={[${rx.toFixed(3)}, ${ry.toFixed(3)}, ${rz.toFixed(3)}]}`)
-        console.log('---')
       }
     }
   })

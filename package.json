@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "setup:lab": "node -e \"const fs=require('fs');const src='teoria-sintergica/brain-prototype/frontend/public/models/brain';const dest='static/models/brain';if(!fs.existsSync(dest)&&fs.existsSync(src)){fs.mkdirSync('static/models',{recursive:true});fs.cpSync(src,dest,{recursive:true});console.log('✅ Brain model copied')}else{console.log('ℹ️ Already exists or source not found')}\""
+    "preview": "vite preview",
+    "setup:lab": "node -e \"const fs=require('fs');const src='teoria-sintergica/brain-prototype/frontend/public/models/brain';const dest='static/models/brain';if(!fs.existsSync(dest)&&fs.existsSync(src)){fs.mkdirSync('static/models',{recursive:true});fs.cpSync(src,dest,{recursive:true});console.log('✅ Brain model copied')}else{console.log('ℹ️ Already exists or source not found')}\"",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.2",
@@ -22,10 +25,13 @@
     "@react-three/fiber": "^9.5.0",
     "dat.gui": "^0.7.9",
     "gsap": "^3.14.2",
+    "i18next": "^25.8.5",
+    "i18next-browser-languagedetector": "^8.2.0",
     "lil-gui": "^0.20.0",
     "lucide-react": "^0.563.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-i18next": "^16.5.4",
     "react-router-dom": "^7.13.0",
     "three": "^0.174.0"
   }

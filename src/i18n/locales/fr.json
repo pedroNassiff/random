@@ -1,0 +1,52 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "projects": "Projets",
+    "services": "Services",
+    "lab": "Lab",
+    "about": "À propos"
+  },
+  "footer": {
+    "projects_title": "Projets",
+    "work": "Travaux",
+    "services": "Services",
+    "lab": "Lab",
+    "info_title": "Info",
+    "about": "À propos",
+    "contact": "Contact",
+    "rights": "Tous droits réservés"
+  },
+  "home": {
+    "work_title": "TRAVAUX",
+    "view_project": "voir le projet",
+    "cta_description": "Nous brisons les structures pour trouver de nouvelles formes. Nous déconstruisons l'établi pour construire l'extraordinaire. Marque qui respire, identité qui évolue, web qui se sent vivant, expériences inoubliables — chaque projet naît de l'exploration de l'inattendu.",
+    "discover_all": "découvrir tous les projets",
+    "services_title": "SERVICES",
+    "services": {
+      "web_dev": {
+        "title": "DÉVELOPPEMENT WEB",
+        "description": "Applications web modernes et évolutives avec les dernières technologies"
+      },
+      "cloud": {
+        "title": "CLOUD & DEVOPS",
+        "description": "Infrastructure cloud et automatisation des déploiements"
+      },
+      "ai": {
+        "title": "IA & ML",
+        "description": "Intelligence artificielle et modèles d'apprentissage automatique"
+      },
+      "3d": {
+        "title": "EXPÉRIENCES 3D",
+        "description": "Visualisations interactives avec WebGL et Three.js"
+      }
+    },
+    "lab_title": "LAB",
+    "go_to_lab": "aller au lab",
+    "about_title": "À PROPOS",
+    "about_text_1": "Dans le chaos des données, le bruit de la matrice, le flux constant d'informations — là se trouve notre laboratoire. Là où d'autres voient le désordre, nous trouvons des motifs. Là où l'habitude limite, l'exploration découvre. Random est cette perturbation nécessaire qui brise le prévisible pour atteindre l'extraordinaire.",
+    "about_text_2": "La meilleure solution ne vient pas du manuel — elle vient de briser la règle, tester, ajuster. La matrice tombe avec son code infini, mais là, dans le bruit, se trouve la température exacte, le temps précis, la coupe parfaite. Random est cette exploration : nous perturbons l'eau pour voir les vagues, nous observons l'énergie formant la galaxie, nous capturons les vibrations holographiques. Non pas parce que nous cherchons le chaos — nous le cherchons parce que c'est là que se trouve l'apprentissage. Nous brisons l'habitude pour trouver le chemin. Nous nous perdons dans l'inconnu pour découvrir ce que nous ne savions pas exister. C'est pour cela que nous sommes là : transformer l'aléatoire en intention, le bruit en clarté, la perturbation en création."
+  },
+  "work": {
+    "title": "TRAVAUX"
+  }
+}
