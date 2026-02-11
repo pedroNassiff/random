@@ -293,6 +293,57 @@
   color: #fff;
 }
 
+/* Geographic Distribution */
+.geo-list {
+  display: grid;
+  gap: 12px;
+}
+
+.geo-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.geo-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.geo-details {
+  flex: 1;
+}
+
+.geo-location {
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 4px 0;
+}
+
+.geo-count {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.geo-percentage {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.no-data {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  padding: 32px;
+  font-style: italic;
+}
+
 /* Loading */
 .analytics-loading {
   min-height: 100vh;

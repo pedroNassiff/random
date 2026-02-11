@@ -368,7 +368,6 @@ const Analytics = () => {
             <div className="geo-list">
               {summary?.top_countries?.map((location, index) => (
                 <div key={index} className="geo-item">
-                  <div className="geo-flag">🌍</div>
                   <div className="geo-details">
                     <p className="geo-location">
                       {location.city ? `${location.city}, ` : ''}{location.country || 'Unknown'}
