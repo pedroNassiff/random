@@ -39,7 +39,8 @@ const ProjectDetail = () => {
 
     // Scroll to top
     window.scrollTo(0, 0)
-  }, [projectId, navigate, trackProjectView])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, navigate]) // trackProjectView se omite intencionalmente para evitar duplicados
 
   useEffect(() => {
     if (!project || !project.images) return

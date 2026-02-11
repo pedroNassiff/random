@@ -14,7 +14,7 @@ from uuid import UUID
 class AnalyticsSessionStart(BaseModel):
     """Iniciar una nueva sesión de usuario"""
     anonymous_id: str = Field(..., description="Hash anónimo único del navegador")
-    session_id: str = Field(..., description="ID único de la sesión")
+    session_id: Optional[str] = Field(None, description="ID único de la sesión (se genera automáticamente si no se provee)")
     
     # Device & Browser
     device_type: Optional[str] = Field(None, description="desktop, mobile, tablet")
@@ -36,13 +36,18 @@ class AnalyticsSessionStart(BaseModel):
     utm_content: Optional[str] = None
     utm_term: Optional[str] = None
     
-    # Location (será procesado en el backend)
+    # Location (from frontend geolocation API)
+    country: Optional[str] = Field(None, max_length=2, description="ISO country code (e.g., 'US', 'ES')")
+    city: Optional[str] = Field(None, max_length=100, description="City name")
+    ip_hash: Optional[str] = Field(None, max_length=64, description="Hashed IP for privacy")
     timezone: Optional[str] = None
     language: Optional[str] = Field(None, description="e.g., 'es', 'en', 'fr'")
 
 
 class PageView(BaseModel):
     """Registrar una vista de página"""
+    model_config = {"extra": "ignore"}  # Ignorar campos adicionales
+    
     session_id: str
     page_path: str = Field(..., description="e.g., '/', '/work', '/work/hermes'")
     page_title: Optional[str] = None
@@ -55,6 +60,8 @@ class PageView(BaseModel):
 
 class AnalyticsEvent(BaseModel):
     """Registrar un evento (click, scroll, hover, etc.)"""
+    model_config = {"extra": "ignore"}  # Ignorar campos adicionales
+    
     session_id: str
     event_type: str = Field(..., description="click, scroll, hover, view, form_submit")
     event_name: str = Field(..., description="project_card_click, nav_click, cta_click")
@@ -76,9 +83,11 @@ class AnalyticsEvent(BaseModel):
 
 class EngagementZone(BaseModel):
     """Registrar tiempo en una zona específica de la página"""
+    model_config = {"extra": "ignore"}  # Ignorar campos adicionales
+    
     session_id: str
     page_path: str
-    zone_id: str = Field(..., description="hero, projects, services, lab, about")
+    zone_id: Optional[str] = Field(None, description="hero, projects, services, lab, about")
     zone_name: Optional[str] = None
     time_spent: int = Field(..., ge=0, description="Segundos en la zona")
     scroll_reached: bool = False
@@ -96,9 +105,9 @@ class Conversion(BaseModel):
 class AnalyticsSessionEnd(BaseModel):
     """Finalizar una sesión"""
     session_id: str
-    exit_page: str
-    total_clicks: int = Field(0, ge=0)
-    avg_scroll_depth: int = Field(0, ge=0, le=100)
+    exit_page: Optional[str] = Field(None)
+    total_clicks: Optional[int] = Field(0, ge=0)
+    avg_scroll_depth: Optional[int] = Field(0, ge=0, le=100)
 
 
 class AnalyticsBatch(BaseModel):
@@ -134,6 +143,9 @@ class AnalyticsSummary(BaseModel):
     top_pages: List[Dict[str, Any]]
     top_events: List[Dict[str, Any]]
     top_sources: List[Dict[str, Any]]
+    daily_sessions: List[Dict[str, Any]] = []
+    device_breakdown: List[Dict[str, Any]] = []
+    top_countries: List[Dict[str, Any]] = []
 
 
 class PageAnalytics(BaseModel):

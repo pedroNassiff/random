@@ -94,12 +94,14 @@ export function usePageTracking(section) {
       const scrollTop = window.scrollY;
       const currentDepth = Math.round(((scrollTop + windowHeight) / documentHeight) * 100);
       
+      const previousDepth = scrollDepth.current;
+      
       if (currentDepth > scrollDepth.current) {
         scrollDepth.current = currentDepth;
       }
 
-      // Conversion: scroll completo
-      if (currentDepth >= 95 && scrollDepth.current < 95) {
+      // Conversion: scroll completo (solo una vez)
+      if (currentDepth >= 95 && previousDepth < 95) {
         analyticsService.trackConversion('full_scroll');
       }
     };
@@ -113,22 +115,17 @@ export function usePageTracking(section) {
     window.addEventListener('scroll', handleScroll, { passive: true });
     document.addEventListener('click', handleClick);
 
-    // Track pageview inicial
-    analyticsService.trackPageview({
-      section,
-      page_title: document.title,
-    });
+    // NO trackeamos pageview al entrar - solo al salir con métricas completas
 
     // Cleanup
     return () => {
       window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('click', handleClick);
 
-      // Track pageview final con métricas
+      // Track pageview con todas las métricas acumuladas
       if (pageStartTime.current) {
         const timeOnPage = Math.floor((Date.now() - pageStartTime.current) / 1000);
         analyticsService.trackPageview({
-          section,
           time_on_page: timeOnPage,
           scroll_depth: scrollDepth.current,
           clicks: clickCount.current,

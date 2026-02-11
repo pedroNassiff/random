@@ -38,10 +38,24 @@ async def start_session(
     if "x-forwarded-for" in request.headers:
         client_ip = request.headers["x-forwarded-for"].split(",")[0].strip()
     
-    # En producción, usar un servicio de geolocalización (ej: MaxMind GeoIP2)
-    # Para desarrollo, usamos None
-    country = None  # TODO: Implementar geolocalización
+    # Obtener geolocalización usando ip-api.com (gratis, sin API key)
+    country = None
     city = None
+    
+    # Si la IP no es local, obtener geolocalización
+    if client_ip and not client_ip.startswith(('127.', '192.168.', '10.', '172.')):
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get(f"http://ip-api.com/json/{client_ip}?fields=status,country,countryCode,city")
+                if response.status_code == 200:
+                    geo_data = response.json()
+                    if geo_data.get('status') == 'success':
+                        country = geo_data.get('countryCode')
+                        city = geo_data.get('city')
+        except Exception as e:
+            # Si falla la geolocalización, continuar sin ella
+            print(f"Geolocation failed: {e}")
     
     result = await service.start_session(data, client_ip, country, city)
     
@@ -226,6 +240,36 @@ async def get_summary(
     return await service.get_summary(days)
 
 
+@router.get("/top-pages")
+async def get_top_pages(
+    days: int = 30,
+    limit: int = 10,
+    service: AnalyticsService = Depends(get_analytics_service)
+):
+    """Obtener páginas más visitadas"""
+    return await service.get_top_pages(days, limit)
+
+
+@router.get("/top-events")
+async def get_top_events(
+    days: int = 30,
+    limit: int = 10,
+    service: AnalyticsService = Depends(get_analytics_service)
+):
+    """Obtener eventos más frecuentes"""
+    return await service.get_top_events(days, limit)
+
+
+@router.get("/top-engagement-zones")
+async def get_top_zones(
+    days: int = 30,
+    limit: int = 10,
+    service: AnalyticsService = Depends(get_analytics_service)
+):
+    """Obtener zonas de engagement más activas"""
+    return await service.get_top_engagement_zones(days, limit)
+
+
 @router.get("/health")
 async def health_check():
     """Health check del sistema de analytics"""
@@ -234,3 +278,4 @@ async def health_check():
         "service": "analytics",
         "version": "1.0.0"
     }
+

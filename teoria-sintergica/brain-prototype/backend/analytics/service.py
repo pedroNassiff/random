@@ -67,6 +67,11 @@ class AnalyticsService:
     ) -> Dict[str, Any]:
         """Iniciar una nueva sesión de usuario"""
         
+        # Usar datos de geolocalización del frontend si existen, sino usar los del backend
+        final_country = data.country if data.country else country
+        final_city = data.city if data.city else city
+        final_ip_hash = data.ip_hash if data.ip_hash else self.hash_ip(ip_address)
+        
         async with self.db.acquire() as conn:
             # 1. Buscar o crear usuario
             user = await conn.fetchrow(
@@ -92,7 +97,7 @@ class AnalyticsService:
                         updated_at = NOW()
                     WHERE id = $1
                     """,
-                    user_id, country, city, data.timezone, data.language
+                    user_id, final_country, final_city, data.timezone, data.language
                 )
             else:
                 # Nuevo usuario
@@ -103,12 +108,15 @@ class AnalyticsService:
                     ) VALUES ($1, $2, $3, $4, $5)
                     RETURNING id
                     """,
-                    data.anonymous_id, country, city, data.timezone, data.language
+                    data.anonymous_id, final_country, final_city, data.timezone, data.language
                 )
             
             # 2. Crear sesión
             referrer_source = self.parse_referrer(data.referrer_url)
-            ip_hash = self.hash_ip(ip_address)
+            
+            # Generar session_id si no viene en el request
+            if not data.session_id:
+                data.session_id = f"sess_{uuid4().hex[:16]}"
             
             session_id = await conn.fetchval(
                 """
@@ -128,7 +136,7 @@ class AnalyticsService:
                 data.os, data.os_version, data.screen_width, data.screen_height,
                 data.entry_page, referrer_source, data.referrer_url,
                 data.utm_source, data.utm_medium, data.utm_campaign, data.utm_content, data.utm_term,
-                country, city, ip_hash
+                final_country, final_city, final_ip_hash
             )
             
             return {
@@ -243,6 +251,9 @@ class AnalyticsService:
             if not session:
                 return {"success": False, "message": "Session not found"}
             
+            # Asegurar que time_spent es int para evitar ambigüedad de tipo
+            time_spent_int = int(data.time_spent)
+            
             await conn.execute(
                 """
                 INSERT INTO engagement_zones (
@@ -251,11 +262,12 @@ class AnalyticsService:
                 )
                 SELECT 
                     id, $2, $3, $4, $5, $6, $7, $8, 
-                    NOW() - ($6 || ' seconds')::INTERVAL, NOW()
+                    NOW() - make_interval(secs => $9), NOW()
                 FROM sessions WHERE session_id = $1
                 """,
                 data.session_id, session['user_id'], data.page_path, data.zone_id,
-                data.zone_name, data.time_spent, data.scroll_reached, data.clicked
+                data.zone_name, time_spent_int, data.scroll_reached, data.clicked,
+                time_spent_int  # Parámetro separado para make_interval
             )
             
             return {"success": True, "message": "Engagement tracked"}
@@ -325,6 +337,9 @@ class AnalyticsService:
     async def get_summary(self, days: int = 30) -> AnalyticsSummary:
         """Obtener resumen de analytics de los últimos N días"""
         
+        # Convertir días a timedelta para PostgreSQL
+        time_window = timedelta(days=days)
+        
         async with self.db.acquire() as conn:
             # Métricas generales
             summary = await conn.fetchrow(
@@ -339,7 +354,7 @@ class AnalyticsService:
                 FROM sessions
                 WHERE started_at > NOW() - $1::INTERVAL
                 """,
-                f"{days} days"
+                time_window
             )
             
             # Top páginas
@@ -352,7 +367,7 @@ class AnalyticsService:
                 ORDER BY views DESC
                 LIMIT 10
                 """,
-                f"{days} days"
+                time_window
             )
             
             # Top eventos
@@ -365,7 +380,7 @@ class AnalyticsService:
                 ORDER BY count DESC
                 LIMIT 10
                 """,
-                f"{days} days"
+                time_window
             )
             
             # Top sources
@@ -378,7 +393,52 @@ class AnalyticsService:
                 ORDER BY count DESC
                 LIMIT 10
                 """,
-                f"{days} days"
+                time_window
+            )
+            
+            # Daily sessions (para gráfico de línea)
+            daily_sessions = await conn.fetch(
+                """
+                SELECT 
+                    DATE(started_at) as date,
+                    COUNT(*) as count
+                FROM sessions
+                WHERE started_at > NOW() - $1::INTERVAL
+                GROUP BY DATE(started_at)
+                ORDER BY date ASC
+                """,
+                time_window
+            )
+            
+            # Device breakdown (para gráfico de donut)
+            device_breakdown = await conn.fetch(
+                """
+                SELECT 
+                    device_type,
+                    COUNT(*) as count
+                FROM sessions
+                WHERE started_at > NOW() - $1::INTERVAL
+                GROUP BY device_type
+                ORDER BY count DESC
+                """,
+                time_window
+            )
+            
+            # Top countries/cities (geolocalización)
+            top_countries = await conn.fetch(
+                """
+                SELECT 
+                    country,
+                    city,
+                    COUNT(*) as count
+                FROM sessions
+                WHERE started_at > NOW() - $1::INTERVAL
+                  AND (country IS NOT NULL OR city IS NOT NULL)
+                GROUP BY country, city
+                ORDER BY count DESC
+                LIMIT 10
+                """,
+                time_window
             )
             
             return AnalyticsSummary(
@@ -391,5 +451,76 @@ class AnalyticsService:
                 bounce_rate=round(float(summary['bounce_rate']), 2),
                 top_pages=[dict(r) for r in top_pages],
                 top_events=[dict(r) for r in top_events],
-                top_sources=[dict(r) for r in top_sources]
+                top_sources=[dict(r) for r in top_sources],
+                daily_sessions=[{"date": str(r['date']), "count": r['count']} for r in daily_sessions],
+                device_breakdown=[dict(r) for r in device_breakdown],
+                top_countries=[dict(r) for r in top_countries]
             )
+    
+    async def get_top_pages(self, days: int = 30, limit: int = 10):
+        """Obtener páginas más visitadas"""
+        time_window = timedelta(days=days)
+        
+        async with self.db.acquire() as conn:
+            results = await conn.fetch(
+                """
+                SELECT 
+                    page_path,
+                    page_title,
+                    COUNT(*) as views,
+                    COUNT(DISTINCT session_id) as unique_sessions,
+                    AVG(time_on_page) as avg_time
+                FROM pageviews
+                WHERE viewed_at > NOW() - $1::INTERVAL
+                GROUP BY page_path, page_title
+                ORDER BY views DESC
+                LIMIT $2
+                """,
+                time_window, limit
+            )
+            return [dict(r) for r in results]
+    
+    async def get_top_events(self, days: int = 30, limit: int = 10):
+        """Obtener eventos más frecuentes"""
+        time_window = timedelta(days=days)
+        
+        async with self.db.acquire() as conn:
+            results = await conn.fetch(
+                """
+                SELECT 
+                    event_name,
+                    event_category,
+                    COUNT(*) as count,
+                    COUNT(DISTINCT session_id) as unique_sessions
+                FROM events
+                WHERE occurred_at > NOW() - $1::INTERVAL
+                GROUP BY event_name, event_category
+                ORDER BY count DESC
+                LIMIT $2
+                """,
+                time_window, limit
+            )
+            return [dict(r) for r in results]
+    
+    async def get_top_engagement_zones(self, days: int = 30, limit: int = 10):
+        """Obtener zonas de engagement más activas"""
+        time_window = timedelta(days=days)
+        
+        async with self.db.acquire() as conn:
+            results = await conn.fetch(
+                """
+                SELECT 
+                    zone_id,
+                    zone_name,
+                    COUNT(*) as interactions,
+                    AVG(time_spent) as avg_duration,
+                    COUNT(DISTINCT session_id) as unique_sessions
+                FROM engagement_zones
+                WHERE entered_at > NOW() - $1::INTERVAL
+                GROUP BY zone_id, zone_name
+                ORDER BY interactions DESC
+                LIMIT $2
+                """,
+                time_window, limit
+            )
+            return [dict(r) for r in results]

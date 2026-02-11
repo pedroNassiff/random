@@ -181,7 +181,7 @@ const Analytics = () => {
   const barChartSeries = [
     {
       name: 'Pageviews',
-      data: topPages.map(p => p.view_count) || []
+      data: topPages.map(p => p.views) || []
     }
   ];
 
@@ -197,26 +197,26 @@ const Analytics = () => {
   return (
     <div className="analytics-container">
       <Navbar />
-      
+
       <div className="analytics-content">
         {/* Header */}
         <div className="analytics-header">
           <h1 className="analytics-title">Random Analytics</h1>
           <div className="time-range-selector">
-            <button 
-              className={timeRange === 7 ? 'active' : ''} 
+            <button
+              className={timeRange === 7 ? 'active' : ''}
               onClick={() => setTimeRange(7)}
             >
               7D
             </button>
-            <button 
-              className={timeRange === 30 ? 'active' : ''} 
+            <button
+              className={timeRange === 30 ? 'active' : ''}
               onClick={() => setTimeRange(30)}
             >
               30D
             </button>
-            <button 
-              className={timeRange === 90 ? 'active' : ''} 
+            <button
+              className={timeRange === 90 ? 'active' : ''}
               onClick={() => setTimeRange(90)}
             >
               90D
@@ -312,10 +312,10 @@ const Analytics = () => {
                 <div key={index} className="event-item">
                   <div className="event-rank">{index + 1}</div>
                   <div className="event-details">
-                    <p className="event-name">{event.event_type}</p>
-                    <p className="event-target">{event.target_element}</p>
+                    <p className="event-name">{event.event_name}</p>
+                    <p className="event-category">{event.event_category || 'General'}</p>
                   </div>
-                  <div className="event-count">{event.event_count}</div>
+                  <div className="event-count">{event.count}</div>
                 </div>
               ))}
             </div>
@@ -330,8 +330,8 @@ const Analytics = () => {
                   <div className="engagement-info">
                     <p className="zone-name">{zone.zone_id}</p>
                     <div className="engagement-bar">
-                      <div 
-                        className="engagement-fill" 
+                      <div
+                        className="engagement-fill"
                         style={{ width: `${(zone.avg_duration / 60) * 100}%` }}
                       ></div>
                     </div>
@@ -351,7 +351,7 @@ const Analytics = () => {
               {summary?.top_sources?.map((source, index) => (
                 <div key={index} className="source-item">
                   <div className="source-details">
-                    <p className="source-name">{source.source}</p>
+                    <p className="source-name">{source.referrer_source || 'Direct'}</p>
                     <p className="source-count">{source.count} visits</p>
                   </div>
                   <div className="source-percentage">
@@ -359,6 +359,30 @@ const Analytics = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Geographic Distribution */}
+          <div className="chart-card">
+            <h3 className="chart-title">Geographic Distribution</h3>
+            <div className="geo-list">
+              {summary?.top_countries?.map((location, index) => (
+                <div key={index} className="geo-item">
+                  <div className="geo-flag">🌍</div>
+                  <div className="geo-details">
+                    <p className="geo-location">
+                      {location.city ? `${location.city}, ` : ''}{location.country || 'Unknown'}
+                    </p>
+                    <p className="geo-count">{location.count} visits</p>
+                  </div>
+                  <div className="geo-percentage">
+                    {((location.count / summary.total_sessions) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              ))}
+              {(!summary?.top_countries || summary.top_countries.length === 0) && (
+                <p className="no-data">No geographic data available yet</p>
+              )}
             </div>
           </div>
         </div>
