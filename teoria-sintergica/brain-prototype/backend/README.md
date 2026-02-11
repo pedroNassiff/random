@@ -106,3 +106,4 @@ Para entrenar tu propia "Lattice Artificial", sigue estos pasos en tu terminal:
         `Epoch: 2 | Average Loss: 4321.05`
     *   Al finalizar, generará un archivo `syntergic_vae.pth`.
 
+# Trigger CI/CD with fixed workflow
