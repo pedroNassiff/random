@@ -350,7 +350,7 @@ class AnalyticsService:
                     SUM(pageviews) as total_pageviews,
                     COALESCE(AVG(duration), 0) as avg_session_duration,
                     COALESCE(AVG(total_scroll_depth), 0) as avg_scroll_depth,
-                    (COUNT(CASE WHEN bounce THEN 1 END) * 100.0 / COUNT(*)) as bounce_rate
+                    COALESCE((COUNT(CASE WHEN bounce THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)), 0) as bounce_rate
                 FROM sessions
                 WHERE started_at > NOW() - $1::INTERVAL
                 """,
