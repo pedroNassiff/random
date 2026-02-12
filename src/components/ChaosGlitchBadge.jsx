@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export default function ChaosGlitchBadge({ text }) {
+export default function ChaosGlitchBadge({ text, onGlitchEnd }) {
   const [isGlitching, setIsGlitching] = useState(false);
   const [glitchEffect, setGlitchEffect] = useState(0); // 0, 1, 2 para diferentes efectos
   const containerRef = useRef(null);
@@ -14,6 +14,8 @@ export default function ChaosGlitchBadge({ text }) {
       // Desactivar después de 1 segundo
       setTimeout(() => {
         setIsGlitching(false);
+        // Notificar que terminó el glitch
+        if (onGlitchEnd) onGlitchEnd();
       }, 1000);
 
       // Programar el siguiente glitch en 1-5 segundos
@@ -42,7 +44,7 @@ export default function ChaosGlitchBadge({ text }) {
       <div 
         ref={containerRef}
         className={`
-          inline-flex items-center border rounded-full w-[280px] overflow-hidden py-2 
+          inline-flex items-center justify-center border rounded-full w-[320px] h-[36px] overflow-hidden
           relative
           ${isGlitching ? 'glitch-active' : ''}
           ${clipPathGlitch ? 'clip-glitch' : ''}

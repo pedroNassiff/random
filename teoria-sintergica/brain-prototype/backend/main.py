@@ -17,6 +17,9 @@ from database import get_recorder_v2, SessionRecorderV2
 from analytics.router import router as analytics_router
 from analytics.service import AnalyticsService
 
+from automation import router as automation_router
+from automation.service import AutomationService
+
 app = FastAPI(title="Syntergic Brain API v0.4")
 
 
@@ -78,8 +81,13 @@ async def startup():
         max_size=20,
     )
     app.state.analytics_pool = analytics_pool
+    app.state.db_pool = analytics_pool  # Alias para automation service
     app.state.analytics_service = AnalyticsService(analytics_pool)
-    print("✓ Analytics database pool created")
+    print("Analytics database pool created")
+
+    app.state.automation_service = AutomationService(app.state.db_pool)
+    print("Automation service initialized")
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -90,6 +98,9 @@ async def shutdown():
 
 # Include analytics router
 app.include_router(analytics_router)
+
+# Include automation router
+app.include_router(automation_router)
 
 # ============================================
 # Brain Endpoints

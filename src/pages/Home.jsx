@@ -55,6 +55,13 @@ export default function Home() {
   const project4Ref = useRef(null);
   const project5Ref = useRef(null);
   
+  // Textos rotativos para el badge
+  const badgeTexts = [
+    "donde fluyen caos y orden",
+    "donde fluyen ciencia y arte",
+  ];
+  const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0);
+  
   // State para controlar la secuencia de efectos del hero
   const [heroPhase, setHeroPhase] = useState('water'); // 'water' | 'galaxy' | 'holographic' | 'idle'
   const [waterOpacity, setWaterOpacity] = useState(1.0);
@@ -329,7 +336,12 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       >
         {/* Hero Left - Text */}
         <div className="flex flex-col gap-8 md:gap-12 w-full lg:w-[980px] py-5">
-          <ChaosGlitchBadge text="Donde fluye ciencia y arte" />
+          <ChaosGlitchBadge 
+            text={badgeTexts[currentBadgeIndex]} 
+            onGlitchEnd={() => {
+              setCurrentBadgeIndex((prev) => (prev + 1) % badgeTexts.length);
+            }}
+          />
           <h1 className="text-[36px] md:text-[50px] lg:text-[63px] font-semibold text-[#1A1A1A] leading-[1.1]">
             <span className="block">Explorando el caos</span>
             <span className="block">para encontrar el propósito</span>
