@@ -38,13 +38,22 @@ jobs:
           sudo systemctl restart brain-backend
           
           echo "⏳ Esperando a que el servicio inicie..."
-          sleep 10
+          sleep 15
           
           echo "✅ Verificando estado del servicio..."
           sudo systemctl status brain-backend --no-pager | head -10
           
+          echo ""
+          echo "📋 Últimos logs del servicio..."
+          sudo journalctl -u brain-backend -n 30 --no-pager
+          
+          echo ""
           echo "🧪 Probando health check..."
           curl -s http://localhost:8000/ || echo "⚠️  Backend aún no responde"
+          
+          echo ""
+          echo "🧪 Probando automation endpoint..."
+          curl -s http://localhost:8000/automation/dashboard || echo "⚠️  Automation endpoint error"
 
     - name: 🎉 Deployment Success
       run: |
