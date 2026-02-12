@@ -618,7 +618,16 @@ La mejor solución no sale del manual. Sale de observar, perturbar, ajustar. Com
         
         async with self.db.acquire() as conn:
             rows = await conn.fetch(query, *params)
-            return [AutomationLog(**dict(row)) for row in rows]
+            logs = []
+            for row in rows:
+                row_dict = dict(row)
+                # Parse JSON strings to dicts
+                if row_dict.get('input_data') and isinstance(row_dict['input_data'], str):
+                    row_dict['input_data'] = json.loads(row_dict['input_data'])
+                if row_dict.get('output_data') and isinstance(row_dict['output_data'], str):
+                    row_dict['output_data'] = json.loads(row_dict['output_data'])
+                logs.append(AutomationLog(**row_dict))
+            return logs
     
     async def log_action(
         self,
