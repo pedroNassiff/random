@@ -6,6 +6,11 @@ import time
 import asyncio
 import asyncpg
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 from models import SyntergicState, FrequencyBands, Vector3
 from ai.inference import SyntergicBrain
 from hardware import MuseConnector, MuseToSyntergicAdapter

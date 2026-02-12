@@ -144,34 +144,49 @@ class AutomationService:
         if not lead:
             raise ValueError(f"Lead {lead_id} not found")
         
-        # TODO: Implementar integración con Claude API real
-        # Por ahora, scoring dummy basado en criterios básicos
-        import random
+        from automation.claude_client import get_claude_client
         
-        # Scoring básico
-        score = 50
-        
-        # Bonus por industria
-        if lead.industry and lead.industry.lower() in ['software', 'technology', 'fintech', 'saas']:
-            score += 20
-        
-        # Bonus por tamaño
-        if lead.company_size in ['51-200', '201-500', '501-1000']:
-            score += 15
-        
-        # Bonus por datos completos
-        if lead.website and lead.linkedin_url:
-            score += 10
-        
-        # Randomness para simular análisis IA
-        score += random.randint(-5, 10)
-        score = min(95, max(40, score))  # Clamp entre 40-95
-        
-        reasoning = f"Lead {'con alto potencial' if score > 80 else 'con potencial medio' if score > 60 else 'básico'} "
-        reasoning += f"en sector {lead.industry or 'desconocido'}. "
-        reasoning += f"Empresa de tamaño {lead.company_size or 'desconocido'}."
-        
-        category = "high" if score > 80 else "medium" if score > 60 else "low"
+        try:
+            # Llamar a Claude para scoring real
+            claude = get_claude_client()
+            result = await claude.score_lead(
+                company_name=lead.company_name,
+                industry=lead.industry,
+                company_size=lead.company_size,
+                website=lead.website,
+                linkedin_url=lead.linkedin_url,
+                tech_stack=lead.tech_stack,
+                location=lead.location
+            )
+            
+            score = result.get("score", 50)
+            category = result.get("category", "medium")
+            reasoning = result.get("reasoning", "Análisis completado")
+            
+            # Agregar highlights y concerns al reasoning si existen
+            if result.get("fit_highlights"):
+                reasoning += f"\n\nPuntos fuertes: {', '.join(result['fit_highlights'])}"
+            if result.get("concerns"):
+                reasoning += f"\n\nConsideraciones: {', '.join(result['concerns'])}"
+            if result.get("recommended_approach"):
+                reasoning += f"\n\nApproach recomendado: {result['recommended_approach']}"
+            
+        except Exception as e:
+            print(f"⚠️  Claude scoring failed, using fallback: {e}")
+            # Fallback a scoring básico
+            import random
+            score = 50
+            if lead.industry and lead.industry.lower() in ['software', 'technology', 'fintech', 'saas']:
+                score += 20
+            if lead.company_size in ['51-200', '201-500', '501-1000']:
+                score += 15
+            if lead.website and lead.linkedin_url:
+                score += 10
+            score += random.randint(-5, 10)
+            score = min(95, max(40, score))
+            
+            reasoning = f"Scoring automático (Claude no disponible): Lead en {lead.industry or 'sector desconocido'}, tamaño {lead.company_size or 'desconocido'}"
+            category = "high" if score > 80 else "medium" if score > 60 else "low"
         
         async with self.db.acquire() as conn:
             row = await conn.fetchrow(
@@ -273,33 +288,32 @@ class AutomationService:
     async def generate_content_with_ai(self, request: ContentGenerateRequest) -> ContentResponse:
         """Generar contenido con Claude API"""
         
-        # TODO: Implementar integración con Claude API real
-        # Por ahora, contenido dummy con tono Random
+        from automation.claude_client import get_claude_client
         
-        templates = {
-            "philosophical": [
-                f"¿Y si {request.topic} es solo el principio?",
-                f"En el caos de {request.topic}, encontramos patrones",
-                f"{request.topic}: Perturbando lo establecido"
-            ],
-            "technical": [
-                f"Deep Dive: {request.topic}",
-                f"Arquitectura de {request.topic}",
-                f"Por qué {request.topic} importa ahora"
-            ],
-            "inspirational": [
-                f"El futuro de {request.topic}",
-                f"Transformando {request.topic}",
-                f"La revolución de {request.topic}"
-            ]
-        }
-        
-        tone = request.tone or "philosophical"
-        import random
-        title = random.choice(templates.get(tone, templates["philosophical"]))
-        
-        body = f"""
-Explorando {request.topic} desde Random.
+        try:
+            # Llamar a Claude para generación real
+            claude = get_claude_client()
+            result = await claude.generate_content(
+                topic=request.topic,
+                content_type=request.content_type,
+                tone=request.tone or "philosophical",
+                target_audience=request.target_audience or "CTOs",
+                additional_context=request.additional_context
+            )
+            
+            title = result.get("title", f"Explorando {request.topic}")
+            body = result.get("body", "")
+            
+            # Agregar hashtags al final si no están
+            hashtags = result.get("hashtags", ["Random", "Innovation"])
+            if hashtags and not any(tag in body for tag in hashtags):
+                body += f"\n\n{' '.join(f'#{tag}' for tag in hashtags)}"
+            
+        except Exception as e:
+            print(f"⚠️  Claude content generation failed, using fallback: {e}")
+            # Fallback a contenido template
+            title = f"{request.topic}: Perturbando lo establecido"
+            body = f"""Explorando {request.topic} desde Random.
 
 En el flujo constante de información, donde otros ven ruido, nosotros encontramos señales. {request.topic} no es solo un concepto — es una perturbación necesaria en el status quo.
 
@@ -307,8 +321,7 @@ La mejor solución no sale del manual. Sale de observar, perturbar, ajustar. Com
 
 ¿Y si dejáramos de buscar respuestas perfectas y empezáramos a hacer las preguntas correctas?
 
-#Random #Innovation #Technology
-        """.strip()
+#Random #Innovation #Technology"""
         
         async with self.db.acquire() as conn:
             row = await conn.fetchrow(
