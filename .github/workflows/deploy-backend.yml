@@ -44,8 +44,8 @@ jobs:
           sudo systemctl status brain-backend --no-pager | head -10
           
           echo ""
-          echo "📋 Últimos logs del servicio..."
-          sudo journalctl -u brain-backend -n 30 --no-pager
+          echo "📋 Últimos logs del servicio (incluyendo errores)..."
+          sudo journalctl -u brain-backend -n 50 --no-pager | grep -E "(ERROR|Exception|Traceback|automation)" || sudo journalctl -u brain-backend -n 30 --no-pager
           
           echo ""
           echo "🧪 Probando health check..."
@@ -53,7 +53,12 @@ jobs:
           
           echo ""
           echo "🧪 Probando automation endpoint..."
-          curl -s http://localhost:8000/automation/dashboard || echo "⚠️  Automation endpoint error"
+          curl -v http://localhost:8000/automation/dashboard 2>&1 | head -20
+          
+          echo ""
+          echo "🔍 Verificando logs después del request..."
+          sleep 2
+          sudo journalctl -u brain-backend -n 20 --no-pager | tail -10
 
     - name: 🎉 Deployment Success
       run: |
