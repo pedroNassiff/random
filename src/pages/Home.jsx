@@ -62,6 +62,17 @@ export default function Home() {
   ];
   const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0);
   
+  // Variantes poéticas para la segunda línea del hero
+  const heroLineVariants = [
+    "para encontrar la frecuencia",
+    "para revelar el patrón",
+    "para trazar la geometría",
+    "para cristalizar el orden",
+    "para capturar la esencia"
+  ];
+  const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [isLineGlitching, setIsLineGlitching] = useState(false);
+  
   // State para controlar la secuencia de efectos del hero
   const [heroPhase, setHeroPhase] = useState('water'); // 'water' | 'galaxy' | 'holographic' | 'idle'
   const [waterOpacity, setWaterOpacity] = useState(1.0);
@@ -87,6 +98,20 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
   // Memoizar props para evitar re-renders
   const holographicPosition = React.useMemo(() => [0, -1.3, 0], []);
   const holographicRotation = React.useMemo(() => [0, 0, 0], []);
+
+  // Rotación de variantes poéticas cada 3 segundos con glitch
+  useEffect(() => {
+    const rotationInterval = setInterval(() => {
+      setIsLineGlitching(true);
+      
+      setTimeout(() => {
+        setCurrentLineIndex((prev) => (prev + 1) % heroLineVariants.length);
+        setIsLineGlitching(false);
+      }, 300); // Duración del glitch
+    }, 3000); // Cambia cada 3 segundos
+
+    return () => clearInterval(rotationInterval);
+  }, [heroLineVariants.length]);
 
   // Manejo de la secuencia de efectos del hero con transiciones suaves
   useEffect(() => {
@@ -342,9 +367,14 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
               setCurrentBadgeIndex((prev) => (prev + 1) % badgeTexts.length);
             }}
           />
-          <h1 className="text-[36px] md:text-[50px] lg:text-[63px] font-semibold text-[#1A1A1A] leading-[1.1]">
+          <h1 className="text-[36px] md:text-[30px] lg:text-[47px] font-semibold text-[#1A1A1A] leading-[1.1]">
             <span className="block">Explorando el caos</span>
-            <span className="block">para encontrar el propósito</span>
+            <span 
+              className={`block glitch-text ${isLineGlitching ? 'active' : ''}`}
+              data-text={heroLineVariants[currentLineIndex]}
+            >
+              {heroLineVariants[currentLineIndex]}
+            </span>
           </h1>
         </div>
 

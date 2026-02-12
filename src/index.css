@@ -21,3 +21,126 @@ body {
     scrollbar-width: none;
 }
 
+/* 🎭 GLITCH EFFECT - Tipo 404 Error */
+@keyframes glitch-anim-1 {
+    0% {
+        clip-path: inset(40% 0 61% 0);
+        transform: translate(0);
+    }
+    20% {
+        clip-path: inset(92% 0 1% 0);
+        transform: translate(-10px);
+    }
+    40% {
+        clip-path: inset(43% 0 1% 0);
+        transform: translate(10px);
+    }
+    60% {
+        clip-path: inset(25% 0 58% 0);
+        transform: translate(-10px);
+    }
+    80% {
+        clip-path: inset(54% 0 7% 0);
+        transform: translate(10px);
+    }
+    100% {
+        clip-path: inset(58% 0 43% 0);
+        transform: translate(0);
+    }
+}
+
+@keyframes glitch-anim-2 {
+    0% {
+        clip-path: inset(65% 0 15% 0);
+        transform: translate(0);
+    }
+    20% {
+        clip-path: inset(12% 0 83% 0);
+        transform: translate(10px);
+    }
+    40% {
+        clip-path: inset(76% 0 1% 0);
+        transform: translate(-10px);
+    }
+    60% {
+        clip-path: inset(34% 0 42% 0);
+        transform: translate(10px);
+    }
+    80% {
+        clip-path: inset(88% 0 1% 0);
+        transform: translate(-10px);
+    }
+    100% {
+        clip-path: inset(28% 0 35% 0);
+        transform: translate(0);
+    }
+}
+
+@keyframes glitch-skew {
+    0% {
+        transform: skew(0deg);
+    }
+    10% {
+        transform: skew(-2deg);
+    }
+    20% {
+        transform: skew(2deg);
+    }
+    30% {
+        transform: skew(-1deg);
+    }
+    40% {
+        transform: skew(1deg);
+    }
+    50% {
+        transform: skew(0deg);
+    }
+    60% {
+        transform: skew(-1deg);
+    }
+    70% {
+        transform: skew(1deg);
+    }
+    80% {
+        transform: skew(-2deg);
+    }
+    90% {
+        transform: skew(2deg);
+    }
+    100% {
+        transform: skew(0deg);
+    }
+}
+
+.glitch-text {
+    position: relative;
+    display: inline-block;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.glitch-text::before {
+    animation: glitch-anim-1 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+    color: #ff00ff;
+    z-index: -1;
+}
+
+.glitch-text::after {
+    animation: glitch-anim-2 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) reverse both infinite;
+    color: #00ffff;
+    z-index: -2;
+}
+
+.glitch-text.active {
+    animation: glitch-skew 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+    text-shadow: -2px 0 red, 2px 0 cyan;
+}
+
