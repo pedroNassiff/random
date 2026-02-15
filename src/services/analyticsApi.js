@@ -43,5 +43,16 @@ export const analyticsApi = {
       console.error('Error fetching engagement zones:', error);
       throw error;
     }
+  },
+
+  async getUsersActivity(days = 30, limit = 20) {
+    try {
+      const response = await fetch(`${API_URL}/users-activity?days=${days}&limit=${limit}`);
+      if (!response.ok) throw new Error('Failed to fetch users activity');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching users activity:', error);
+      throw error;
+    }
   }
 };

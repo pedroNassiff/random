@@ -119,6 +119,13 @@ class AnalyticsBatch(BaseModel):
     conversions: Optional[List[Conversion]] = []
 
 
+class UserMetadata(BaseModel):
+    """Metadata de usuario extraída del storage del navegador"""
+    session_id: str
+    metadata: Dict[str, Any] = Field(..., description="Datos extraídos del storage con estructura {campo: {value, source, key}}")
+    timestamp: str = Field(..., description="ISO timestamp de cuando se extrajo la data")
+
+
 # ============================================
 # RESPONSE MODELS (Lo que devuelve el backend)
 # ============================================

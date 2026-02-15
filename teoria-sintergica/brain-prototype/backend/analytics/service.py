@@ -2,6 +2,7 @@
 Analytics Service - Lógica de negocio para el sistema de analytics
 """
 import hashlib
+import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from uuid import UUID, uuid4
@@ -524,3 +525,160 @@ class AnalyticsService:
                 time_window, limit
             )
             return [dict(r) for r in results]
+
+    async def get_users_activity(self, days: int = 30, limit: int = 20):
+        """
+        Obtener actividad detallada por usuario
+        
+        Retorna usuarios con su metadata (email, nombre) y desglose de su actividad:
+        - Páginas visitadas con tiempo en cada una
+        - Total de clicks por página
+        - Número de sesiones
+        """
+        time_window = timedelta(days=days)
+        
+        async with self.db.acquire() as conn:
+            # Obtener usuarios con metadata y sus métricas generales
+            users = await conn.fetch(
+                """
+                SELECT 
+                    u.id,
+                    u.anonymous_id,
+                    u.email,
+                    u.name,
+                    u.phone,
+                    u.user_identifier,
+                    u.total_sessions,
+                    u.total_pageviews,
+                    u.last_seen,
+                    u.country,
+                    u.city
+                FROM users u
+                WHERE u.last_seen > NOW() - $1::INTERVAL
+                ORDER BY 
+                    CASE 
+                        WHEN u.email IS NOT NULL THEN 0
+                        ELSE 1
+                    END,
+                    u.last_seen DESC
+                LIMIT $2
+                """,
+                time_window, limit
+            )
+            
+            result = []
+            for user in users:
+                user_data = dict(user)
+                user_id = user['id']
+                
+                # Obtener páginas visitadas con tiempo y clicks
+                pages = await conn.fetch(
+                    """
+                    SELECT 
+                        p.page_path,
+                        p.page_title,
+                        COUNT(*) as visits,
+                        SUM(p.time_on_page) as total_time,
+                        AVG(p.time_on_page) as avg_time,
+                        SUM(p.clicks) as total_clicks,
+                        MAX(p.viewed_at) as last_visit
+                    FROM pageviews p
+                    JOIN sessions s ON p.session_id = s.id
+                    WHERE s.user_id = $1
+                        AND p.viewed_at > NOW() - $2::INTERVAL
+                    GROUP BY p.page_path, p.page_title
+                    ORDER BY total_time DESC
+                    """,
+                    user_id, time_window
+                )
+                
+                user_data['pages'] = [dict(p) for p in pages]
+                user_data['total_clicks'] = sum(p['total_clicks'] or 0 for p in pages)
+                user_data['total_time'] = sum(p['total_time'] or 0 for p in pages)
+                
+                result.append(user_data)
+            
+            return result
+
+    async def save_user_metadata(self, data) -> Dict[str, Any]:
+        """
+        Guardar metadata de usuario extraída del storage del navegador
+        
+        Actualiza el perfil del usuario con información adicional como email,
+        nombre, teléfono, etc., que se extrajo del localStorage/sessionStorage/cookies.
+        """
+        async with self.db.acquire() as conn:
+            # 1. Obtener el user_id de la sesión
+            session = await conn.fetchrow(
+                """
+                SELECT user_id FROM sessions 
+                WHERE session_id = $1
+                """,
+                data.session_id
+            )
+            
+            if not session:
+                return {
+                    "success": False,
+                    "message": "Session not found"
+                }
+            
+            user_id = session['user_id']
+            
+            # 2. Extraer campos importantes de la metadata
+            email = None
+            name = None
+            phone = None
+            user_identifier = None
+            
+            if 'email' in data.metadata and data.metadata['email']:
+                email = data.metadata['email'].get('value')
+            
+            if 'name' in data.metadata and data.metadata['name']:
+                name = data.metadata['name'].get('value')
+            
+            if 'phone' in data.metadata and data.metadata['phone']:
+                phone = data.metadata['phone'].get('value')
+            
+            if 'userId' in data.metadata and data.metadata['userId']:
+                user_identifier = data.metadata['userId'].get('value')
+            
+            # 3. Actualizar usuario con campos estructurados
+            await conn.execute(
+                """
+                UPDATE users SET
+                    email = COALESCE($2, email),
+                    name = COALESCE($3, name), 
+                    phone = COALESCE($4, phone),
+                    user_identifier = COALESCE($5, user_identifier),
+                    updated_at = NOW()
+                WHERE id = $1
+                """,
+                user_id, email, name, phone, user_identifier
+            )
+            
+            # 4. Guardar toda la metadata raw en una tabla separada para análisis
+            # Parsear timestamp ISO string a datetime naive (sin timezone)
+            timestamp_dt = datetime.fromisoformat(data.timestamp.replace('Z', '+00:00'))
+            timestamp_naive = timestamp_dt.replace(tzinfo=None)
+            
+            await conn.execute(
+                """
+                INSERT INTO user_metadata_history (
+                    user_id, session_id, metadata, extracted_at
+                ) VALUES ($1, $2, $3, $4)
+                """,
+                user_id, data.session_id, json.dumps(data.metadata), timestamp_naive
+            )
+            
+            return {
+                "success": True,
+                "message": "User metadata saved successfully",
+                "fields_updated": {
+                    "email": email is not None,
+                    "name": name is not None,
+                    "phone": phone is not None,
+                    "user_identifier": user_identifier is not None
+                }
+            }
+

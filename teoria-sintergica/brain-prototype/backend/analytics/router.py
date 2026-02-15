@@ -8,7 +8,7 @@ from analytics.models import (
     AnalyticsSessionStart, PageView, AnalyticsEvent,
     EngagementZone, Conversion, AnalyticsSessionEnd,
     AnalyticsBatch, AnalyticsResponse, AnalyticsSummary,
-    PageAnalytics
+    PageAnalytics, UserMetadata
 )
 from analytics.service import AnalyticsService
 
@@ -214,6 +214,34 @@ async def track_batch(
     )
 
 
+@router.post("/user/metadata", response_model=AnalyticsResponse)
+async def save_user_metadata(
+    data: UserMetadata,
+    service: AnalyticsService = Depends(get_analytics_service)
+):
+    """
+    Guardar metadata de usuario extraída del storage del navegador
+    
+    Esta información se usa para enriquecer el perfil del usuario y permitir
+    análisis más detallados de comportamiento por tipo de usuario.
+    
+    Los datos incluyen:
+    - Email (si está disponible)
+    - Nombre de usuario
+    - ID de usuario
+    - Teléfono
+    - Ubicación
+    - Idioma preferido
+    - Otros datos relevantes encontrados en localStorage/sessionStorage/cookies
+    """
+    result = await service.save_user_metadata(data)
+    
+    return AnalyticsResponse(
+        success=result["success"],
+        message=result["message"]
+    )
+
+
 # ============================================
 # ENDPOINTS DE CONSULTA (Para dashboard)
 # ============================================
@@ -268,6 +296,25 @@ async def get_top_zones(
 ):
     """Obtener zonas de engagement más activas"""
     return await service.get_top_engagement_zones(days, limit)
+
+
+@router.get("/users-activity")
+async def get_users_activity(
+    days: int = 30,
+    limit: int = 20,
+    service: AnalyticsService = Depends(get_analytics_service)
+):
+    """
+    Obtener actividad detallada por usuario
+    
+    Incluye:
+    - Email y nombre del usuario (si está disponible)
+    - Páginas visitadas
+    - Total de clicks
+    - Tiempo en cada página
+    - Total de sesiones del usuario
+    """
+    return await service.get_users_activity(days, limit)
 
 
 @router.get("/health")

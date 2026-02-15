@@ -144,13 +144,13 @@ export default function Navbar() {
           </>
         )}
         {/* Analytics link in mobile menu */}
-        <button 
+        {/* <button 
           onClick={() => { setMobileMenuOpen(false); navigate('/analytics'); }} 
           className="flex items-center gap-2 text-xl font-medium text-[#1A1A1A] hover:opacity-70 transition-opacity"
         >
           <BarChart3 className="w-5 h-5" />
           Analytics
-        </button>
+        </button> */}
       </div>
     </>
   );

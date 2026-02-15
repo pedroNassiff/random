@@ -14,6 +14,7 @@ const Analytics = () => {
   const [topPages, setTopPages] = useState([]);
   const [topEvents, setTopEvents] = useState([]);
   const [engagementZones, setEngagementZones] = useState([]);
+  const [usersActivity, setUsersActivity] = useState([]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -22,17 +23,19 @@ const Analytics = () => {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const [summaryData, pagesData, eventsData, zonesData] = await Promise.all([
+      const [summaryData, pagesData, eventsData, zonesData, usersData] = await Promise.all([
         analyticsApi.getSummary(timeRange),
         analyticsApi.getTopPages(timeRange),
         analyticsApi.getTopEvents(timeRange),
-        analyticsApi.getEngagementZones(timeRange)
+        analyticsApi.getEngagementZones(timeRange),
+        analyticsApi.getUsersActivity(timeRange)
       ]);
 
       setSummary(summaryData);
       setTopPages(pagesData);
       setTopEvents(eventsData);
       setEngagementZones(zonesData);
+      setUsersActivity(usersData);
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
@@ -381,6 +384,73 @@ const Analytics = () => {
               ))}
               {(!summary?.top_countries || summary.top_countries.length === 0) && (
                 <p className="no-data">No geographic data available yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Users Activity */}
+          <div className="chart-card large">
+            <h3 className="chart-title">👤 User Activity</h3>
+            <div className="users-activity-container">
+              {usersActivity.length > 0 ? (
+                usersActivity.map((user, index) => (
+                  <div key={user.id} className="user-activity-card">
+                    <div className="user-header">
+                      <div className="user-info">
+                        <div className="user-avatar">
+                          {user.email ? (
+                            <span className="avatar-icon">✉️</span>
+                          ) : (
+                            <span className="avatar-icon anonymous">👤</span>
+                          )}
+                        </div>
+                        <div className="user-details">
+                          <p className="user-name">
+                            {user.name || user.email || `Anonymous ${user.anonymous_id.slice(-8)}`}
+                          </p>
+                          {user.email && <p className="user-email">{user.email}</p>}
+                          {user.city && user.country && (
+                            <p className="user-location">📍 {user.city}, {user.country}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="user-stats">
+                        <div className="stat-badge">
+                          <span className="stat-label">Sessions</span>
+                          <span className="stat-value">{user.total_sessions}</span>
+                        </div>
+                        <div className="stat-badge">
+                          <span className="stat-label">Clicks</span>
+                          <span className="stat-value">{user.total_clicks || 0}</span>
+                        </div>
+                        <div className="stat-badge">
+                          <span className="stat-label">Time</span>
+                          <span className="stat-value">{Math.round(user.total_time || 0)}s</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {user.pages && user.pages.length > 0 && (
+                      <div className="user-pages">
+                        <p className="pages-title">Pages visited:</p>
+                        {user.pages.map((page, pageIndex) => (
+                          <div key={pageIndex} className="page-item">
+                            <div className="page-info">
+                              <span className="page-path">{page.page_path}</span>
+                              <span className="page-visits">{page.visits} visit{page.visits > 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="page-metrics">
+                              <span className="page-time">⏱ {Math.round(page.avg_time || 0)}s avg</span>
+                              <span className="page-clicks">🖱 {page.total_clicks || 0} clicks</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="no-data">No user activity data available yet</p>
               )}
             </div>
           </div>

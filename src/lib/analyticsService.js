@@ -451,6 +451,31 @@ export const analyticsService = {
       return null;
     }
   },
+
+  /**
+   * Enviar metadata de usuario extraída del storage
+   */
+  async sendUserMetadata(metadata) {
+    const sessionId = localStorage.getItem('analytics_session_id');
+    if (!sessionId) {
+      console.warn('⚠️  Analytics: No session ID, cannot send user metadata');
+      return null;
+    }
+
+    console.log('📤 Analytics: Enviando metadata de usuario:', metadata);
+
+    const response = await sendRequest('/user/metadata', {
+      session_id: sessionId,
+      metadata,
+      timestamp: new Date().toISOString()
+    });
+
+    if (response) {
+      console.log('✅ Analytics: Metadata de usuario guardada');
+    }
+
+    return response;
+  },
 };
 
 /**

@@ -57,16 +57,21 @@ export default function GlitchButton({ children, className = '', variant = 'nav'
       ? "px-5 py-2.5 text-[15px] text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
       : "px-5 py-2.5 text-[15px] text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] rounded-lg transition-all duration-200",
     primary: isReactElement 
-      ? "py-[14px] bg-white rounded-full text-[15px] font-medium text-[#1A1A1A] hover:bg-gray-100 transition-all duration-200 overflow-hidden"
-      : "px-8 py-[14px] bg-white rounded-full text-[15px] font-medium text-[#1A1A1A] hover:bg-gray-100 transition-all duration-200 overflow-hidden",
+      ? "py-[14px] rounded-full text-[15px] font-medium text-[#1A1A1A] transition-all duration-200 overflow-hidden"
+      : "px-8 py-[14px] rounded-full text-[15px] font-medium text-[#1A1A1A] transition-all duration-200 overflow-hidden",
     secondary: isReactElement
       ? "py-[18px] bg-[#1A1A1A] rounded-lg text-base font-medium text-white hover:bg-[#333333] transition-all duration-200 overflow-hidden"
       : "px-10 py-[18px] bg-[#1A1A1A] rounded-lg text-base font-medium text-white hover:bg-[#333333] transition-all duration-200"
   };
 
+  const buttonStyle = variant === 'primary' ? {
+    backgroundColor: '#00FFD1',
+  } : {};
+
   return (
     <button
       className={`${variants[variant]} ${className}`}
+      style={buttonStyle}
       onMouseEnter={handleMouseEnter}
       {...props}
     >

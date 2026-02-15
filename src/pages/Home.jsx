@@ -12,6 +12,7 @@ import HeroGalaxy from '../components/HeroGalaxy';
 import LabModelViewer from '../lab/LabModelViewer';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import CookieConsent from '../components/CookieConsent';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 // Analytics
@@ -64,10 +65,10 @@ export default function Home() {
   
   // Variantes poéticas para la segunda línea del hero
   const heroLineVariants = [
-    "para encontrar la frecuencia",
+    // "para encontrar la frecuencia",
     "para revelar el patrón",
     "para trazar la geometría",
-    "para cristalizar el orden",
+    // "para cristalizar el orden",
     "para capturar la esencia"
   ];
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -598,14 +599,14 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             {t('home.cta_description')}
           </p>
           <GlitchButton 
-            variant="secondary" 
+            variant="primary" 
             className="self-start md:self-start mx-auto md:mx-0 w-[300px] relative z-50 cursor-pointer"
             onClick={() => {
               trackClick('cta_click', 'discover_all_projects', '.cta-button');
               navigate('/work');
             }}
           >
-            <ScrollingText text={t('home.discover_all')} speed={10} textColor="text-white" />
+            <ScrollingText text={t('home.discover_all')} speed={10} textColor="text-[#1A1A1A]" />
           </GlitchButton>
         </div>
       </section>
@@ -746,11 +747,11 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             
           </p>
           <GlitchButton 
-            variant="secondary" 
+            variant="primary" 
             className="w-[250px] mx-auto md:mx-0"
             onClick={() => trackClick('lab_cta_click', 'go_to_lab', '.lab-button')}
           >
-            <ScrollingText text={t('home.go_to_lab')} speed={10} textColor="text-white" />
+            <ScrollingText text={t('home.go_to_lab')} speed={10} textColor="text-[#1A1A1A]" />
           </GlitchButton>
         </div>
       </section>
@@ -777,6 +778,9 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       </section>
 
       <Footer />
+      
+      {/* Cookie Consent */}
+      <CookieConsent />
     </div>
   );
 }
