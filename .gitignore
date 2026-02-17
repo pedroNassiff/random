@@ -5,3 +5,6 @@ dist/
 # Environment variables
 .env
 **/.env
+
+docs/*
+outputs-promts/*

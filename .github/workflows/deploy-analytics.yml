@@ -55,9 +55,9 @@ jobs:
           
           echo "🧪 Probando endpoint de analytics..."
           sleep 2
-          curl -s http://localhost:8000/analytics/health || echo "⚠️  Endpoint aún no responde"
+          curl -s http://localhost:8000/ || echo "⚠️  Backend aún no responde"
 
     - name: 🎉 Deployment Success
       run: |
         echo "✅ Analytics deployed successfully!"
-        echo "🌐 Test: http://api.random-studio.io/analytics/health"
+        echo "🌐 Test: https://api.random-lab.es/analytics"

@@ -63,4 +63,4 @@ jobs:
     - name: 🎉 Deployment Success
       run: |
         echo "✅ Backend deployed successfully!"
-        echo "🌐 API: http://api.random-studio.io"
+        echo "🌐 API: https://api.random-lab.es"

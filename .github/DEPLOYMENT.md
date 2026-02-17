@@ -164,7 +164,8 @@ graph LR
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [SSH Action Marketplace](https://github.com/marketplace/actions/ssh-remote-commands)
 - [Vercel Documentation](https://vercel.com/docs)
+- [Conectar pgAdmin a PostgreSQL](../PGADMIN-SETUP.md) - Guía para acceder a la base de datos
 
 ---
 
-**Última actualización:** 11 de Febrero, 2026
+**Última actualización:** 15 de Febrero, 2026

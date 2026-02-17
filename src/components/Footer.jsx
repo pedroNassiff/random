@@ -12,7 +12,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between gap-8 md:gap-0 px-4">
           {/* Logo */}
           <div className="flex flex-col gap-4">
-            <div className="text-xl font-semibold text-white">.RANDOM()</div>
+            <div className="text-xl font-semibold text-white font-geist-pixel">.RANDOM()</div>
           </div>
 
           {/* Links */}

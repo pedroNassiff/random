@@ -5,7 +5,7 @@
 
 html, body {
     overflow-x: hidden;
-    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-family: var(--font-geist-pixel-square), 'Courier Prime', 'Courier New', monospace;
     background-color: #0a0a0a;
 }
 

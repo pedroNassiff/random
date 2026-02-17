@@ -46,9 +46,14 @@ export default function Navbar() {
           ? 'bg-[#FDFCFB]/80 backdrop-blur-sm shadow-sm' 
           : 'bg-transparent md:max-w-[1400px] md:mx-auto'
       }`}>
-        <div className={`absolute left-1/2 -translate-x-1/2 text-xl font-semibold transition-colors duration-300 ${
-          isScrolled ? 'text-[#1A1A1A]' : (isProjectPage ? 'text-white' : 'text-[#1A1A1A]')
-        }`}>.RANDOM()</div>
+        <div 
+          className={`absolute left-1/2 -translate-x-1/2 text-xl font-semibold transition-colors duration-300 ${
+            isScrolled ? 'text-[#1A1A1A]' : (isProjectPage ? 'text-white' : 'text-[#1A1A1A]')
+          }`}
+          style={{ fontFamily: 'var(--font-geist-pixel-square)' }}
+        >
+          .RANDOM()
+        </div>
         
         {/* Desktop Nav */}
         <nav className="hidden md:flex gap-3 items-center">

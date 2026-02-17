@@ -72,7 +72,8 @@ export default function ChaosGlitchBadge({ text, onGlitchEnd }) {
             className="absolute inset-0 flex items-center justify-center clip-glitch-layer px-4"
             style={{
               color: 'white',
-              textShadow: '-3px -3px 0px #1df2f0, 3px 3px 0px #E94BE8'
+              textShadow: '-3px -3px 0px #1df2f0, 3px 3px 0px #E94BE8',
+              fontFamily: 'var(--font-geist-pixel-square)'
             }}
           >
             <span className="text-[13px] tracking-[0.5px]">{text}</span>
@@ -87,7 +88,8 @@ export default function ChaosGlitchBadge({ text, onGlitchEnd }) {
               (colorGlitch ? '2px 2px 0px #00ffd5, -2px -2px 0px #E94BE8' :
                shakeGlitch ? '1px 1px 0px #E94BE8' :
                '-1px -1px 0px #1df2f0, 1px 1px 0px #E94BE8') :
-              'none'
+              'none',
+            fontFamily: 'var(--font-geist-pixel-square)'
           }}
         >
           <span className="text-[13px] text-white tracking-[0.5px]">{text}</span>

@@ -19,7 +19,7 @@
   "home": {
     "work_title": "WORK",
     "view_project": "view project",
-    "cta_description": "We break structures to find new forms. We deconstruct the established to build the extraordinary. Brand that breathes, identity that evolves, web that feels alive, experiences that are not forgotten — each project is born from exploring the unexpected.",
+    "cta_description": "> We break structures to find new forms. We deconstruct the established to build the extraordinary. Brand that breathes, identity that evolves, web that feels alive, experiences that are not forgotten  each project is born from exploring the unexpected.",
     "discover_all": "discover all projects",
     "services_title": "SERVICES",
     "services": {
@@ -43,8 +43,8 @@
     "lab_title": "LAB",
     "go_to_lab": "go to lab",
     "about_title": "ABOUT",
-    "about_text_1": "In the chaos of data, the noise of the matrix, the constant flow of information — there lies our laboratory. Where others see disorder, we find patterns. Where habit limits, exploration discovers. Random is that necessary disturbance that breaks the predictable to achieve the extraordinary.",
-    "about_text_2": "The best solution doesn't come from the manual — it comes from breaking the rule, testing, adjusting. The matrix falls with its infinite code, but there, in the noise, is the exact temperature, the precise time, the perfect cut. Random is that exploration: we disturb the water to see the waves, we observe energy forming galaxy, we capture holographic vibrations. Not because we seek chaos — we seek it because that's where learning is. We break habit to find the way. We get lost in the unknown to discover what we didn't know existed. That's what we're here for: to turn randomness into intention, noise into clarity, disturbance into creation."
+    "about_text_1": "> In the chaos of data, the noise of the matrix, the constant flow of information  there lies our laboratory. Where others see disorder, we find patterns. Where habit limits, exploration discovers. Random is that necessary disturbance that breaks the predictable to achieve the extraordinary.",
+    "about_text_2": "> The best solution doesn't come from the manual  it comes from breaking the rule, testing, adjusting. The matrix falls with its infinite code, but there, in the noise, is the exact temperature, the precise time, the perfect cut. Random is that exploration: we disturb the water to see the waves, we observe energy forming galaxy, we capture holographic vibrations. Not because we seek chaos  we seek it because that's where learning is. We break habit to find the way. We get lost in the unknown to discover what we didn't know existed. That's what we're here for: to turn randomness into intention, noise into clarity, disturbance into creation."
   },
   "work": {
     "title": "WORK"
@@ -81,23 +81,24 @@
     "no_user_activity": "No user activity data available yet"
   },
   "cookies": {
-    "trust_message": "trust, because if you don't trust, there's no trust",
-    "helper_message": "alright, now that you chose to trust, I can help you be lighter, because yes, on the internet it's 99% certain you're being watched",
+    "trust_message": "> trust, because if you don't trust, there's no trust",
+    "helper_message": "> alright, now that you chose to trust, I can help you be lighter, because yes, on the internet it's 99% sure someone is watching",
     "see_tracking": "see who's watching me",
     "tracking_title": "Who's watching you:",
     "delete_all": "Delete all",
     "back": "Back",
-    "final_message": "done, now you're lighter",
+    "final_message": "> done, now you're lighter",
     "necessary": "Necessary",
     "necessary_desc": "Essential for operation",
     "analytics": "Analytics",
     "analytics_desc": "Measure site behavior",
     "preferences": "Preferences",
-    "preferences_desc": "Your browsing preferences",
+    "preferences_desc": "Language and personal settings",
     "marketing": "Marketing",
-    "marketing_desc": "Personalized advertising",
-    "accept_all": "Accept all",
-    "reject_all": "Reject all",
+    "marketing_desc": "Personalized ads and campaigns",
+    "accept_all": "Accept",
+    "reject_all": "Reject",
+    "save_preferences": "Save preferences",
     "customize": "Customize",
     "local_storage": "LocalStorage",
     "session_storage": "SessionStorage",

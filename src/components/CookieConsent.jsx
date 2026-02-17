@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Settings, Trash2, Eye } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { analyticsService } from '../lib/analyticsService';
 
 export default function CookieConsent() {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPrivacyHelper, setShowPrivacyHelper] = useState(false);
@@ -341,14 +343,14 @@ export default function CookieConsent() {
             <>
               <div className="mb-3">
                 <p 
-                  className="text-sm font-medium text-white leading-relaxed text-center"
+                  className="text-sm font-medium text-white leading-relaxed text-center font-geist-pixel"
                   style={{
                     textShadow: `${glitchIntensity * 2}px ${glitchIntensity * 2}px 0px #00FFD1, -${glitchIntensity * 2}px -${glitchIntensity * 2}px 0px #FF6B2C`,
                     transform: `translateX(${Math.sin(glitchIntensity * 10) * glitchIntensity * 5}px)`,
                     opacity: 1 - glitchIntensity * 0.3
                   }}
                 >
-                  listo, ahora estas mas liviano
+                  {t('cookies.final_message')}
                 </p>
               </div>
             </>
@@ -356,14 +358,14 @@ export default function CookieConsent() {
             <>
               <div className="mb-3">
                 <p 
-                  className="text-sm font-medium text-white leading-relaxed"
+                  className="text-sm font-medium text-white leading-relaxed font-geist-pixel"
                   style={{
                     textShadow: isGlitching 
                       ? '1px 1px 0px #00FFD1, -1px -1px 0px #FF6B2C' 
                       : 'none',
                   }}
                 >
-                  bien, ahora que elegiste confiar, puedo ayudarte a estar mas liviano, porque si, en internet es 99% que te esten vigilando
+                  {t('cookies.helper_message')}
                 </p>
               </div>
 
@@ -382,7 +384,7 @@ export default function CookieConsent() {
                   }}
                 >
                   <Eye size={14} />
-                  <span className="relative z-10">ver quien me vigila</span>
+                  <span className="relative z-10">{t('cookies.see_tracking')}</span>
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
                 </button>
                 <button
@@ -396,7 +398,7 @@ export default function CookieConsent() {
           ) : showStorageView ? (
             <>
               <div className="mb-3">
-                <h3 className="text-sm font-medium text-white mb-2">Quien te está vigilando:</h3>
+                <h3 className="text-sm font-medium text-white mb-2">{t('cookies.tracking_title')}</h3>
               </div>
 
               <div 
@@ -491,7 +493,7 @@ export default function CookieConsent() {
                     e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
-                  <span className="relative z-10">Eliminar todo</span>
+                  <span className="relative z-10">{t('cookies.delete_all')}</span>
                   <div className="absolute inset-0 bg-black/20 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
                 </button>
 
@@ -502,7 +504,7 @@ export default function CookieConsent() {
                   }}
                   className="flex-1 py-2.5 rounded-lg text-xs font-medium text-white transition-all duration-200 border border-white/20 hover:border-[#00FFD1] hover:bg-[#00FFD1]/10"
                 >
-                  Volver
+                  {t('cookies.back')}
                 </button>
               </div>
             </>
@@ -510,14 +512,14 @@ export default function CookieConsent() {
             <>
               <div className="mb-3">
                 <h3 
-                  className="text-sm font-medium text-white tracking-wide"
+                  className="text-sm font-medium text-white tracking-wide font-geist-pixel"
                   style={{
                     textShadow: isGlitching 
                       ? '1px 1px 0px #00FFD1, -1px -1px 0px #FF6B2C' 
                       : 'none',
                   }}
                 >
-                  confía, porque si no confías, no hay confianza
+                 {t('cookies.trust_message')}
                 </h3>
               </div>
 
@@ -525,8 +527,8 @@ export default function CookieConsent() {
                 <div className="mb-3 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-white font-medium">Necesarias</p>
-                      <p className="text-[10px] text-white/60 mt-0.5">Esenciales para el funcionamiento</p>
+                      <p className="text-xs text-white font-medium">{t('cookies.necessary')}</p>
+                      <p className="text-[10px] text-white/60 mt-0.5">{t('cookies.necessary_desc')}</p>
                     </div>
                     <div className="w-8 h-5 bg-[#00FFD1] rounded-full flex items-center px-0.5">
                       <div className="w-3.5 h-3.5 bg-black rounded-full ml-auto" />
@@ -535,8 +537,8 @@ export default function CookieConsent() {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-white font-medium">Analíticas</p>
-                      <p className="text-[10px] text-white/60 mt-0.5">Medir el comportamiento del sitio</p>
+                      <p className="text-xs text-white font-medium">{t('cookies.analytics')}</p>
+                      <p className="text-[10px] text-white/60 mt-0.5">{t('cookies.analytics_desc')}</p>
                     </div>
                     <button
                       onClick={() => toggleCookie('analytics')}
@@ -554,8 +556,8 @@ export default function CookieConsent() {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-white font-medium">Marketing</p>
-                      <p className="text-[10px] text-white/60 mt-0.5">Anuncios y campañas personalizadas</p>
+                      <p className="text-xs text-white font-medium">{t('cookies.marketing')}</p>
+                      <p className="text-[10px] text-white/60 mt-0.5">{t('cookies.marketing_desc')}</p>
                     </div>
                     <button
                       onClick={() => toggleCookie('marketing')}
@@ -573,8 +575,8 @@ export default function CookieConsent() {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-white font-medium">Preferencias</p>
-                      <p className="text-[10px] text-white/60 mt-0.5">Idioma y configuraciones personales</p>
+                      <p className="text-xs text-white font-medium">{t('cookies.preferences')}</p>
+                      <p className="text-[10px] text-white/60 mt-0.5">{t('cookies.preferences_desc')}</p>
                     </div>
                     <button
                       onClick={() => toggleCookie('preferences')}
@@ -608,14 +610,14 @@ export default function CookieConsent() {
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
-                      <span className="relative z-10">Guardar preferencias</span>
+                      <span className="relative z-10">{t('cookies.save_preferences')}</span>
                       <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
                     </button>
                     <button
                       onClick={() => setShowSettings(false)}
                       className="w-full py-2.5 rounded-lg text-xs font-medium text-white/70 hover:text-white transition-all duration-200"
                     >
-                      Volver
+                      {t('cookies.back')}
                     </button>
                   </>
                 ) : (
@@ -633,7 +635,7 @@ export default function CookieConsent() {
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
-                      <span className="relative z-10">Aceptar</span>
+                      <span className="relative z-10">{t('cookies.accept_all')}</span>
                       <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
                     </button>
                     
@@ -654,7 +656,7 @@ export default function CookieConsent() {
                           e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
-                        <span className="relative z-10">Rechazar</span>
+                        <span className="relative z-10">{t('cookies.reject_all')}</span>
                         <div className="absolute inset-0 bg-black/20 translate-y-full group-hover:translate-y-0 transition-transform duration-200" />
                       </button>
 
@@ -663,7 +665,7 @@ export default function CookieConsent() {
                         className="flex-1 py-2.5 rounded-lg text-xs font-medium text-white transition-all duration-200 border border-white/20 hover:border-[#00FFD1] hover:bg-[#00FFD1]/10 flex items-center justify-center gap-1.5"
                       >
                         <Settings size={13} />
-                        Personalizar
+                        {t('cookies.customize')}
                       </button>
                     </div>
                   </>

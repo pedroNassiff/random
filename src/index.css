@@ -1,6 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Fuentes alternativas con estética similar a Geist */
+    --font-geist-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-geist-mono: 'JetBrains Mono', 'Courier New', monospace;
+    --font-geist-pixel-square: 'JetBrains Mono', 'Courier Prime', monospace;
+  }
+}
 
 * {
     margin: 0;
@@ -9,7 +20,7 @@
 
 html, body {
     overflow-x: hidden;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-geist-sans);
 }
 
 body::-webkit-scrollbar {

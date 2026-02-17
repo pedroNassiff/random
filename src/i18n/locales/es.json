@@ -19,7 +19,7 @@
   "home": {
     "work_title": "WORK",
     "view_project": "ver proyecto",
-    "cta_description": "Rompemos estructuras para encontrar nuevas formas. Deconstruimos lo establecido para construir lo extraordinario. Marca que respira, identidad que evoluciona, web que se siente viva, experiencias que no se olvidan — cada proyecto nace de explorar lo inesperado.",
+    "cta_description": "> Rompemos estructuras para encontrar nuevas formas. Deconstruimos lo establecido para construir lo extraordinario. Marca que respira, identidad que evoluciona, web que se siente viva, experiencias que no se olvidan — cada proyecto nace de explorar lo inesperado.",
     "discover_all": "descubrir todos los proyectos",
     "services_title": "SERVICIOS",
     "services": {
@@ -43,8 +43,8 @@
     "lab_title": "LAB",
     "go_to_lab": "ir al lab",
     "about_title": "ABOUT",
-    "about_text_1": "En el caos de los datos, el ruido de la matrix, el flujo constante de información — ahí está nuestro laboratorio. Donde otros ven desorden, nosotros encontramos patrones. Donde el hábito limita, la exploración descubre. Random es esa perturbación necesaria que rompe lo predecible para alcanzar lo extraordinario.",
-    "about_text_2": "La mejor solución no sale del manual — sale de romper la regla, probar, ajustar. La matrix cae con su código infinito, pero ahí, entre el ruido, está la temperatura exacta, el tiempo preciso, el corte perfecto. Random es esa exploración: perturbamos el agua para ver las ondas, observamos energía formando galaxia, captamos vibraciones holográficas. No porque busquemos el caos — lo buscamos porque ahí está el aprendizaje. Rompemos el hábito para encontrar el camino. Nos perdemos en lo desconocido para descubrir lo que no sabíamos que existía. Para eso estamos: convertir lo aleatorio en intención, el ruido en claridad, la perturbación en creación."
+    "about_text_1": "> En el caos de los datos, el ruido de la matrix, el flujo constante de información, ahí está nuestro laboratorio. Donde otros ven desorden, nosotros encontramos patrones. Donde el hábito limita, la exploración descubre. Random es esa perturbación necesaria que rompe lo predecible para alcanzar lo extraordinario.",
+    "about_text_2": "> La mejor solución no sale del manual, sale de romper la regla, probar, ajustar. La matrix cae con su código infinito, pero ahí, entre el ruido, está la temperatura exacta, el tiempo preciso, el corte perfecto. Random es esa exploración: perturbamos el agua para ver las ondas, observamos energía formando galaxia, captamos vibraciones holográficas. No porque busquemos el caos lo buscamos porque ahí está el aprendizaje. Rompemos el hábito para encontrar el camino. Nos perdemos en lo desconocido para descubrir lo que no sabíamos que existía. Para eso estamos: convertir lo aleatorio en intención, el ruido en claridad, la perturbación en creación."
   },
   "work": {
     "title": "WORK"
@@ -81,23 +81,24 @@
     "no_user_activity": "No hay actividad de usuario disponible aún"
   },
   "cookies": {
-    "trust_message": "confía, porque si no confías, no hay confianza",
-    "helper_message": "bien, ahora que elegiste confiar, puedo ayudarte a estar mas liviano, porque si, en internet es 99% que te esten vigilando",
+    "trust_message": "> confía, porque si no confías, no hay confianza",
+    "helper_message": "> bien, ahora que elegiste confiar, puedo ayudarte a estar mas liviano, porque si, en internet es 99% seguro que alguien este vigilando",
     "see_tracking": "ver quien me vigila",
     "tracking_title": "Quien te está vigilando:",
     "delete_all": "Eliminar todo",
     "back": "Volver",
-    "final_message": "listo, ahora estas mas liviano",
+    "final_message": "> listo, ahora estas mas liviano",
     "necessary": "Necesarias",
     "necessary_desc": "Esenciales para el funcionamiento",
     "analytics": "Analíticas",
     "analytics_desc": "Medir el comportamiento del sitio",
     "preferences": "Preferencias",
-    "preferences_desc": "Tus preferencias de navegación",
+    "preferences_desc": "Idioma y configuraciones personales",
     "marketing": "Marketing",
-    "marketing_desc": "Publicidad personalizada",
-    "accept_all": "Aceptar todo",
-    "reject_all": "Rechazar todo",
+    "marketing_desc": "Anuncios y campañas personalizadas",
+    "accept_all": "Aceptar",
+    "reject_all": "Rechazar",
+    "save_preferences": "Guardar preferencias",
     "customize": "Personalizar",
     "local_storage": "LocalStorage",
     "session_storage": "SessionStorage",
