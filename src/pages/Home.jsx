@@ -749,7 +749,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           <GlitchButton 
             variant="primary" 
             className="w-[250px] mx-auto md:mx-0"
-            onClick={() => trackClick('lab_cta_click', 'go_to_lab', '.lab-button')}
+            onClick={() => { trackClick('lab_cta_click', 'go_to_lab', '.lab-button'); navigate('/lab'); }}
           >
             <ScrollingText text={t('home.go_to_lab')} speed={10} textColor="text-[#1A1A1A]" />
           </GlitchButton>
