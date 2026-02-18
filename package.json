@@ -21,6 +21,8 @@
     "vite-plugin-restart": "^0.4.2"
   },
   "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/face_mesh": "^0.4.1633559619",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "apexcharts": "^5.3.6",
@@ -35,6 +37,7 @@
     "react-dom": "^19.2.3",
     "react-i18next": "^16.5.4",
     "react-router-dom": "^7.13.0",
-    "three": "^0.174.0"
+    "three": "^0.174.0",
+    "zustand": "^5.0.11"
   }
 }

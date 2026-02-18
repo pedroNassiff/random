@@ -5,6 +5,8 @@ import Work from './pages/Work.jsx';
 import ProjectDetail from './pages/ProjectDetail.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Automation from './pages/Automation.jsx';
+import Lab from './pages/Lab.jsx';
+import LabDetail from './pages/LabDetail.jsx';
 import PageTransition from './components/PageTransition.jsx';
 import { AnalyticsProvider } from './lib/useAnalytics.jsx';
 import './index.css';
@@ -20,6 +22,8 @@ function AppRoutes() {
         <Route path="/work/:projectId" element={<ProjectDetail />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/automation" element={<Automation />} />
+        <Route path="/lab" element={<Lab />} />
+        <Route path="/lab/:id" element={<LabDetail />} />
       </Routes>
     </PageTransition>
   );

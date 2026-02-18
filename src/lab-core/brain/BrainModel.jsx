@@ -27,6 +27,7 @@ const BrainModel = memo(function BrainModel({
   const { scene } = useGLTF('/models/brain/scene.gltf')
   const groupRef = useRef()
   const materialRef = useRef()
+  const wireframeMaterialRef = useRef(new THREE.MeshBasicMaterial({ color: '#00E5FF', wireframe: true, transparent: true, opacity: 0.55 }))
   const rotationRef = useRef(0)
   const lastHoveredRef = useRef(hovered)
 
@@ -70,7 +71,7 @@ const BrainModel = memo(function BrainModel({
       if (!clonedScene.userData.materialApplied) {
         clonedScene.traverse((child) => {
           if (child.isMesh) {
-            child.material = materialRef.current
+            child.material = wireframe ? wireframeMaterialRef.current : materialRef.current
           }
         })
         clonedScene.userData.materialApplied = true

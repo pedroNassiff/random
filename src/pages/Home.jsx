@@ -9,7 +9,7 @@ import Scene3D from '../components/Scene3D';
 import HolographicModel from '../components/HolographicModel';
 import { WaterEffect } from '../components/WaterEffect';
 import HeroGalaxy from '../components/HeroGalaxy';
-import LabModelViewer from '../lab/LabModelViewer';
+import LabModelViewer from '../lab-core/LabModelViewer';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import CookieConsent from '../components/CookieConsent';
