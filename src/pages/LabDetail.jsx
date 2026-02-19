@@ -1,5 +1,6 @@
 import React, { Suspense, useRef, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { usePageTracking, useEventTracking } from '../lib/useAnalytics.jsx'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 
@@ -124,8 +125,13 @@ export default function LabDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [hint, setHint] = useState(true)
+  usePageTracking(`lab/${id}`);
+  const { trackClick } = useEventTracking();
 
-  const back = () => navigate('/lab')
+  const back = () => {
+    trackClick('lab_back_click', id);
+    navigate('/lab');
+  }
 
   // Ocultar el drag hint tras 3s
   useEffect(() => {

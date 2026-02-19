@@ -4,6 +4,7 @@ import { usePageTracking, useConversionTracking, useEventTracking } from '../lib
 import { projects } from '../data/projects'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import GlitchButton from '../components/GlitchButton'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -154,6 +155,28 @@ const ProjectDetail = () => {
               <p className="text-lg md:text-xl">{project.technologies || project.category}</p>
             </div>
           </div>
+
+          {/* CTA Lab — solo si el proyecto tiene experimento interactivo */}
+          {project.labLink && (
+            <div className="mt-16 md:mt-20 pt-12 border-t border-white/10">
+              <p className="text-xs font-mono text-gray-500 uppercase tracking-[0.25em] mb-4">Experimento interactivo</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                <p className="text-gray-400 text-sm max-w-md leading-relaxed">
+                  Este proyecto tiene una versión interactiva en el Lab. Explorá el modelo en tiempo real.
+                </p>
+                <GlitchButton
+                  variant="primary"
+                  onClick={() => {
+                    trackClick('lab_cta_click', project.id);
+                    navigate(project.labLink);
+                  }}
+                  className="flex items-center gap-3 font-mono tracking-widest uppercase text-sm"
+                >
+                  IR AL LAB
+                </GlitchButton>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

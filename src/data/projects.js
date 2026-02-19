@@ -75,6 +75,7 @@ export const projects = [
     client: 'Random Lab',
     technologies: 'React, Three.js, PyTorch VAE, Muse 2 EEG, WebSockets, PhysioNet',
     link: '/project/hermes',
+    labLink: '/lab/brain',
     images: [
       { src: hermesDashboard, size: 'large' },
       { src: hermesDashboard, size: 'medium' },

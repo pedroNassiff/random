@@ -1,10 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import Chart from 'react-apexcharts';
+import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout';
 import { analyticsApi } from '../services/analyticsApi';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 import '../styles/Analytics.css';
+
+const DEFAULT_LAYOUT = {
+  lg: [
+    { i: 'sessions',   x: 0,  y: 0,  w: 8, h: 6, minW: 4, minH: 4 },
+    { i: 'devices',    x: 8,  y: 0,  w: 4, h: 6, minW: 3, minH: 4 },
+    { i: 'top_pages',  x: 0,  y: 6,  w: 8, h: 6, minW: 4, minH: 4 },
+    { i: 'top_events', x: 8,  y: 6,  w: 4, h: 6, minW: 3, minH: 4 },
+    { i: 'engagement', x: 0,  y: 12, w: 4, h: 5, minW: 3, minH: 3 },
+    { i: 'traffic',    x: 4,  y: 12, w: 4, h: 5, minW: 3, minH: 3 },
+    { i: 'geo',        x: 8,  y: 12, w: 4, h: 5, minW: 3, minH: 3 },
+    { i: 'users',      x: 0,  y: 17, w: 12, h: 10, minW: 4, minH: 4 },
+  ]
+};
+
+const STORAGE_KEY = 'analytics_dashboard_layout';
 
 const Analytics = () => {
   const { t } = useTranslation();
@@ -15,6 +33,67 @@ const Analytics = () => {
   const [topEvents, setTopEvents] = useState([]);
   const [engagementZones, setEngagementZones] = useState([]);
   const [usersActivity, setUsersActivity] = useState([]);
+  const [layouts, setLayouts] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return DEFAULT_LAYOUT;
+      const parsed = JSON.parse(saved);
+      // Reject corrupt layouts — if any item is too small it got mangled
+      const items = parsed.lg ?? [];
+      const isValid = items.length === DEFAULT_LAYOUT.lg.length &&
+        items.every(item => item.w >= 2 && item.h >= 2);
+      if (!isValid) {
+        console.warn('[Analytics] Stored layout invalid, resetting to default');
+        localStorage.removeItem(STORAGE_KEY);
+        return DEFAULT_LAYOUT;
+      }
+      return parsed;
+    } catch { return DEFAULT_LAYOUT; }
+  });
+
+  const { containerRef: gridRef, width: gridWidth } = useContainerWidth();
+
+  const logDimensions = useCallback((label, layoutItems, cols = 12) => {
+    const ROW_H = 60;
+    const MARGIN = 16;
+    const colWidth = (gridWidth - MARGIN * (cols + 1)) / cols;
+    console.group(`📐 [Analytics Grid] ${label} — container width: ${Math.round(gridWidth)}px`);
+    layoutItems.forEach(item => {
+      const pxW = Math.round(colWidth * item.w + MARGIN * (item.w - 1));
+      const pxH = Math.round(ROW_H * item.h + MARGIN * (item.h - 1));
+      console.log(
+        `%c ${item.i.padEnd(12)} %c grid(${item.w}×${item.h}) → ${pxW}×${pxH}px  [x:${item.x} y:${item.y}]`,
+        'background:#00FFD1;color:#000;font-weight:bold;border-radius:3px;padding:1px 4px',
+        'color:#aaa'
+      );
+    });
+    console.groupEnd();
+  }, [gridWidth]);
+
+  // Log on first meaningful render (when gridWidth is known)
+  useEffect(() => {
+    if (gridWidth <= 0) return;
+    const current = layouts.lg ?? DEFAULT_LAYOUT.lg;
+    logDimensions('DEFAULT LAYOUT (initial)', current);
+  }, [gridWidth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLayoutChange = useCallback((_, allLayouts) => {
+    setLayouts(allLayouts);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allLayouts));
+    if (allLayouts.lg) logDimensions('LAYOUT CHANGED', allLayouts.lg);
+  }, [logDimensions]);
+
+  const resetLayout = () => {
+    setLayouts(DEFAULT_LAYOUT);
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
+  const DragHandle = ({ title }) => (
+    <div className="widget-drag-handle">
+      <span className="widget-title">{title}</span>
+      <span className="drag-hint">⠿</span>
+    </div>
+  );
 
   useEffect(() => {
     fetchAnalytics();
@@ -58,26 +137,33 @@ const Analytics = () => {
     dataLabels: { enabled: false },
     stroke: {
       curve: 'smooth',
-      width: 3
+      width: 2
     },
     fill: {
-      type: 'solid',
-      opacity: 0.1
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.25,
+        opacityTo: 0.02,
+        stops: [0, 100]
+      }
     },
-    colors: ['#fff'],
+    colors: ['#00FFD1'],
     grid: {
-      borderColor: 'rgba(255, 255, 255, 0.1)',
+      borderColor: 'rgba(255, 255, 255, 0.06)',
       strokeDashArray: 4
     },
     xaxis: {
       categories: summary?.daily_sessions?.map(d => d.date) || [],
       labels: {
-        style: { colors: '#888' }
-      }
+        style: { colors: '#555' }
+      },
+      axisBorder: { show: false },
+      axisTicks: { show: false }
     },
     yaxis: {
       labels: {
-        style: { colors: '#888' }
+        style: { colors: '#555' }
       }
     },
     tooltip: {
@@ -105,7 +191,7 @@ const Analytics = () => {
       type: 'donut',
       background: 'transparent'
     },
-    colors: ['#fff', '#aaa', '#666', '#333'],
+    colors: ['#00FFD1', '#E040FB', '#00B4FF', '#FFD700'],
     labels: summary?.device_breakdown?.map(d => d.device_type) || [],
     plotOptions: {
       pie: {
@@ -116,22 +202,26 @@ const Analytics = () => {
             total: {
               show: true,
               label: 'Devices',
+              color: '#888',
+              fontSize: '13px',
+              fontFamily: 'monospace'
+            },
+            value: {
               color: '#fff',
-              fontSize: '16px'
+              fontSize: '22px',
+              fontWeight: 700
             }
           }
         }
       }
     },
     dataLabels: {
-      enabled: true,
-      style: {
-        colors: ['#000']
-      }
+      enabled: false
     },
     legend: {
       position: 'bottom',
-      labels: { colors: '#fff' }
+      labels: { colors: '#888' },
+      markers: { width: 8, height: 8, radius: 8 }
     },
     tooltip: {
       theme: 'dark'
@@ -147,12 +237,13 @@ const Analytics = () => {
       toolbar: { show: false },
       background: 'transparent'
     },
-    colors: ['#fff'],
+    colors: ['#00FFD1'],
     plotOptions: {
       bar: {
         horizontal: true,
-        borderRadius: 4,
-        distributed: false
+        borderRadius: 3,
+        distributed: false,
+        barHeight: '60%'
       }
     },
     dataLabels: {
@@ -161,16 +252,20 @@ const Analytics = () => {
     xaxis: {
       categories: topPages.map(p => p.page_path) || [],
       labels: {
-        style: { colors: '#888' }
-      }
+        style: { colors: '#555' }
+      },
+      axisBorder: { show: false },
+      axisTicks: { show: false }
     },
     yaxis: {
       labels: {
-        style: { colors: '#888' }
+        style: { colors: '#aaa', fontSize: '12px' }
       }
     },
     grid: {
-      borderColor: 'rgba(255, 255, 255, 0.1)'
+      borderColor: 'rgba(255, 255, 255, 0.06)',
+      xaxis: { lines: { show: true } },
+      yaxis: { lines: { show: false } }
     },
     tooltip: {
       theme: 'dark',
@@ -187,6 +282,33 @@ const Analytics = () => {
       data: topPages.map(p => p.views) || []
     }
   ];
+
+  const formatDuration = (seconds) => {
+    const s = Math.round(seconds || 0);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    if (m < 60) return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
+  };
+
+  const formatEuropeDate = (dateStr) => {
+    if (!dateStr) return null;
+    try {
+      return new Date(dateStr).toLocaleString('es-ES', {
+        timeZone: 'Europe/Madrid',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return null;
+    }
+  };
 
   if (loading) {
     return (
@@ -205,24 +327,14 @@ const Analytics = () => {
         {/* Header */}
         <div className="analytics-header">
           <h1 className="analytics-title">Random Analytics</h1>
-          <div className="time-range-selector">
-            <button
-              className={timeRange === 7 ? 'active' : ''}
-              onClick={() => setTimeRange(7)}
-            >
-              7D
-            </button>
-            <button
-              className={timeRange === 30 ? 'active' : ''}
-              onClick={() => setTimeRange(30)}
-            >
-              30D
-            </button>
-            <button
-              className={timeRange === 90 ? 'active' : ''}
-              onClick={() => setTimeRange(90)}
-            >
-              90D
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div className="time-range-selector">
+              <button className={timeRange === 7 ? 'active' : ''} onClick={() => setTimeRange(7)}>7D</button>
+              <button className={timeRange === 30 ? 'active' : ''} onClick={() => setTimeRange(30)}>30D</button>
+              <button className={timeRange === 90 ? 'active' : ''} onClick={() => setTimeRange(90)}>90D</button>
+            </div>
+            <button onClick={resetLayout} className="reset-layout-btn" title="Reset dashboard layout">
+              ↺ Reset
             </button>
           </div>
         </div>
@@ -253,7 +365,7 @@ const Analytics = () => {
           <div className="stat-card">
             <div className="stat-content">
               <p className="stat-label">Avg Duration</p>
-              <h3 className="stat-value">{Math.round(summary?.avg_session_duration || 0)}s</h3>
+              <h3 className="stat-value">{formatDuration(summary?.avg_session_duration)}</h3>
             </div>
           </div>
 
@@ -272,188 +384,202 @@ const Analytics = () => {
           </div>
         </div>
 
-        {/* Charts Grid */}
-        <div className="charts-grid">
-          {/* Line Chart - Sessions Over Time */}
-          <div className="chart-card large">
-            <h3 className="chart-title">Sessions Over Time</h3>
-            <Chart
-              options={lineChartOptions}
-              series={lineChartSeries}
-              type="area"
-              height={300}
-            />
+        {/* Dashboard Grid — draggable & resizable */}
+        <div ref={gridRef} className="dashboard-grid">
+        <ResponsiveGridLayout
+          width={gridWidth}
+          layouts={layouts}
+          onLayoutChange={handleLayoutChange}
+          breakpoints={{ lg: 1200, md: 996, sm: 768 }}
+          cols={{ lg: 12, md: 10, sm: 6 }}
+          rowHeight={60}
+          draggableHandle=".widget-drag-handle"
+          margin={[16, 16]}
+          containerPadding={[0, 0]}
+          useCSSTransforms
+        >
+          {/* Sessions Over Time */}
+          <div key="sessions" className="widget">
+            <DragHandle title="Sessions Over Time" />
+            <div className="widget-body">
+              <Chart options={lineChartOptions} series={lineChartSeries} type="area" height="100%" />
+            </div>
           </div>
 
-          {/* Donut Chart - Device Breakdown */}
-          <div className="chart-card">
-            <h3 className="chart-title">Device Breakdown</h3>
-            <Chart
-              options={donutChartOptions}
-              series={donutChartSeries}
-              type="donut"
-              height={300}
-            />
+          {/* Device Breakdown */}
+          <div key="devices" className="widget">
+            <DragHandle title="Device Breakdown" />
+            <div className="widget-body">
+              <Chart options={donutChartOptions} series={donutChartSeries} type="donut" height="100%" />
+            </div>
           </div>
 
-          {/* Bar Chart - Top Pages */}
-          <div className="chart-card large">
-            <h3 className="chart-title">Top Pages</h3>
-            <Chart
-              options={barChartOptions}
-              series={barChartSeries}
-              type="bar"
-              height={300}
-            />
+          {/* Top Pages */}
+          <div key="top_pages" className="widget">
+            <DragHandle title="Top Pages" />
+            <div className="widget-body">
+              <Chart options={barChartOptions} series={barChartSeries} type="bar" height="100%" />
+            </div>
           </div>
 
-          {/* Top Events Table */}
-          <div className="chart-card">
-            <h3 className="chart-title">Top Events</h3>
-            <div className="events-list">
-              {topEvents.map((event, index) => (
-                <div key={index} className="event-item">
-                  <div className="event-rank">{index + 1}</div>
-                  <div className="event-details">
-                    <p className="event-name">{event.event_name}</p>
-                    <p className="event-category">{event.event_category || 'General'}</p>
+          {/* Top Events */}
+          <div key="top_events" className="widget">
+            <DragHandle title="Top Events" />
+            <div className="widget-body widget-scroll">
+              <div className="events-list">
+                {topEvents.map((event, index) => (
+                  <div key={index} className="event-item">
+                    <div className="event-rank">{index + 1}</div>
+                    <div className="event-details">
+                      <p className="event-name">{event.event_name}</p>
+                      <p className="event-category">{event.event_category || 'General'}</p>
+                    </div>
+                    <div className="event-count">{event.count}</div>
                   </div>
-                  <div className="event-count">{event.count}</div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Engagement Zones */}
-          <div className="chart-card">
-            <h3 className="chart-title">Engagement Zones</h3>
-            <div className="engagement-list">
-              {engagementZones.map((zone, index) => (
-                <div key={index} className="engagement-item">
-                  <div className="engagement-info">
-                    <p className="zone-name">{zone.zone_id}</p>
-                    <div className="engagement-bar">
-                      <div
-                        className="engagement-fill"
-                        style={{ width: `${(zone.avg_duration / 60) * 100}%` }}
-                      ></div>
+          <div key="engagement" className="widget">
+            <DragHandle title="Engagement Zones" />
+            <div className="widget-body widget-scroll">
+              <div className="engagement-list">
+                {engagementZones.map((zone, index) => (
+                  <div key={index} className="engagement-item">
+                    <div className="engagement-info">
+                      <p className="zone-name">{zone.zone_id}</p>
+                      <div className="engagement-bar">
+                        <div className="engagement-fill" style={{ width: `${Math.min((zone.avg_duration / 60) * 100, 100)}%` }} />
+                      </div>
                     </div>
+                    <div className="engagement-time">{formatDuration(zone.avg_duration)}</div>
                   </div>
-                  <div className="engagement-time">
-                    {Math.round(zone.avg_duration)}s
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Traffic Sources */}
-          <div className="chart-card large">
-            <h3 className="chart-title">Traffic Sources</h3>
-            <div className="sources-grid">
-              {summary?.top_sources?.map((source, index) => (
-                <div key={index} className="source-item">
-                  <div className="source-details">
-                    <p className="source-name">{source.referrer_source || 'Direct'}</p>
-                    <p className="source-count">{source.count} visits</p>
+          <div key="traffic" className="widget">
+            <DragHandle title="Traffic Sources" />
+            <div className="widget-body widget-scroll">
+              <div className="sources-grid">
+                {summary?.top_sources?.map((source, index) => (
+                  <div key={index} className="source-item">
+                    <div className="source-details">
+                      <p className="source-name">{source.referrer_source || 'Direct'}</p>
+                      <p className="source-count">{source.count} visits</p>
+                    </div>
+                    <div className="source-percentage">
+                      {((source.count / summary.total_sessions) * 100).toFixed(1)}%
+                    </div>
                   </div>
-                  <div className="source-percentage">
-                    {((source.count / summary.total_sessions) * 100).toFixed(1)}%
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Geographic Distribution */}
-          <div className="chart-card">
-            <h3 className="chart-title">Geographic Distribution</h3>
-            <div className="geo-list">
-              {summary?.top_countries?.map((location, index) => (
-                <div key={index} className="geo-item">
-                  <div className="geo-details">
-                    <p className="geo-location">
-                      {location.city ? `${location.city}, ` : ''}{location.country || 'Unknown'}
-                    </p>
-                    <p className="geo-count">{location.count} visits</p>
+          <div key="geo" className="widget">
+            <DragHandle title="Geographic Distribution" />
+            <div className="widget-body widget-scroll">
+              <div className="geo-list">
+                {summary?.top_countries?.map((location, index) => (
+                  <div key={index} className="geo-item">
+                    <div className="geo-details">
+                      <p className="geo-location">
+                        {location.city ? `${location.city}, ` : ''}{location.country || 'Unknown'}
+                      </p>
+                      <p className="geo-count">{location.count} visits</p>
+                    </div>
+                    <div className="geo-percentage">
+                      {((location.count / summary.total_sessions) * 100).toFixed(1)}%
+                    </div>
                   </div>
-                  <div className="geo-percentage">
-                    {((location.count / summary.total_sessions) * 100).toFixed(1)}%
-                  </div>
-                </div>
-              ))}
-              {(!summary?.top_countries || summary.top_countries.length === 0) && (
-                <p className="no-data">No geographic data available yet</p>
-              )}
+                ))}
+                {(!summary?.top_countries || summary.top_countries.length === 0) && (
+                  <p className="no-data">No geographic data available yet</p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Users Activity */}
-          <div className="chart-card large">
-            <h3 className="chart-title">👤 User Activity</h3>
-            <div className="users-activity-container">
-              {usersActivity.length > 0 ? (
-                usersActivity.map((user, index) => (
-                  <div key={user.id} className="user-activity-card">
-                    <div className="user-header">
-                      <div className="user-info">
-                        <div className="user-avatar">
-                          {user.email ? (
-                            <span className="avatar-icon">✉️</span>
-                          ) : (
-                            <span className="avatar-icon anonymous">👤</span>
-                          )}
-                        </div>
-                        <div className="user-details">
-                          <p className="user-name">
-                            {user.name || user.email || `Anonymous ${user.anonymous_id.slice(-8)}`}
-                          </p>
-                          {user.email && <p className="user-email">{user.email}</p>}
-                          {user.city && user.country && (
-                            <p className="user-location">📍 {user.city}, {user.country}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="user-stats">
-                        <div className="stat-badge">
-                          <span className="stat-label">Sessions</span>
-                          <span className="stat-value">{user.total_sessions}</span>
-                        </div>
-                        <div className="stat-badge">
-                          <span className="stat-label">Clicks</span>
-                          <span className="stat-value">{user.total_clicks || 0}</span>
-                        </div>
-                        <div className="stat-badge">
-                          <span className="stat-label">Time</span>
-                          <span className="stat-value">{Math.round(user.total_time || 0)}s</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {user.pages && user.pages.length > 0 && (
-                      <div className="user-pages">
-                        <p className="pages-title">Pages visited:</p>
-                        {user.pages.map((page, pageIndex) => (
-                          <div key={pageIndex} className="page-item">
-                            <div className="page-info">
-                              <span className="page-path">{page.page_path}</span>
-                              <span className="page-visits">{page.visits} visit{page.visits > 1 ? 's' : ''}</span>
-                            </div>
-                            <div className="page-metrics">
-                              <span className="page-time">⏱ {Math.round(page.avg_time || 0)}s avg</span>
-                              <span className="page-clicks">🖱 {page.total_clicks || 0} clicks</span>
+          {/* User Activity */}
+          <div key="users" className="widget">
+            <DragHandle title="User Activity" />
+            <div className="widget-body widget-scroll">
+              <div className="users-activity-container">
+                {usersActivity.length > 0 ? (
+                  usersActivity.map((user) => (
+                    <div key={user.id} className="user-activity-card">
+                      <div className="user-header">
+                        <div className="user-info">
+                          <div className="user-avatar">
+                            {user.email
+                              ? <span className="avatar-icon">✉️</span>
+                              : <span className="avatar-icon anonymous">👤</span>}
+                          </div>
+                          <div className="user-details">
+                            <p className="user-name">
+                              {user.name || user.email || `Anonymous ${user.anonymous_id.slice(-8)}`}
+                            </p>
+                            {user.email && <p className="user-email">{user.email}</p>}
+                            {user.city && user.country && (
+                              <p className="user-location">📍 {user.city}, {user.country}</p>
+                            )}
+                            <div className="user-timestamps">
+                              {user.first_seen && (
+                                <span className="user-ts">🟢 Primera visita: {formatEuropeDate(user.first_seen)}</span>
+                              )}
+                              {user.last_seen && (
+                                <span className="user-ts">🕐 Última visita: {formatEuropeDate(user.last_seen)}</span>
+                              )}
                             </div>
                           </div>
-                        ))}
+                        </div>
+                        <div className="user-stats">
+                          <div className="stat-badge">
+                            <span className="stat-label">Sessions</span>
+                            <span className="stat-value">{user.total_sessions}</span>
+                          </div>
+                          <div className="stat-badge">
+                            <span className="stat-label">Clicks</span>
+                            <span className="stat-value">{user.total_clicks || 0}</span>
+                          </div>
+                          <div className="stat-badge">
+                            <span className="stat-label">Time</span>
+                            <span className="stat-value">{Math.round(user.total_time || 0)}s</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="no-data">No user activity data available yet</p>
-              )}
+                      {user.pages && user.pages.length > 0 && (
+                        <div className="user-pages">
+                          <p className="pages-title">Pages visited:</p>
+                          {user.pages.map((page, pageIndex) => (
+                            <div key={pageIndex} className="page-item">
+                              <div className="page-info">
+                                <span className="page-path">{page.page_path}</span>
+                                <span className="page-visits">{page.visits} visit{page.visits > 1 ? 's' : ''}</span>
+                              </div>
+                              <div className="page-metrics">
+                                <span className="page-time">⏱ {Math.round(page.avg_time || 0)}s avg</span>
+                                <span className="page-clicks">🖱 {page.total_clicks || 0} clicks</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-data">No user activity data available yet</p>
+                )}
+              </div>
             </div>
           </div>
+        </ResponsiveGridLayout>
         </div>
       </div>
 

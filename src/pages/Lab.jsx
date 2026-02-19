@@ -4,6 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { usePageTracking, useConversionTracking, useEventTracking } from '../lib/useAnalytics.jsx'
 
 // Models — import directos para uso dentro de Canvas
 import HolographicModel from '../components/HolographicModel'
@@ -147,6 +148,7 @@ const ExperimentCanvas = memo(function ExperimentCanvas({ exp, isHovered, inView
 const ExperimentSlot = memo(function ExperimentSlot({ exp, itemIndex }) {
   const containerRef = useRef(null)
   const navigate = useNavigate()
+  const { trackClick } = useEventTracking()
   const [inView, setInView] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -179,7 +181,10 @@ const ExperimentSlot = memo(function ExperimentSlot({ exp, itemIndex }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onMouseMove={handleMouseMove}
-      onClick={() => navigate(`/lab/${exp.id}`)}
+      onClick={() => {
+        trackClick('lab_experiment_click', exp.id);
+        navigate(`/lab/${exp.id}`);
+      }}
     >
       <div style={{ position: 'absolute', inset: 0 }}>
         {loaded && <ExperimentCanvas exp={exp} isHovered={isHovered} inView={inView} />}
@@ -250,6 +255,14 @@ function CustomCursor() {
 }
 
 export default function Lab() {
+  usePageTracking('lab');
+  const { trackLabVisit } = useConversionTracking();
+
+  useEffect(() => {
+    trackLabVisit();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="min-h-screen bg-black text-white">
       <CustomCursor />
