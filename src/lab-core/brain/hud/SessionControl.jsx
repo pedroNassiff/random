@@ -173,14 +173,15 @@ export default function SessionControl() {
   
   const stopSession = async () => {
     try {
-      setSessionActive(false);
-      setIsPlaying(false);
-      setSessionPaused(true);  // Pausar audio binaural al detener
-      setSessionStatus(null);
-      setShowPlaylist(false);
-    } catch (err) {
-      console.error('Error stopping session:', err);
-    }
+      // Tell backend to go back to idle so next activate starts fresh
+      await fetch(`${API_BASE}/set-mode/idle`, { method: 'POST' }).catch(() => {});
+    } catch (_) {}
+    setSessionActive(false);
+    setIsPlaying(false);
+    setSessionStatus(null);
+    setSessionPaused(true);
+    setShowPlaylist(false);
+    console.log('[SessionControl] Session stopped, backend set to idle');
   };
   
   const seekTo = async (seconds) => {
@@ -200,24 +201,28 @@ export default function SessionControl() {
     }
   };
 
+  // Helper: refresh playlist and force play
+  const refreshPlaylistAndPlay = async () => {
+    const [playlistRes] = await Promise.all([
+      fetch(`${API_BASE}/playlist`),
+      fetch(`${API_BASE}/session/play`, { method: 'POST' }),
+    ]);
+    const playlistData = await playlistRes.json();
+    if (playlistData.status === 'success') setPlaylist(playlistData);
+    setIsPlaying(true);
+    setSessionPaused(false);
+  };
+
   // Seleccionar sesión directamente por índice
   const selectSession = async (index) => {
     setIsLoadingSession(true);
+    setSessionStatus(null); // clear stale data before loading new session
     try {
       const res = await fetch(`${API_BASE}/playlist/select/${index}`, { method: 'POST' });
       const data = await res.json();
       if (data.status === 'success') {
-        // Refresh playlist
-        const playlistRes = await fetch(`${API_BASE}/playlist`);
-        const playlistData = await playlistRes.json();
-        if (playlistData.status === 'success') {
-          setPlaylist(playlistData);
-        }
-        // Auto-play la sesión seleccionada
-        if (!isPlaying) {
-          const playRes = await fetch(`${API_BASE}/session/play`, { method: 'POST' });
-          if (playRes.ok) setIsPlaying(true);
-        }
+        await refreshPlaylistAndPlay();
+        console.log(`[SessionControl] Switched to session index ${index}`);
       }
     } catch (err) {
       console.error('Error selecting session:', err);
@@ -228,15 +233,13 @@ export default function SessionControl() {
   
   const nextSession = async () => {
     setIsLoadingSession(true);
+    setSessionStatus(null);
     try {
       const res = await fetch(`${API_BASE}/playlist/next`, { method: 'POST' });
       const data = await res.json();
       if (data.status === 'success') {
-        const playlistRes = await fetch(`${API_BASE}/playlist`);
-        const playlistData = await playlistRes.json();
-        if (playlistData.status === 'success') {
-          setPlaylist(playlistData);
-        }
+        await refreshPlaylistAndPlay();
+        console.log('[SessionControl] Advanced to next session');
       }
     } catch (err) {
       console.error('Error advancing to next session:', err);
@@ -247,15 +250,13 @@ export default function SessionControl() {
   
   const previousSession = async () => {
     setIsLoadingSession(true);
+    setSessionStatus(null);
     try {
       const res = await fetch(`${API_BASE}/playlist/previous`, { method: 'POST' });
       const data = await res.json();
       if (data.status === 'success') {
-        const playlistRes = await fetch(`${API_BASE}/playlist`);
-        const playlistData = await playlistRes.json();
-        if (playlistData.status === 'success') {
-          setPlaylist(playlistData);
-        }
+        await refreshPlaylistAndPlay();
+        console.log('[SessionControl] Went to previous session');
       }
     } catch (err) {
       console.error('Error going to previous session:', err);
@@ -321,7 +322,7 @@ export default function SessionControl() {
     return (
       <div style={{
         position: 'fixed',
-        bottom: '20px',
+        bottom: '50px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 100,

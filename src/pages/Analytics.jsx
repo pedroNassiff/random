@@ -191,7 +191,7 @@ const Analytics = () => {
       type: 'donut',
       background: 'transparent'
     },
-    colors: ['#00FFD1', '#E040FB', '#00B4FF', '#FFD700'],
+    colors: ['#00FFD1', '#FF6B2C', '#00B4FF', '#FFD700'],
     labels: summary?.device_breakdown?.map(d => d.device_type) || [],
     plotOptions: {
       pie: {

@@ -178,8 +178,24 @@ export default function BrainDetail() {
           <button onClick={() => setDataSource('dataset')} style={tabStyle(dataSource === 'dataset')}>
             Dataset
           </button>
-          <button onClick={() => setDataSource('muse')} style={tabStyle(dataSource === 'muse', 'rgba(0,255,136,0.15)', 'rgba(0,255,136,0.4)')}>
-            <span style={{ color: dataSource === 'muse' ? '#00ff88' : 'inherit' }}>Muse 2</span>
+          <button
+            disabled
+            title="Muse 2 — próximamente"
+            style={{
+              ...tabStyle(false),
+              opacity: 0.3,
+              cursor: 'not-allowed',
+              position: 'relative',
+            }}
+          >
+            Muse 2
+            <span style={{
+              marginLeft: 5,
+              fontSize: '0.55rem',
+              letterSpacing: '0.06em',
+              color: 'rgba(255,255,255,0.4)',
+              verticalAlign: 'middle',
+            }}>WIP</span>
           </button>
         </div>
 
@@ -199,7 +215,7 @@ export default function BrainDetail() {
       </div>
 
       {/* ── Bottom tags (canvas area) ── */}
-      <div style={{
+      {/* <div style={{
         position: 'fixed', bottom: 22, left: '50%',
         transform: 'translateX(-50%) translateX(-155px)',
         zIndex: 100, pointerEvents: 'none',
@@ -214,7 +230,7 @@ export default function BrainDetail() {
             {tag}
           </span>
         ))}
-      </div>
+      </div> */}
 
       <style>{`
         ::-webkit-scrollbar { display: none; }
