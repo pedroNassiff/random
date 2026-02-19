@@ -196,7 +196,7 @@ export default function LabDetail() {
       {/* Back button */}
       <button
         onClick={back}
-        className="fixed top-8 left-8 z-50 text-white/40 hover:text-white text-[10px] tracking-[0.4em] uppercase font-mono transition-colors duration-200"
+        className="fixed top-8 left-8 z-50 text-white/40 hover:text-white text-[14px] tracking-[0.4em] uppercase font-mono transition-colors duration-200"
         style={{ cursor: 'none' }}
       >
         ← Back
@@ -204,17 +204,17 @@ export default function LabDetail() {
 
       {/* Experiment name — top center */}
       <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none text-center">
-        <p className="text-white/20 text-[9px] tracking-[0.5em] uppercase font-mono">.RANDOM() / LAB</p>
-        <p className="text-white/60 text-[11px] tracking-[0.4em] uppercase font-mono mt-1">{name}</p>
+        <p className="text-white/20 text-[10px] tracking-[0.5em] uppercase font-mono">.RANDOM() / LAB</p>
+        <p className="text-white/60 text-[12px] tracking-[0.4em] uppercase font-mono mt-1">{name}</p>
       </div>
 
       {/* Description + tags — bottom center */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none text-center space-y-2">
-        <p className="text-white/25 text-[9px] tracking-[0.3em] uppercase font-mono">{desc}</p>
+        <p className="text-white/75 text-[12px] tracking-[0.3em] uppercase font-mono">{desc}</p>
         {config.tags?.length > 0 && (
           <div className="flex justify-center gap-2">
             {config.tags.map(tag => (
-              <span key={tag} className="text-white/20 text-[7px] tracking-[0.3em] uppercase font-mono border border-white/10 px-1.5 py-0.5">
+              <span key={tag} className="text-white/65 text-[10px] tracking-[0.3em] uppercase font-mono border border-white/10 px-1.5 py-0.5">
                 {tag}
               </span>
             ))}
