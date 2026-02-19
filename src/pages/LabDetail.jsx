@@ -1290,22 +1290,24 @@ export default function LabDetail() {
       {/* Source tab */}
       {EDITOR_FILES[id] && !showEditor && (
         isMobile ? (
-          /* Mobile — horizontal pill at the bottom center */
+          /* Mobile — vertical pill on right edge, same as desktop */
           <button
             className="lab-source-btn"
             data-text=">_ source"
             onClick={() => setShowEditor(true)}
             style={{
               position: 'fixed',
-              bottom: 24,
-              left: '50%',
-              transform: 'translateX(-50%)',
+              right: 0,
+              top: '50%',
+              transform: 'translateY(-50%) rotate(180deg)',
               zIndex: 150,
-              background: 'rgba(0,255,209,0.05)',
-              border: '1px solid rgba(0,255,209,0.28)',
-              borderRadius: 6,
+              writingMode: 'vertical-rl',
+              background: 'rgba(0,255,209,0.04)',
+              border: '1px solid rgba(0,255,209,0.25)',
+              borderRight: 'none',
+              borderRadius: '6px 0 0 6px',
               color: '#00FFD1',
-              padding: '10px 22px',
+              padding: '14px 7px',
               fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
               fontSize: '10px',
               letterSpacing: '0.18em',
