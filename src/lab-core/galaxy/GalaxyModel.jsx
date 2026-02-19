@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, memo } from 'react'
+import React, { useRef, useMemo, useEffect, memo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -68,7 +68,11 @@ const GalaxyModel = memo(function GalaxyModel({
   opacity = 1,
   hovered = false,
   isVisible = true,
-  onClick
+  onClick,
+  // Live editor props
+  vertexShader: liveVertex,
+  fragmentShader: liveFragment,
+  galaxyParams: liveParams,
 }) {
   const pointsRef = useRef()
   const groupRef = useRef()
@@ -76,9 +80,9 @@ const GalaxyModel = memo(function GalaxyModel({
   const sizeRef = useRef(20)
   const lastHoveredRef = useRef(hovered)
 
-  // Parámetros - reducidos para mejor rendimiento
+  // Parámetros - merge defaults con los live props del editor
   const parameters = useMemo(() => ({
-    count: 25000, // Reducido de 50k a 25k
+    count: 25000,
     size: 20,
     radius: 3,
     branches: 5,
@@ -86,8 +90,10 @@ const GalaxyModel = memo(function GalaxyModel({
     randomness: 0.2,
     randomnessPower: 3,
     insideColor: '#ff6030',
-    outsideColor: '#1b3984'
-  }), [])
+    outsideColor: '#1b3984',
+    ...liveParams,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [JSON.stringify(liveParams)])
 
   // Geometría y material memoizados - NUNCA se recrean
   const { geometry, material } = useMemo(() => {
@@ -138,8 +144,8 @@ const GalaxyModel = memo(function GalaxyModel({
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       vertexColors: true,
-      vertexShader: galaxyVertexShader,
-      fragmentShader: galaxyFragmentShader,
+      vertexShader: liveVertex ?? galaxyVertexShader,
+      fragmentShader: liveFragment ?? galaxyFragmentShader,
       uniforms: {
         uSize: { value: parameters.size * Math.min(window.devicePixelRatio, 2) },
         uTime: { value: 0 }
@@ -147,7 +153,16 @@ const GalaxyModel = memo(function GalaxyModel({
     })
 
     return { geometry: geo, material: mat }
-  }, [parameters])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parameters, liveVertex, liveFragment])
+
+  // Dispose old GPU resources when shader/params change
+  useEffect(() => {
+    return () => {
+      geometry?.dispose()
+      material?.dispose()
+    }
+  }, [geometry, material])
 
   // Animation loop optimizado
   useFrame((state, delta) => {

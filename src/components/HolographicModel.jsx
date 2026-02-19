@@ -2,8 +2,8 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import * as THREE from 'three';
-import holographicVertexShader from '../shaders/holographic/vertex.glsl';
-import holographicFragmentShader from '../shaders/holographic/fragment.glsl';
+import defaultVertex from '../shaders/holographic/vertex.glsl';
+import defaultFragment from '../shaders/holographic/fragment.glsl';
 
 export default function HolographicModel({ 
   scale = 0.1, 
@@ -11,38 +11,51 @@ export default function HolographicModel({
   rotation = [0, 0, 0],
   autoRotate = false,
   opacity = 1.0,
-  // ✨ Props nuevos para tercer ojo
+  // Live editor props
+  vertexShader,
+  fragmentShader,
+  holographicParams,
+  // ✨ Props para tercer ojo
   showThirdEye = false,
   isBreathing = false,
   thirdEyeIntensity = 0,
   onThirdEyePress = () => {},
   onThirdEyeRelease = () => {}
 }) {
-  const modelRef = useRef();
+  const modelRef    = useRef();
   const thirdEyeRef = useRef();
   const { camera, gl } = useThree();
+  const paramsRef = useRef(holographicParams)
+  useEffect(() => { paramsRef.current = holographicParams }, [holographicParams])
   
-  // Estados para interacción con tercer ojo
   const [isHoveringThirdEye, setIsHoveringThirdEye] = useState(false);
   const [isPressingThirdEye, setIsPressingThirdEye] = useState(false);
 
   const gltf = useLoader(GLTFLoader, '/malebase.glb');
 
   const material = useMemo(() => {
-    return new THREE.ShaderMaterial({
-      vertexShader: holographicVertexShader,
-      fragmentShader: holographicFragmentShader,
+    const mat = new THREE.ShaderMaterial({
+      vertexShader:   vertexShader   || defaultVertex,
+      fragmentShader: fragmentShader || defaultFragment,
       uniforms: {
-        uTime: { value: 0 },
-        uColor: { value: new THREE.Color('#70c1ff') },
-        uOpacity: { value: 1.0 }
+        uTime:    { value: 0 },
+        uColor:   { value: new THREE.Color(holographicParams?.color ?? '#70c1ff') },
+        uOpacity: { value: holographicParams?.opacity ?? 1.0 },
+        uGlitch:  { value: holographicParams?.glitchStrength ?? 0.05 },
+        uSpeed:   { value: holographicParams?.speed ?? 0.02 },
+        uStripe:  { value: holographicParams?.stripeFreq ?? 20.0 },
+        uFresnel: { value: holographicParams?.fresnelPower ?? 2.0 },
       },
       transparent: true,
       side: THREE.DoubleSide,
       depthWrite: false,
       blending: THREE.AdditiveBlending
     });
-  }, []);
+    return mat;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vertexShader, fragmentShader]);
+
+  useEffect(() => () => { material.dispose() }, [material]);
 
   const model = useMemo(() => {
     const clonedScene = gltf.scene.clone();
@@ -56,45 +69,27 @@ export default function HolographicModel({
   }, [gltf.scene, material]);
 
   useFrame((state) => {
-    // ✅ Defensive checks para evitar errores de uniformes undefined
-    if (material?.uniforms?.uTime) {
-      material.uniforms.uTime.value = state.clock.elapsedTime;
-    }
-    if (material?.uniforms?.uOpacity) {
-      material.uniforms.uOpacity.value = opacity;
-    }
+    const p = paramsRef.current
+    if (material?.uniforms?.uTime)    material.uniforms.uTime.value    = state.clock.elapsedTime;
+    if (material?.uniforms?.uOpacity) material.uniforms.uOpacity.value = p?.opacity ?? opacity;
+    if (material?.uniforms?.uColor)   material.uniforms.uColor.value.set(p?.color ?? '#70c1ff');
+    if (material?.uniforms?.uGlitch)  material.uniforms.uGlitch.value  = p?.glitchStrength ?? 0.05;
+    if (material?.uniforms?.uSpeed)   material.uniforms.uSpeed.value   = p?.speed ?? 0.02;
+    if (material?.uniforms?.uStripe)  material.uniforms.uStripe.value  = p?.stripeFreq ?? 20.0;
+    if (material?.uniforms?.uFresnel) material.uniforms.uFresnel.value = p?.fresnelPower ?? 2.0;
     
     if (modelRef.current) {
       modelRef.current.position.set(position[0], position[1], position[2]);
-      modelRef.current.rotation.set(rotation[0], rotation[1], rotation[2]);
       modelRef.current.scale.set(scale, scale, scale);
-      
-      // Auto-rotación si está activa
-      if (autoRotate) {
-        modelRef.current.rotation.y += state.clock.getDelta() * 0.2;
-      }
+      if (autoRotate) modelRef.current.rotation.y += 0.003;
     }
 
-    // Animar tercer ojo
     if (thirdEyeRef.current && showThirdEye) {
-      const baseScale = 1.0;
       const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.1;
-      
-      thirdEyeRef.current.scale.set(
-        baseScale + pulse,
-        baseScale + pulse,
-        baseScale + pulse
-      );
-      
-      // Actualizar intensidad del glow
-      if (thirdEyeRef.current.material) {
-        thirdEyeRef.current.material.emissiveIntensity = 
-          isBreathing 
-            ? 1.5 + (thirdEyeIntensity * 2) 
-            : isHoveringThirdEye 
-            ? 1.0 
-            : 0.5;
-      }
+      thirdEyeRef.current.scale.setScalar(1 + pulse);
+      if (thirdEyeRef.current.material)
+        thirdEyeRef.current.material.emissiveIntensity =
+          isBreathing ? 1.5 + thirdEyeIntensity * 2 : isHoveringThirdEye ? 1.0 : 0.5;
     }
   });
 

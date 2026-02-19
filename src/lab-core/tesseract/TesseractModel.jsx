@@ -1,211 +1,181 @@
-import React, { useRef, useMemo, memo } from 'react'
+import React, { useRef, useMemo, useEffect, memo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Line } from '@react-three/drei'
 import * as THREE from 'three'
 
-/**
- * TesseractModel - Hipercubo 4D usando Lines (más estable)
- * 
- * Usa Line de drei para las aristas, evitando problemas
- * de orientación con cilindros
- */
-const TesseractModel = memo(function TesseractModel({ 
-  scale = 1, 
-  position = [0, 0, 0], 
-  rotation = [0, 0, 0],
+// ── Default shaders (editable live in the source panel) ────────────────
+const DEFAULT_VERTEX = `
+uniform float uTime;
+varying vec3  vPos;
+
+void main() {
+  vPos        = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`
+
+const DEFAULT_FRAGMENT = `
+uniform float uTime;
+uniform vec3  uColor;
+varying vec3  vPos;
+
+void main() {
+  // Pulse along time + distance from origin
+  float t = 0.65 + 0.35 * sin(uTime * 1.2 + length(vPos) * 3.0);
+  gl_FragColor = vec4(uColor * t, 0.85);
+}
+`
+
+// ── TesseractModel ────────────────────────────────────────────
+const TesseractModel = memo(function TesseractModel({
+  scale = 1,
+  position = [0, 0, 0],
   autoRotate = true,
-  opacity = 1,
   hovered = false,
   isVisible = true,
-  onClick
+  onClick,
+  // Live editor props
+  vertexShader:   liveVertex,
+  fragmentShader: liveFragment,
+  tesseractParams: liveParams,
 }) {
-  const groupRef = useRef()
-  const linesRef = useRef([])
-  const pointsRef = useRef([])
-  const rotationYRef = useRef(0)
+  const groupRef      = useRef()
+  const rotationYRef  = useRef(0)
+  const liveRef       = useRef(liveParams)
+  useEffect(() => { liveRef.current = liveParams }, [liveParams])
 
-  // Vértices 4D del hipercubo - coordenadas normalizadas
+  // 16 vertices of the 4D hypercube
   const vertices4D = useMemo(() => {
-    const verts = []
+    const v = []
     for (let i = 0; i < 16; i++) {
-      verts.push([
+      v.push([
         (i & 1) ? 0.5 : -0.5,
         (i & 2) ? 0.5 : -0.5,
         (i & 4) ? 0.5 : -0.5,
-        (i & 8) ? 0.5 : -0.5
+        (i & 8) ? 0.5 : -0.5,
       ])
     }
-    return verts
+    return v
   }, [])
 
-  // 32 aristas del tesseract
+  // 32 edges: pairs that differ in exactly one bit
   const edges = useMemo(() => {
-    const edgeList = []
-    for (let i = 0; i < 16; i++) {
+    const list = []
+    for (let i = 0; i < 16; i++)
       for (let j = i + 1; j < 16; j++) {
         let diff = 0
-        for (let k = 0; k < 4; k++) {
-          if (vertices4D[i][k] !== vertices4D[j][k]) diff++
-        }
-        if (diff === 1) {
-          edgeList.push([i, j])
-        }
+        for (let k = 0; k < 4; k++) if (vertices4D[i][k] !== vertices4D[j][k]) diff++
+        if (diff === 1) list.push([i, j])
       }
-    }
-    return edgeList
+    return list
   }, [vertices4D])
 
-  // Colores
-  const colors = useMemo(() => ({
-    line: new THREE.Color('#ffd700'),
-    lineHover: new THREE.Color('#00ffff'),
-    point: new THREE.Color('#ffffff'),
-    pointHover: new THREE.Color('#ff6b6b')
+  // ── Geometry: LineSegments — 32 edges * 2 verts * 3 floats ──
+  const edgeGeo = useMemo(() => {
+    const geo  = new THREE.BufferGeometry()
+    const pos  = new Float32Array(edges.length * 2 * 3)
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    return geo
+  }, [edges])
+
+  // ── Geometry: Points — 16 vertices * 3 floats ──
+  const vertGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry()
+    const pos = new Float32Array(16 * 3)
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    return geo
+  }, [])
+
+  // ── ShaderMaterial for edges — rebuilt when shaders change ──
+  const lineMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   liveVertex   || DEFAULT_VERTEX,
+    fragmentShader: liveFragment || DEFAULT_FRAGMENT,
+    uniforms: {
+      uTime:  { value: 0 },
+      uColor: { value: new THREE.Color('#ffd700') },
+    },
+    transparent: true,
+  }), [liveVertex, liveFragment])
+
+  // ── PointsMaterial for vertices ──
+  const vertMat = useMemo(() => new THREE.PointsMaterial({
+    color: '#ffffff',
+    size: 0.055,
+    transparent: true,
+    opacity: 0.8,
   }), [])
 
-  // Estado de colores animados
-  const currentColors = useRef({
-    line: new THREE.Color('#ffd700'),
-    point: new THREE.Color('#ffffff')
-  })
+  // Cleanup GPU resources on rebuild
+  useEffect(() => () => { edgeGeo.dispose(); lineMat.dispose() }, [edgeGeo, lineMat])
 
-  // Proyección 4D → 3D (estereográfica estable)
-  const project4Dto3D = (point4D, time) => {
+  // ── 4D → 3D stereographic projection ──
+  const project = (point4D, time) => {
     let [x, y, z, w] = point4D
-    
-    // Rotación XW (plano x-w)
-    const angleXW = time * 0.4
-    const cosXW = Math.cos(angleXW)
-    const sinXW = Math.sin(angleXW)
-    const x1 = x * cosXW - w * sinXW
-    const w1 = x * sinXW + w * cosXW
-    
-    // Rotación YW (plano y-w) - más lenta
-    const angleYW = time * 0.25
-    const cosYW = Math.cos(angleYW)
-    const sinYW = Math.sin(angleYW)
-    const y1 = y * cosYW - w1 * sinYW
-    const w2 = y * sinYW + w1 * cosYW
-    
-    // Rotación ZW (plano z-w) - aún más lenta
-    const angleZW = time * 0.15
-    const cosZW = Math.cos(angleZW)
-    const sinZW = Math.sin(angleZW)
-    const z1 = z * cosZW - w2 * sinZW
-    const w3 = z * sinZW + w2 * cosZW
-    
-    // Proyección perspectiva desde 4D
-    // Distancia del "ojo" en la 4ta dimensión
-    const viewDistance = 2.0
-    const perspectiveFactor = viewDistance / (viewDistance - w3)
-    
-    return new THREE.Vector3(
-      x1 * perspectiveFactor,
-      y1 * perspectiveFactor,
-      z1 * perspectiveFactor
-    )
+    const p = liveRef.current
+    const xwS = p?.rotation?.xwSpeed  ?? 0.4
+    const ywS = p?.rotation?.ywSpeed  ?? 0.25
+    const zwS = p?.rotation?.zwSpeed  ?? 0.15
+    const vd  = p?.viewDistance        ?? 2.0
+
+    // XW
+    let cx = Math.cos(time * xwS), sx = Math.sin(time * xwS)
+    ;[x, w] = [x * cx - w * sx, x * sx + w * cx]
+    // YW
+    let cy = Math.cos(time * ywS), sy = Math.sin(time * ywS)
+    ;[y, w] = [y * cy - w * sy, y * sy + w * cy]
+    // ZW
+    let cz = Math.cos(time * zwS), sz = Math.sin(time * zwS)
+    ;[z, w] = [z * cz - w * sz, z * sz + w * cz]
+
+    const d = vd / (vd - w)
+    return [x * d, y * d, z * d]
   }
 
-  // Geometría para los puntos/vértices
-  const pointGeometry = useMemo(() => new THREE.SphereGeometry(0.04, 12, 12), [])
-
-  // Material para los puntos
-  const pointMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: colors.point,
-    transparent: true,
-    opacity: 0.9
-  }), [colors.point])
-
-  // Animation loop
+  // ── Animation loop ──
   useFrame((state, delta) => {
     if (!isVisible || !groupRef.current) return
-    
     const time = state.clock.elapsedTime
-    
-    // Interpolar colores suavemente
-    const targetLineColor = hovered ? colors.lineHover : colors.line
-    const targetPointColor = hovered ? colors.pointHover : colors.point
-    currentColors.current.line.lerp(targetLineColor, 0.1)
-    currentColors.current.point.lerp(targetPointColor, 0.1)
-    
-    // Actualizar material de puntos
-    pointMaterial.color.copy(currentColors.current.point)
-    
-    // Calcular proyecciones de todos los vértices
-    const projectedVertices = vertices4D.map(v => project4Dto3D(v, time))
-    
-    // Actualizar líneas
-    linesRef.current.forEach((lineRef, i) => {
-      if (!lineRef) return
-      const [fromIdx, toIdx] = edges[i]
-      const from = projectedVertices[fromIdx]
-      const to = projectedVertices[toIdx]
-      
-      // Actualizar geometría de la línea
-      const positions = lineRef.geometry.attributes.position
-      positions.setXYZ(0, from.x, from.y, from.z)
-      positions.setXYZ(1, to.x, to.y, to.z)
-      positions.needsUpdate = true
-      
-      // Actualizar color
-      lineRef.material.color.copy(currentColors.current.line)
+
+    // Update uniforms
+    lineMat.uniforms.uTime.value  = time
+    const p = liveRef.current
+    lineMat.uniforms.uColor.value.set(
+      hovered ? '#00ffff' : (p?.colors?.line ?? '#ffd700')
+    )
+    vertMat.color.set(hovered ? '#ff6b6b' : (p?.colors?.point ?? '#ffffff'))
+
+    // Project all 16 vertices
+    const pts = vertices4D.map(v => project(v, time))
+
+    // Update edge positions buffer
+    const eBuf = edgeGeo.attributes.position
+    edges.forEach(([a, b], i) => {
+      eBuf.setXYZ(i * 2,     pts[a][0], pts[a][1], pts[a][2])
+      eBuf.setXYZ(i * 2 + 1, pts[b][0], pts[b][1], pts[b][2])
     })
-    
-    // Actualizar puntos/vértices
-    pointsRef.current.forEach((pointRef, i) => {
-      if (!pointRef) return
-      const pos = projectedVertices[i]
-      pointRef.position.copy(pos)
-    })
-    
-    // Transforms del grupo
+    eBuf.needsUpdate = true
+
+    // Update vertex positions buffer
+    const vBuf = vertGeo.attributes.position
+    pts.forEach(([x, y, z], i) => vBuf.setXYZ(i, x, y, z))
+    vBuf.needsUpdate = true
+
+    // Group init
     if (!groupRef.current.userData.initialized) {
       groupRef.current.position.set(...position)
       const s = scale * 1.5
       groupRef.current.scale.set(s, s, s)
       groupRef.current.userData.initialized = true
     }
-    
-    // Rotación adicional del grupo (3D)
     if (autoRotate) {
       rotationYRef.current += delta * (hovered ? 0.3 : 0.1)
       groupRef.current.rotation.y = rotationYRef.current
     }
   })
 
-  // Posiciones iniciales para las líneas (se actualizarán en useFrame)
-  const initialLinePoints = useMemo(() => {
-    return edges.map(([fromIdx, toIdx]) => {
-      const from = project4Dto3D(vertices4D[fromIdx], 0)
-      const to = project4Dto3D(vertices4D[toIdx], 0)
-      return [from, to]
-    })
-  }, [edges, vertices4D])
-
   return (
     <group ref={groupRef} onClick={onClick}>
-      {/* Aristas usando Line de drei */}
-      {initialLinePoints.map((points, i) => (
-        <Line
-          key={`line-${i}`}
-          ref={el => linesRef.current[i] = el}
-          points={points}
-          color={colors.line}
-          lineWidth={2}
-          transparent
-          opacity={0.8}
-        />
-      ))}
-      
-      {/* Vértices */}
-      {vertices4D.map((_, i) => (
-        <mesh
-          key={`point-${i}`}
-          ref={el => pointsRef.current[i] = el}
-          geometry={pointGeometry}
-          material={pointMaterial}
-        />
-      ))}
+      <lineSegments geometry={edgeGeo} material={lineMat} />
+      <points      geometry={vertGeo} material={vertMat} />
     </group>
   )
 })

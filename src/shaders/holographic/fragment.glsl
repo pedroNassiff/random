@@ -1,68 +1,48 @@
 uniform float uTime;
-uniform vec3 uColor;
-varying vec3 vPosition;
+uniform vec3  uColor;
 uniform float uOpacity;
-varying vec3 vNormal;
+uniform float uSpeed;
+uniform float uStripe;
+uniform float uFresnel;
+varying vec3  vPosition;
+varying vec3  vNormal;
 
-// Función para obtener el color del chakra según el tiempo
-vec3 getChakraColor(float time)
-{
-    // Los 7 colores de los chakras
+vec3 getChakraColor(float time) {
     vec3 chakraColors[7];
-    chakraColors[0] = vec3(1.0, 0.0, 0.0);      // Rojo - Muladhara (Raíz)
-    chakraColors[1] = vec3(1.0, 0.5, 0.0);      // Naranja - Svadhisthana (Sacro)
-    chakraColors[2] = vec3(1.0, 1.0, 0.0);      // Amarillo - Manipura (Plexo Solar)
-    chakraColors[3] = vec3(0.0, 1.0, 0.0);      // Verde - Anahata (Corazón)
-    chakraColors[4] = vec3(0.0, 0.5, 1.0);      // Azul - Vishuddha (Garganta)
-    chakraColors[5] = vec3(0.3, 0.0, 0.5);      // Índigo - Ajna (Tercer Ojo)
-    chakraColors[6] = vec3(0.5, 0.0, 1.0);      // Violeta - Sahasrara (Corona)
-    
-    // Ciclo completo cada 14 segundos (2 segundos por chakra)
-    float cycleTime = mod(time * 0.5, 7.0); // 0 a 7
-    
-    // Índice actual y siguiente
-    int currentIndex = int(floor(cycleTime));
-    int nextIndex = int(mod(float(currentIndex + 1), 7.0));
-    
-    // Factor de mezcla suave entre colores
-    float mixFactor = fract(cycleTime);
-    mixFactor = smoothstep(0.0, 1.0, mixFactor); // Transición suave
-    
-    // Mezcla entre el color actual y el siguiente
-    return mix(chakraColors[currentIndex], chakraColors[nextIndex], mixFactor);
+    chakraColors[0] = vec3(1.0, 0.0, 0.0);
+    chakraColors[1] = vec3(1.0, 0.5, 0.0);
+    chakraColors[2] = vec3(1.0, 1.0, 0.0);
+    chakraColors[3] = vec3(0.0, 1.0, 0.0);
+    chakraColors[4] = vec3(0.0, 0.5, 1.0);
+    chakraColors[5] = vec3(0.3, 0.0, 0.5);
+    chakraColors[6] = vec3(0.5, 0.0, 1.0);
+
+    float cycleTime   = mod(time * 0.5, 7.0);
+    int   currIdx     = int(floor(cycleTime));
+    int   nextIdx     = int(mod(float(currIdx + 1), 7.0));
+    float mixFactor   = smoothstep(0.0, 1.0, fract(cycleTime));
+    return mix(chakraColors[currIdx], chakraColors[nextIdx], mixFactor);
 }
 
-void main()
-{
-
+void main() {
     vec3 normal = normalize(vNormal);
-    if(!gl_FrontFacing)
-    {
-        normal *= - 1.0;
-    }
+    if (!gl_FrontFacing) normal *= -1.0;
 
-    float stripes = mod((vPosition.y - uTime * 0.02) * 20.0, 1.0);
+    float stripes = mod((vPosition.y - uTime * uSpeed) * uStripe, 1.0);
     stripes = pow(stripes, 3.0);
 
-    // fresnel
-    vec3 viewDirection = normalize(vPosition - cameraPosition);
-     float fresnel = dot(viewDirection, normal) + 1.0;
-    fresnel = pow(fresnel, 2.0);
+    vec3  viewDirection = normalize(vPosition - cameraPosition);
+    float fresnel       = pow(dot(viewDirection, normal) + 1.0, uFresnel);
+    float falloff       = smoothstep(0.8, 0.0, fresnel);
 
-    float flalloff = smoothstep(0.8, 0.0, fresnel);
+    float holographic = stripes * fresnel + fresnel * 1.25;
+    holographic *= falloff;
 
-    // holographic
-    float holographic = stripes * fresnel;
-    holographic += fresnel * 1.25;
-
-    // falloff
-    holographic *= flalloff;
-
-    // Obtener color del chakra animado
     vec3 chakraColor = getChakraColor(uTime);
+    // Blend chakra cycle with the editable uColor
+    vec3 finalColor  = mix(chakraColor, uColor, 0.3);
 
-    gl_FragColor = vec4(chakraColor, holographic * uOpacity);
-    //  gl_FragColor = vec4(vNormal, 1.0);
+    gl_FragColor = vec4(finalColor, holographic * uOpacity);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
 }

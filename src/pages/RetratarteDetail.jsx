@@ -7,6 +7,15 @@ import { AudioAnalyzer } from '../lab-core/retratarte/AudioAnalyzer'
 // Shader imports via vite-plugin-glsl
 import vertexShader from '../lab-core/retratarte/shaders/patterns/vertex.glsl'
 import fragmentShader from '../lab-core/retratarte/shaders/patterns/fragment.glsl'
+import { EditorPanel, SourceButton, EDITOR_STYLES } from '../components/CodeEditor'
+
+// ─────────────────────────────────────────────
+// Editor file tabs
+// ─────────────────────────────────────────────
+const RETRATARTE_FILES = [
+  { name: 'vertex.glsl',   lang: 'glsl', live: true, code: vertexShader },
+  { name: 'fragment.glsl', lang: 'glsl', live: true, code: fragmentShader },
+]
 
 // ─────────────────────────────────────────────
 // All patterns — face-dependent ones degrade gracefully with hasFace=0
@@ -67,8 +76,53 @@ export default function RetratarteDetail() {
   const [camStatus, setCamStatus] = useState('init')   // init | active | denied
   const [micStatus, setMicStatus] = useState('init')
   const patternIdxRef = useRef(0)
-  const faceTrackerRef = useRef(null)
+  const faceTrackerRef  = useRef(null)
   const audioAnalyzerRef = useRef(null)
+
+  // ── Live shader editor ────────────────────
+  const [showEditor,       setShowEditor]       = useState(false)
+  const [liveCode,         setLiveCode]         = useState(() => ({
+    'vertex.glsl':   vertexShader,
+    'fragment.glsl': fragmentShader,
+  }))
+  const [compiledVertex,   setCompiledVertex]   = useState(null)
+  const [compiledFragment, setCompiledFragment] = useState(null)
+  const [shaderPending,    setShaderPending]    = useState(false)
+  const pendingShaders = useRef(null)  // hot-swap queue (read in animate loop)
+  const materialRef    = useRef(null)  // current THREE.ShaderMaterial
+
+  // Debounce: push to pendingShaders 600ms after last keystroke
+  useEffect(() => {
+    setShaderPending(true)
+    const t = setTimeout(() => {
+      setCompiledVertex(liveCode['vertex.glsl'])
+      setCompiledFragment(liveCode['fragment.glsl'])
+      setShaderPending(false)
+    }, 600)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveCode['vertex.glsl'], liveCode['fragment.glsl']])
+
+  // When debounced shaders are ready, queue them for hot-swap
+  useEffect(() => {
+    if (!compiledVertex && !compiledFragment) return
+    pendingShaders.current = {
+      vertex:   compiledVertex   || vertexShader,
+      fragment: compiledFragment || fragmentShader,
+    }
+  }, [compiledVertex, compiledFragment])
+
+  // Force compile immediately (⌘↵)
+  const forceCompile = () => {
+    setShaderPending(false)
+    pendingShaders.current = {
+      vertex:   liveCode['vertex.glsl']   || vertexShader,
+      fragment: liveCode['fragment.glsl'] || fragmentShader,
+    }
+  }
+
+  const handleCodeChange = (filename, code) =>
+    setLiveCode(prev => ({ ...prev, [filename]: code }))
 
   useEffect(() => {
     const mount = mountRef.current
@@ -142,6 +196,7 @@ export default function RetratarteDetail() {
     var material  // hoisted so applySize can access it
     const geometry = new THREE.PlaneGeometry(2, 2, 128, 128)
     material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, transparent: false })
+    materialRef.current = material  // expose for hot-swap
     const mesh = new THREE.Mesh(geometry, material)
     scene.add(mesh)
 
@@ -172,6 +227,25 @@ export default function RetratarteDetail() {
 
     const animate = () => {
       animId = requestAnimationFrame(animate)
+
+      // ── Hot-swap shaders when editor pushes new code ──
+      if (pendingShaders.current) {
+        const { vertex, fragment } = pendingShaders.current
+        pendingShaders.current = null
+        const oldMat = materialRef.current
+        try {
+          const newMat = new THREE.ShaderMaterial({
+            vertexShader:   vertex,
+            fragmentShader: fragment,
+            uniforms:       oldMat.uniforms,  // share existing uniforms
+            transparent:    false,
+          })
+          mesh.material    = newMat
+          materialRef.current = newMat
+          oldMat.dispose()
+        } catch { /* GL compile errors are surfaced in console — not catchable here */ }
+      }
+
       uniforms.uTime.value = clock.getElapsedTime()
 
       // ── Audio uniforms ──────────────────────
@@ -323,6 +397,7 @@ export default function RetratarteDetail() {
   return (
     <div className="fixed inset-0 bg-black" style={{ cursor: 'none' }}>
       <CustomCursor />
+      <style>{EDITOR_STYLES}</style>
 
       {/* Three.js square canvas */}
       <div ref={mountRef} className="absolute inset-0" />
@@ -375,6 +450,24 @@ export default function RetratarteDetail() {
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes pulse  { 0%,100% { opacity: 0.2 } 50% { opacity: 0.7 } }
       `}</style>
+
+      {/* Source editor button */}
+      {!showEditor && (
+        <SourceButton onClick={() => setShowEditor(true)} />
+      )}
+
+      {/* Live editor panel */}
+      {showEditor && (
+        <EditorPanel
+          files={RETRATARTE_FILES}
+          liveCode={liveCode}
+          onChange={handleCodeChange}
+          errorMsg={null}
+          shaderPending={shaderPending}
+          onForceCompile={forceCompile}
+          onClose={() => setShowEditor(false)}
+        />
+      )}
     </div>
   )
 }
