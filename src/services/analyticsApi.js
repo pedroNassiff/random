@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_ANALYTICS_API || 'http://localhost:8000/analytics';
+const API_URL = import.meta.env.VITE_ANALYTICS_API || '/api/analytics';
 
 export const analyticsApi = {
   async getSummary(days = 30) {

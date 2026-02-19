@@ -3,7 +3,7 @@
  * Cliente para enviar datos de analytics al backend
  */
 
-const API_URL = import.meta.env.VITE_ANALYTICS_API || 'http://localhost:8000/analytics';
+const API_URL = import.meta.env.VITE_ANALYTICS_API || '/api/analytics';
 
 // Cola para batch processing
 let eventQueue = [];

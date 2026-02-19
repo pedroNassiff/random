@@ -63,7 +63,9 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://random-studio.io",
-        "https://www.random-studio.io"
+        "https://www.random-studio.io",
+        "https://random-lab.es",
+        "https://www.random-lab.es"
     ],
     allow_credentials=True,
     allow_methods=["*"],

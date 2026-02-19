@@ -25,6 +25,7 @@ const EXPERIMENTS = [
     camera: { position: [0, 0.5, 9], fov: 40 },
     model: { scale: 0.20, position: [0, -1.7, 0], autoRotate: true, opacity: 0.9 },
     bg: '#000308',
+    tags: ['glitch', 'shaders', 'chakras'],
     lights: [
       { type: 'ambient', intensity: 0.3 },
       { type: 'point', pos: [2, 3, 2], intensity: 2.2, color: '#70c1ff' },
@@ -38,6 +39,7 @@ const EXPERIMENTS = [
     camera: { position: [0, 0, 7], fov: 32 },
     model: { scale: 1.5, position: [0, 0, 0], autoRotate: true, opacity: 1, wireframe: true },
     bg: '#00050a',
+    tags: ['wireframe', 'neural mesh', 'EEG'],
     lights: [
       { type: 'ambient', intensity: 0.2 },
       { type: 'point', pos: [3, 3, 3], intensity: 1.8, color: '#00E5FF' },
@@ -52,6 +54,7 @@ const EXPERIMENTS = [
     camera: { position: [0, 0, 3.2], fov: 36 },
     model: { scale: 0.9, position: [0, 0, 0], autoRotate: false, opacity: 1 },
     bg: '#050200',
+    tags: ['face tracking', 'audio reactive', 'GLSL'],
     lights: [
       { type: 'ambient', intensity: 0.5 },
       { type: 'point', pos: [2, 2, 2], intensity: 1.2, color: '#FFD700' },
@@ -65,6 +68,7 @@ const EXPERIMENTS = [
     camera: { position: [0, 0.3, 3.2], fov: 34 },
     model: { scale: 0.5, position: [0, 0, 0], autoRotate: true, opacity: 1 },
     bg: '#020201',
+    tags: ['4D geometry', 'projection', 'shaders'],
     lights: [
       { type: 'ambient', intensity: 0.4 },
       { type: 'point', pos: [3, 3, 3], intensity: 1.2, color: '#FFD700' },
@@ -78,6 +82,7 @@ const EXPERIMENTS = [
     camera: { position: [0, 3.5, 7], fov: 48 },
     model: { scale: 2, position: [0, 0, 0], autoRotate: true, opacity: 1 },
     bg: '#000005',
+    tags: ['25k particles', 'noise field', 'orbit'],
     lights: [
       { type: 'ambient', intensity: 0.1 },
     ],
@@ -187,7 +192,6 @@ const ExperimentSlot = memo(function ExperimentSlot({ exp, itemIndex }) {
           left: mousePos.x + 14,
           top: mousePos.y - 10,
           opacity: isHovered ? 1 : 0,
-          transform: 'translateY(0)',
           whiteSpace: 'nowrap',
         }}
       >
@@ -195,6 +199,7 @@ const ExperimentSlot = memo(function ExperimentSlot({ exp, itemIndex }) {
           {exp.name}
         </span>
       </div>
+
     </div>
   )
 })

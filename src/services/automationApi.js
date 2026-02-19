@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_AUTOMATION_API || 'http://localhost:8000/automation';
+const API_URL = import.meta.env.VITE_AUTOMATION_API || '/api/automation';
 
 export const automationApi = {
   // Dashboard metrics

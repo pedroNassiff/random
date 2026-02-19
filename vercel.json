@@ -4,6 +4,14 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/analytics/:path*",
+      "destination": "https://api.random-lab.es/analytics/:path*"
+    },
+    {
+      "source": "/api/automation/:path*",
+      "destination": "https://api.random-lab.es/automation/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

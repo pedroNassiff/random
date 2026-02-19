@@ -354,6 +354,13 @@ export default function RetratarteDetail() {
         <p className="text-white/20 text-[8px] tracking-[0.3em] uppercase font-mono leading-relaxed">
           Leyendo gestos · movimientos · respiración
         </p>
+        <div className="flex justify-center gap-2">
+          {['face tracking', 'audio reactive', 'GLSL'].map(tag => (
+            <span key={tag} className="text-white/20 text-[7px] tracking-[0.3em] uppercase font-mono border border-white/10 px-1.5 py-0.5">
+              {tag}
+            </span>
+          ))}
+        </div>
         <div className="flex justify-center gap-4 pt-1">
           <span className="text-[7px] tracking-[0.25em] uppercase font-mono text-white/20 flex items-center gap-1.5">
             {statusDot(camStatus)} cámara

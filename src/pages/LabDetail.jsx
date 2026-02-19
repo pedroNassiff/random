@@ -7,6 +7,7 @@ import HolographicModel from '../components/HolographicModel'
 import TesseractModel from '../lab-core/tesseract/TesseractModel'
 import GalaxyModel from '../lab-core/galaxy/GalaxyModel'
 import RetratarteDetail from './RetratarteDetail'
+import BrainDetail from './BrainDetail'
 
 // ─────────────────────────────────────────────
 // Config full-screen por experimento
@@ -25,6 +26,7 @@ const DETAIL_CONFIG = {
       { type: 'point', pos: [-2, -1, 1], intensity: 0.8, color: '#3040ff' },
     ],
     desc: 'Human form, rendered in light.',
+    tags: ['glitch', 'shaders', 'chakras'],
   },
   tesseract: {
     name: 'TESSERACT',
@@ -37,6 +39,7 @@ const DETAIL_CONFIG = {
       { type: 'point', pos: [3, 3, 3], intensity: 1.2, color: '#FFD700' },
     ],
     desc: '4D hypercube projected into 3-space.',
+    tags: ['4D geometry', 'projection', 'shaders'],
   },
   galaxy: {
     name: 'GALAXY',
@@ -48,11 +51,12 @@ const DETAIL_CONFIG = {
       { type: 'ambient', intensity: 0.1 },
     ],
     desc: '25,000 particles in orbit.',
+    tags: ['25k particles', 'noise field', 'orbit'],
   },
 }
 
 // Placeholders para los complejos
-const PLACEHOLDER_IDS = ['brain']
+const PLACEHOLDER_IDS = []
 
 // ─────────────────────────────────────────────
 // Lights helper
@@ -132,7 +136,10 @@ export default function LabDetail() {
   // Retratarte tiene su propio viewer
   if (id === 'retratarte') return <RetratarteDetail />
 
-  // Placeholder para brain
+  // Brain viewer — WebSocket to Syntergic VAE
+  if (id === 'brain') return <BrainDetail />
+
+  // Placeholder (none currently)
   if (PLACEHOLDER_IDS.includes(id)) return <ComingSoon id={id} onBack={back} />
 
   const config = DETAIL_CONFIG[id]
@@ -195,9 +202,18 @@ export default function LabDetail() {
         <p className="text-white/60 text-[11px] tracking-[0.4em] uppercase font-mono mt-1">{name}</p>
       </div>
 
-      {/* Description — bottom center */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none text-center">
+      {/* Description + tags — bottom center */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none text-center space-y-2">
         <p className="text-white/25 text-[9px] tracking-[0.3em] uppercase font-mono">{desc}</p>
+        {config.tags?.length > 0 && (
+          <div className="flex justify-center gap-2">
+            {config.tags.map(tag => (
+              <span key={tag} className="text-white/20 text-[7px] tracking-[0.3em] uppercase font-mono border border-white/10 px-1.5 py-0.5">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Drag hint */}
