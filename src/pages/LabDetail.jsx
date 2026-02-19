@@ -11,6 +11,185 @@ import RetratarteDetail from './RetratarteDetail'
 import BrainDetail from './BrainDetail'
 
 
+// Locale helper — Argentine Spanish and all Spanish locales
+const isSpanish = () => typeof navigator !== 'undefined' && navigator.language?.startsWith('es')
+
+// Bilingual about.md content
+const ABOUT = {
+  tesseract: {
+    en: `# tesseract.dimension
+
+a cube understands three directions.
+a hypercube insists on a fourth.
+
+we cannot see it — not directly —
+but we can watch its shadow rotate
+and feel the shape of something
+beyond the frame.
+
+the brain is like this.
+we observe its projection:
+language, memory, feeling, thought.
+but the thing casting the shadow
+remains largely unknown.
+
+four dimensions is one more
+than we were given.
+consciousness may be one more than that.
+
+the tesseract is a reminder:
+the limit of your perception
+is not the limit of what exists.
+
+still rotating. still becoming.
+
+// in progress — like the rest of us.
+
+— random() lab`,
+    es: `# tesseract.dimensión
+
+un cubo entiende tres direcciones.
+un hipercubo insiste en una cuarta.
+
+no podemos verla — no directamente —
+pero podemos observar su sombra girar
+y sentir la forma de algo
+más allá del marco.
+
+el cerebro es así.
+observamos su proyección:
+lenguaje, memoria, sentimiento, pensamiento.
+pero lo que proyecta la sombra
+sigue siendo en gran parte desconocido.
+
+cuatro dimensiones es una más
+de las que nos dieron.
+la conciencia puede ser una más que esa.
+
+el tesseract es un recordatorio:
+el límite de tu percepción
+no es el límite de lo que existe.
+
+todavía girando. todavía convirtiéndose.
+
+// en progreso — como el resto de nosotros.
+
+— random() lab`,
+  },
+  galaxy: {
+    en: `# galaxy.home
+
+you are made of stellar remnants —
+every atom in your body
+passed through a star
+before it passed through you.
+
+the galaxy is not a backdrop.
+it is the living context:
+billions of fires spinning in conversation,
+the same geometry at every scale.
+
+look outward and you look inward.
+look inward and you look outward.
+
+zoom in, find the whole.
+zoom out, find yourself.
+the mandelbrot truth: it's the same.
+
+we are the universe become briefly local,
+briefly aware,
+briefly capable of wondering why.
+
+this is your home.
+it has always been moving.
+
+— random() lab`,
+    es: `# galaxia.hogar
+
+estás hecho de restos estelares —
+cada átomo en tu cuerpo
+pasó por una estrella
+antes de pasar por vos.
+
+la galaxia no es un fondo de pantalla.
+es el contexto vivo:
+miles de millones de fuegos girando en conversación,
+la misma geometría a cada escala.
+
+mirá hacia afuera y mirás hacia adentro.
+mirá hacia adentro y mirás hacia afuera.
+
+acercate, encontrás el todo.
+alejate, te encontrás a vos.
+la verdad mandelbrot: es lo mismo.
+
+somos el universo que se vuelve brevemente local,
+brevemente consciente,
+brevemente capaz de preguntarse por qué.
+
+este es tu hogar.
+siempre estuvo en movimiento.
+
+— random() lab`,
+  },
+  holographic: {
+    en: `# holographic.being
+
+vibration is the first language —
+before thought, before image,
+there is oscillation.
+
+the holographic model is the body as signal:
+each color a frequency,
+each frequency a state,
+each state a question
+posed to the present moment.
+
+chakras are not metaphor here.
+they are standing waves in the field of flesh,
+interference patterns where attention pools
+and consciousness gathers.
+
+watch it long enough
+and you will feel the resonance —
+something in you follows the geometry,
+something older than language says yes.
+
+this is not a representation of the self.
+this is the self,
+at a different resolution.
+
+— random() lab`,
+    es: `# holográfico.ser
+
+la vibración es el primer lenguaje —
+antes del pensamiento, antes de la imagen,
+existe la oscilación.
+
+el modelo holográfico es el cuerpo como señal:
+cada color una frecuencia,
+cada frecuencia un estado,
+cada estado una pregunta
+hecha al momento presente.
+
+los chakras no son metáfora acá.
+son ondas estacionarias en el campo de la carne,
+patrones de interferencia donde la atención se acumula
+y la conciencia se reúne.
+
+observalo el tiempo suficiente
+y vas a sentir la resonancia —
+algo en vos sigue la geometría,
+algo más viejo que el lenguaje dice sí.
+
+esto no es una representación del ser.
+esto es el ser,
+en una resolución diferente.
+
+— random() lab`,
+  },
+}
+
 // Source files per experiment
 
 const EDITOR_FILES = {
@@ -96,6 +275,12 @@ void main() {
   gl_FragColor = vec4(uColor * t, 0.85);
 }`,
     },
+    {
+      name: 'about.md',
+      lang: 'markdown',
+      live: false,
+      get code() { return isSpanish() ? ABOUT.tesseract.es : ABOUT.tesseract.en },
+    },
   ],
   galaxy: [
     {
@@ -157,6 +342,12 @@ void main() {
   s = pow(1.0 - s, 10.0);
   gl_FragColor = vec4(mix(vec3(0.0), vColor, s), 1.0);
 }`,
+    },
+    {
+      name: 'about.md',
+      lang: 'markdown',
+      live: false,
+      get code() { return isSpanish() ? ABOUT.galaxy.es : ABOUT.galaxy.en },
     },
   ],
   holographic: [
@@ -256,6 +447,12 @@ void main() {
     #include <colorspace_fragment>
 }`,
     },
+    {
+      name: 'about.md',
+      lang: 'markdown',
+      live: false,
+      get code() { return isSpanish() ? ABOUT.holographic.es : ABOUT.holographic.en },
+    },
   ],
 }
 
@@ -266,6 +463,10 @@ const EDITOR_STYLES = `
   @keyframes slideInRight {
     from { transform: translateX(100%); opacity: 0; }
     to   { transform: translateX(0);    opacity: 1; }
+  }
+  @keyframes slideInUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
   }
   .lab-editor { font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, monospace; }
   .lab-editor *::-webkit-scrollbar        { width: 5px; height: 5px; }
@@ -317,6 +518,38 @@ const EDITOR_STYLES = `
   }
 `
 
+
+// MarkdownView — read-only prose display for .md tabs
+function MarkdownView({ content, compact }) {
+  const lines = content.split('\n')
+  return (
+    <div style={{
+      flex: 1, overflowY: 'auto',
+      padding: compact ? '16px 18px 40px' : '32px 36px 48px',
+      fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
+      fontSize: compact ? 11 : 12,
+    }}>
+      {lines.map((line, i) => {
+        if (line.startsWith('# ')) return (
+          <div key={i} style={{ color: '#00FFD1', fontSize: 13, letterSpacing: '0.12em', marginBottom: 28, paddingBottom: 10, borderBottom: '1px solid rgba(0,255,209,0.12)', fontWeight: 600 }}>{line.slice(2)}</div>
+        )
+        if (line.startsWith('## ')) return (
+          <div key={i} style={{ color: 'rgba(0,255,209,0.6)', fontSize: 11, letterSpacing: '0.1em', marginTop: 20, marginBottom: 10 }}>{line.slice(3)}</div>
+        )
+        if (line.startsWith('// ')) return (
+          <div key={i} style={{ color: 'rgba(255,255,255,0.18)', fontStyle: 'italic', lineHeight: '1.9', letterSpacing: '0.03em' }}>{line}</div>
+        )
+        if (line.startsWith('— ')) return (
+          <div key={i} style={{ color: 'rgba(255,255,255,0.22)', marginTop: 28, letterSpacing: '0.08em', fontSize: 10 }}>{line}</div>
+        )
+        if (line.trim() === '') return <div key={i} style={{ height: 14 }} />
+        return (
+          <div key={i} style={{ color: 'rgba(255,255,255,0.62)', lineHeight: '1.9', letterSpacing: '0.03em' }}>{line}</div>
+        )
+      })}
+    </div>
+  )
+}
 
 // CodeArea — textarea + synced line numbers
 
@@ -425,11 +658,73 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
   const [activeTab,  setActiveTab]  = useState(0)
   const [panelWidth, setPanelWidth] = useState(460)
   const [cursor,     setCursor]     = useState({ ln: 1, col: 1 })
-  const dragRef = useRef(null)
+  const [tabOverflow, setTabOverflow] = useState(false)
+  const [isMobile,   setIsMobile]   = useState(() => typeof window !== 'undefined' && window.innerWidth < 640)
+  const dragRef     = useRef(null)
+  const tabStripRef = useRef(null)
+  const tabDragRef  = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false })
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // about.md always first
+  const orderedFiles = [...files].sort((a, b) => {
+    if (a.name === 'about.md') return -1
+    if (b.name === 'about.md') return 1
+    return 0
+  })
+
+  // Overflow indicator
+  useEffect(() => {
+    const el = tabStripRef.current
+    if (!el) return
+    const check = () => setTabOverflow(el.scrollWidth > el.clientWidth)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [files])
+
+  // Drag-to-scroll on tab strip
+  const onTabStripMouseDown = (e) => {
+    if (e.button !== 0) return
+    const el = tabStripRef.current
+    if (!el) return
+    tabDragRef.current = { active: true, startX: e.clientX, scrollLeft: el.scrollLeft, moved: false }
+    e.stopPropagation()
+  }
+  const onTabStripMouseMove = (e) => {
+    const d = tabDragRef.current
+    if (!d.active) return
+    const dx = e.clientX - d.startX
+    if (Math.abs(dx) > 3) d.moved = true
+    if (d.moved && tabStripRef.current) tabStripRef.current.scrollLeft = d.scrollLeft - dx
+    e.stopPropagation()
+  }
+  const onTabStripMouseUp = (e) => { tabDragRef.current.active = false; e.stopPropagation() }
+  const onTabStripWheel = (e) => {
+    const el = tabStripRef.current
+    if (el) el.scrollLeft += e.deltaY || e.deltaX
+    e.stopPropagation(); e.preventDefault()
+  }
+  // Touch scroll for mobile
+  const onTabStripTouchStart = (e) => {
+    const t = e.touches[0]
+    tabDragRef.current = { active: true, startX: t.clientX, scrollLeft: tabStripRef.current?.scrollLeft || 0, moved: false }
+  }
+  const onTabStripTouchMove = (e) => {
+    const d = tabDragRef.current
+    if (!d.active || !tabStripRef.current) return
+    tabStripRef.current.scrollLeft = d.scrollLeft - (e.touches[0].clientX - d.startX)
+  }
+  const onTabStripTouchEnd = () => { tabDragRef.current.active = false }
 
   useEffect(() => { setActiveTab(0) }, [files])
 
-  const file  = files[activeTab]
+  const file  = orderedFiles[activeTab]
   const value = liveCode[file?.name] ?? file?.code ?? ''
   const lang  = file?.lang ?? 'js'
 
@@ -460,10 +755,12 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
   const extColor = (name) => {
     if (name.endsWith('.glsl')) return '#00B4FF'
     if (name.endsWith('.js'))   return '#E040FB'
+    if (name.endsWith('.md'))   return '#00FFD1'
     return 'rgba(255,255,255,0.38)'
   }
 
-  const langLabel = lang === 'glsl' ? 'GLSL' : lang === 'js' ? 'JavaScript' : lang.toUpperCase()
+  const isEs = typeof navigator !== 'undefined' && navigator.language?.startsWith('es')
+  const langLabel = lang === 'glsl' ? 'GLSL' : lang === 'js' ? 'JavaScript' : lang === 'markdown' ? (isEs ? 'esencia' : 'essence') : lang.toUpperCase()
 
   const hasError = !!errorMsg
 
@@ -473,7 +770,18 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
       onPointerDown={stopAll} onPointerMove={stopAll} onPointerUp={stopAll}
       onMouseDown={stopAll}   onMouseMove={stopAll}
       onTouchStart={stopAll}  onWheel={stopAll}
-      style={{
+      style={isMobile ? {
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        height: '78vh',
+        zIndex: 200,
+        display: 'flex', flexDirection: 'column',
+        background: '#080b10',
+        borderTop: '1px solid rgba(255,255,255,0.10)',
+        borderRadius: '14px 14px 0 0',
+        fontSize: 12,
+        animation: 'slideInUp 0.25s ease',
+        cursor: 'default',
+      } : {
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width: panelWidth,
         zIndex: 200,
@@ -487,8 +795,15 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
     >
       <style>{EDITOR_STYLES}</style>
 
-      {/* ── Resize handle ─────────────────────────────────── */}
-      <div
+      {/* ── Mobile drag pill ──────────────────────────────── */}
+      {isMobile && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.18)' }} />
+        </div>
+      )}
+
+      {/* ── Resize handle (desktop only) ──────────────────── */}
+      {!isMobile && <div
         ref={dragRef}
         className="lab-resize"
         onMouseDown={startResize}
@@ -498,7 +813,7 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
           cursor: 'ew-resize', zIndex: 10,
           background: 'transparent',
         }}
-      />
+      />}
 
       {/* ── Title bar ─────────────────────────────────────── */}
       <div style={{
@@ -507,68 +822,83 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
         background: '#04070c',
         height: 38,
       }}>
-        {/* macOS dots */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 14px', flexShrink: 0 }}>
-          {['#ff5f57','#febc2e','#28c840'].map((c, i) => (
-            <div
-              key={i}
-              onClick={i === 0 ? onClose : undefined}
-              style={{
-                width: 11, height: 11, borderRadius: '50%',
-                background: c, opacity: 0.75,
-                cursor: i === 0 ? 'pointer' : 'default',
-              }}
-            />
-          ))}
+        {/* Brand close */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+          <button
+            onClick={onClose}
+            title="close editor"
+            style={{
+              background: 'none',
+              border: '1px solid rgba(0,255,209,0.22)',
+              borderRadius: 2,
+              color: 'rgba(0,255,209,0.45)',
+              cursor: 'pointer',
+              fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
+              fontSize: 9,
+              letterSpacing: '0.12em',
+              padding: '3px 8px',
+              lineHeight: 1,
+              transition: 'color 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = '#00FFD1'
+              e.currentTarget.style.borderColor = 'rgba(0,255,209,0.55)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'rgba(0,255,209,0.45)'
+              e.currentTarget.style.borderColor = 'rgba(0,255,209,0.22)'
+            }}
+          >×</button>
         </div>
 
-        {/* Scrollable tab strip */}
-        <div className="lab-tab-strip" style={{ display: 'flex', flex: 1, alignItems: 'stretch' }}>
-          {files.map((f, i) => (
-            <button
-              key={i}
-              className="lab-tab-btn"
-              onClick={() => setActiveTab(i)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 14px',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: i === activeTab ? '2px solid #00FFD1' : '2px solid transparent',
-                borderRight: '1px solid rgba(255,255,255,0.05)',
-                color: i === activeTab ? '#fff' : 'rgba(255,255,255,0.32)',
-                cursor: 'pointer',
-                fontSize: 11, letterSpacing: '0.03em',
-                whiteSpace: 'nowrap', flexShrink: 0,
-                fontFamily: 'inherit',
-              }}
-            >
-              <span style={{ color: extColor(f.name), fontSize: 8 }}>⬤</span>
-              {f.name}
-              {f.live && (
-                <span style={{
-                  fontSize: 7, padding: '1px 4px', borderRadius: 2,
-                  border: '1px solid rgba(0,255,209,0.25)',
-                  color: '#00FFD1', letterSpacing: '0.08em',
-                }}>LIVE</span>
-              )}
-            </button>
-          ))}
+        {/* Scrollable tab strip — drag or wheel scroll */}
+        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          {tabOverflow && (
+            <div style={{
+              position: 'absolute', right: 0, top: 0, bottom: 0, width: 32,
+              background: 'linear-gradient(to right, transparent, #04070c)',
+              zIndex: 2, pointerEvents: 'none',
+            }} />
+          )}
+          <div
+            ref={tabStripRef}
+            className="lab-tab-strip"
+            onMouseDown={onTabStripMouseDown}
+            onMouseMove={onTabStripMouseMove}
+            onMouseUp={onTabStripMouseUp}
+            onMouseLeave={onTabStripMouseUp}
+            onWheel={onTabStripWheel}
+            onTouchStart={onTabStripTouchStart}
+            onTouchMove={onTabStripTouchMove}
+            onTouchEnd={onTabStripTouchEnd}
+            style={{ display: 'flex', height: '100%', alignItems: 'stretch', cursor: isMobile ? 'default' : 'grab' }}>
+            {orderedFiles.map((f, i) => (
+              <button
+                key={i}
+                className="lab-tab-btn"
+                onClick={() => { if (!tabDragRef.current?.moved) setActiveTab(i) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '0 14px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: i === activeTab ? '2px solid #00FFD1' : '2px solid transparent',
+                  borderRight: '1px solid rgba(255,255,255,0.05)',
+                  color: i === activeTab ? '#fff' : 'rgba(255,255,255,0.32)',
+                  cursor: 'pointer',
+                  fontSize: 11, letterSpacing: '0.03em',
+                  whiteSpace: 'nowrap', flexShrink: 0,
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span style={{ color: extColor(f.name), fontSize: 8 }}>⬤</span>
+                {f.name}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Close */}
-        <button
-          onClick={onClose}
-          style={{
-            background: 'none', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.05)',
-            color: 'rgba(255,255,255,0.22)', cursor: 'pointer',
-            padding: '0 14px', fontSize: 15, flexShrink: 0,
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.22)'}
-        >✕</button>
-      </div>
+        </div>{/* end title bar */}
 
       {/* ── Error banner ──────────────────────────────────── */}
       {hasError && (
@@ -587,12 +917,15 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
       )}
 
       {/* ── Code area ─────────────────────────────────────── */}
-      <CodeArea
-        value={value}
-        onChange={(v) => onChange(file.name, v)}
-        onCursorChange={setCursor}
-        onForceCompile={onForceCompile}
-      />
+      {file?.lang === 'markdown'
+        ? <MarkdownView content={value} compact={isMobile} />
+        : <CodeArea
+            value={value}
+            onChange={(v) => onChange(file.name, v)}
+            onCursorChange={setCursor}
+            onForceCompile={onForceCompile}
+          />
+      }
 
       {/* ── Status bar (VS Code pattern) ──────────────────── */}
       <div style={{
@@ -609,8 +942,8 @@ function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClo
         {/* Left: lang + status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{
-            background: lang === 'glsl' ? 'rgba(0,180,255,0.12)' : 'rgba(224,64,251,0.12)',
-            color: lang === 'glsl' ? '#00B4FF' : '#E040FB',
+            background: lang === 'glsl' ? 'rgba(0,180,255,0.12)' : lang === 'markdown' ? 'rgba(0,255,209,0.08)' : 'rgba(224,64,251,0.12)',
+            color: lang === 'glsl' ? '#00B4FF' : lang === 'markdown' ? '#00FFD1' : '#E040FB',
             padding: '1px 6px', borderRadius: 2,
             fontSize: 9, letterSpacing: '0.08em',
           }}>{langLabel}</span>
@@ -749,8 +1082,15 @@ export default function LabDetail() {
   const navigate = useNavigate()
   const [hint, setHint] = useState(true)
   const [showEditor, setShowEditor] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640)
   usePageTracking(`lab/${id}`);
   const { trackClick } = useEventTracking();
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // ── Live code state ─────────────────────────────────────
   const [liveCode, setLiveCode] = useState(() => {
@@ -929,8 +1269,8 @@ export default function LabDetail() {
 
       {/* Experiment name — top center */}
       <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none text-center">
-        <p className="text-white/20 text-[10px] tracking-[0.5em] uppercase font-mono">.RANDOM() / LAB</p>
-        <p className="text-white/60 text-[12px] tracking-[0.4em] uppercase font-mono mt-1">{name}</p>
+        <p className="text-white/20 text-[14px] tracking-[0.5em] uppercase font-mono">.RANDOM() / LAB</p>
+        <p className="text-white/60 text-[14px] tracking-[0.4em] uppercase font-mono mt-1">{name}</p>
       </div>
 
       {/* Description + tags — bottom center */}
@@ -947,44 +1287,73 @@ export default function LabDetail() {
         )}
       </div>
 
-      {/* Source tab — vertical pill on right edge */}
+      {/* Source tab */}
       {EDITOR_FILES[id] && !showEditor && (
-        <button
-          className="lab-source-btn"
-          data-text=">_ source"
-          onClick={() => setShowEditor(true)}
-          style={{
-            position: 'fixed',
-            right: 0,
-            top: '50%',
-            transform: 'translateY(-50%) rotate(180deg)',
-            zIndex: 150,
-            writingMode: 'vertical-rl',
-            background: 'rgba(0,255,209,0.04)',
-            border: '1px solid rgba(0,255,209,0.25)',
-            borderRight: 'none',
-            borderRadius: '6px 0 0 6px',
-            color: '#00FFD1',
-            padding: '14px 7px',
-            fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
-            fontSize: '10px',
-            letterSpacing: '0.18em',
-            cursor: 'none',
-            pointerEvents: 'auto',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(0,255,209,0.1)'
-            e.currentTarget.style.borderColor = 'rgba(0,255,209,0.5)'
-            e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,209,0.18)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(0,255,209,0.04)'
-            e.currentTarget.style.borderColor = 'rgba(0,255,209,0.25)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}
-        >
-          &gt;_ source
-        </button>
+        isMobile ? (
+          /* Mobile — horizontal pill at the bottom center */
+          <button
+            className="lab-source-btn"
+            data-text=">_ source"
+            onClick={() => setShowEditor(true)}
+            style={{
+              position: 'fixed',
+              bottom: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 150,
+              background: 'rgba(0,255,209,0.05)',
+              border: '1px solid rgba(0,255,209,0.28)',
+              borderRadius: 6,
+              color: '#00FFD1',
+              padding: '10px 22px',
+              fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
+              fontSize: '10px',
+              letterSpacing: '0.18em',
+              cursor: 'pointer',
+              pointerEvents: 'auto',
+            }}
+          >
+            &gt;_ source
+          </button>
+        ) : (
+          /* Desktop — vertical pill on right edge */
+          <button
+            className="lab-source-btn"
+            data-text=">_ source"
+            onClick={() => setShowEditor(true)}
+            style={{
+              position: 'fixed',
+              right: 0,
+              top: '50%',
+              transform: 'translateY(-50%) rotate(180deg)',
+              zIndex: 150,
+              writingMode: 'vertical-rl',
+              background: 'rgba(0,255,209,0.04)',
+              border: '1px solid rgba(0,255,209,0.25)',
+              borderRight: 'none',
+              borderRadius: '6px 0 0 6px',
+              color: '#00FFD1',
+              padding: '14px 7px',
+              fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
+              fontSize: '10px',
+              letterSpacing: '0.18em',
+              cursor: 'none',
+              pointerEvents: 'auto',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(0,255,209,0.1)'
+              e.currentTarget.style.borderColor = 'rgba(0,255,209,0.5)'
+              e.currentTarget.style.boxShadow = '0 0 12px rgba(0,255,209,0.18)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(0,255,209,0.04)'
+              e.currentTarget.style.borderColor = 'rgba(0,255,209,0.25)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          >
+            &gt;_ source
+          </button>
+        )
       )}
 
       {/* Editor panel */}

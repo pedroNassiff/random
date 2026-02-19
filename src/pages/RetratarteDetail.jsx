@@ -12,9 +12,43 @@ import { EditorPanel, SourceButton, EDITOR_STYLES } from '../components/CodeEdit
 // ─────────────────────────────────────────────
 // Editor file tabs
 // ─────────────────────────────────────────────
+const RETRATARTE_ABOUT = `# retratarte.mirror
+
+every mandala begins at the center —
+the point before division,
+the breath before the name.
+
+patterns do not decorate reality.
+they are the grammar of matter:
+how the universe writes itself
+onto the surface of things.
+
+retratarte means re-portrait, re-trace, re-self —
+see yourself in the geometry,
+find your face in the frequency.
+find the mandala, find the symmetry,
+find the smile at the center.
+
+conscious breath is the oldest tool:
+inhale, pattern forms.
+exhale, the whole reveals itself.
+
+the one contains the whole.
+the whole folds back into the one.
+
+at la vaca —
+in the middle of buenos aires —
+we built a small paradise to practice this.
+
+beauty is not decoration here.
+beauty is the method.
+
+— random() lab`
+
 const RETRATARTE_FILES = [
-  { name: 'vertex.glsl',   lang: 'glsl', live: true, code: vertexShader },
-  { name: 'fragment.glsl', lang: 'glsl', live: true, code: fragmentShader },
+  { name: 'vertex.glsl',   lang: 'glsl',     live: true,  code: vertexShader },
+  { name: 'fragment.glsl', lang: 'glsl',     live: true,  code: fragmentShader },
+  { name: 'about.md',      lang: 'markdown', live: false, code: RETRATARTE_ABOUT },
 ]
 
 // ─────────────────────────────────────────────
@@ -413,8 +447,8 @@ export default function RetratarteDetail() {
 
       {/* Header */}
       <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none text-center">
-        <p className="text-white/20 text-[9px] tracking-[0.5em] uppercase font-mono">.RANDOM() / LAB</p>
-        <p className="text-white/60 text-[11px] tracking-[0.4em] uppercase font-mono mt-1">RETRATARTE</p>
+        <p className="text-white/20 text-[14px] tracking-[0.5em] uppercase font-mono">.RANDOM() / LAB</p>
+        <p className="text-white/60 text-[14px] tracking-[0.4em] uppercase font-mono mt-1">RETRATARTE</p>
       </div>
 
       {/* Bottom — pattern + description + status */}
@@ -426,21 +460,21 @@ export default function RetratarteDetail() {
         >
           {patternName}
         </p>
-        <p className="text-white/20 text-[8px] tracking-[0.3em] uppercase font-mono leading-relaxed">
+        <p className="text-white/50 text-[10px] tracking-[0.3em] uppercase font-mono leading-relaxed">
           Leyendo gestos · movimientos · respiración
         </p>
         <div className="flex justify-center gap-2">
           {['face tracking', 'audio reactive', 'GLSL'].map(tag => (
-            <span key={tag} className="text-white/20 text-[7px] tracking-[0.3em] uppercase font-mono border border-white/10 px-1.5 py-0.5">
+            <span key={tag} className="text-white/50 text-[9px] tracking-[0.3em] uppercase font-mono border border-white/10 px-1.5 py-0.5">
               {tag}
             </span>
           ))}
         </div>
         <div className="flex justify-center gap-4 pt-1">
-          <span className="text-[7px] tracking-[0.25em] uppercase font-mono text-white/20 flex items-center gap-1.5">
+          <span className="text-[9px] tracking-[0.25em] uppercase font-mono text-white/50 flex items-center gap-1.5">
             {statusDot(camStatus)} cámara
           </span>
-          <span className="text-[7px] tracking-[0.25em] uppercase font-mono text-white/20 flex items-center gap-1.5">
+          <span className="text-[9px] tracking-[0.25em] uppercase font-mono text-white/50 flex items-center gap-1.5">
             {statusDot(micStatus)} micrófono
           </span>
         </div>

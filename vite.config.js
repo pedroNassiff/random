@@ -17,7 +17,7 @@ if (!fs.existsSync(brainModelPath) && fs.existsSync(brainModelSource)) {
 export default {
     root: 'src/',
     publicDir: '../static/',
-    base: './',
+    base: '/',
     server:
     {
         host: true,
