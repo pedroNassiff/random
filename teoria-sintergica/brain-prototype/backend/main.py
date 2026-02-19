@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import time
@@ -7,6 +8,7 @@ import asyncio
 import asyncpg
 import os
 from dotenv import load_dotenv
+from security import SecurityMiddleware
 
 # Load environment variables
 load_dotenv()
@@ -70,6 +72,21 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Security: bot protection + rate limiting
+# Must come AFTER CORSMiddleware (starlette applies middleware in reverse order)
+app.add_middleware(SecurityMiddleware)
+
+# Trusted host guard — rejects requests with unknown Host headers
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=[
+        "api.random-lab.es",
+        "api.random-studio.io",
+        "localhost",
+        "127.0.0.1",
+    ],
 )
 
 # ============================================
