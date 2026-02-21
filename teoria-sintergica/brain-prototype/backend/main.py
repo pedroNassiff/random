@@ -956,6 +956,7 @@ async def websocket_endpoint(websocket: WebSocket):
     
     await websocket.accept()
     start_time = time.time()
+    ws_frame_count = 0
     
     print(f"→ New WebSocket connection established")
     
@@ -963,10 +964,23 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # Calcular tiempo relativo
             current_t = time.time() - start_time
+            ws_frame_count += 1
             
             # --- INFERENCIA SINTÉRGICA ---
             # Obtener estado con TODAS las métricas científicas
             ai_state = brain.next_state()
+            
+            # Log cada 25 frames (5s a 5Hz) para ver si los valores cambian
+            if ws_frame_count == 1 or ws_frame_count % 25 == 0:
+                b = ai_state.get('bands') or {}
+                print(
+                    f"[WS #{ws_frame_count:04d}] "
+                    f"source={ai_state.get('source','?')}  "
+                    f"coherence={ai_state.get('coherence', 0):.3f}  "
+                    f"δ={b.get('delta',0):.3f} θ={b.get('theta',0):.3f} "
+                    f"α={b.get('alpha',0):.3f} β={b.get('beta',0):.3f} γ={b.get('gamma',0):.3f}  "
+                    f"state={ai_state.get('state','?')}"
+                )
             
             # Sanitizar valores para evitar NaN/Infinity en JSON
             coherence = sanitize_value(ai_state.get("coherence", 0.5), 0.5)

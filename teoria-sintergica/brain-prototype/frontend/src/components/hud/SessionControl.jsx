@@ -10,38 +10,48 @@ import { useBrainStore } from '../../store/brainStore';
 
 const API_BASE = 'http://localhost:8000';
 
-// Hook para barra de progreso suave con interpolación temporal real
-function useSmoothProgress(serverPercent, totalDuration, isPlaying, playbackSpeed = 1) {
-  const [smoothPercent, setSmoothPercent] = useState(serverPercent);
-  const animationRef = useRef(null);
+function formatSeconds(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function useProgressAnimation(serverPercent, totalDuration, isPlaying, playbackSpeed = 1) {
+  const fillRef   = useRef(null);
+  const timeRef   = useRef(null);
   const anchorRef = useRef({ percent: serverPercent, time: performance.now() });
+  const rafRef    = useRef(null);
 
   useEffect(() => {
     anchorRef.current = { percent: serverPercent, time: performance.now() };
-    setSmoothPercent(serverPercent);
-  }, [serverPercent]);
+    if (timeRef.current && totalDuration > 0) {
+      timeRef.current.textContent = formatSeconds((serverPercent / 100) * totalDuration);
+    }
+  }, [serverPercent, totalDuration]);
 
   useEffect(() => {
     if (!isPlaying || totalDuration <= 0) {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       return;
     }
-
     const tick = () => {
-      const elapsed = (performance.now() - anchorRef.current.time) / 1000;
-      const increment = (elapsed * playbackSpeed / totalDuration) * 100;
-      const projected = Math.min(anchorRef.current.percent + increment, 100);
-      setSmoothPercent(projected);
-      animationRef.current = requestAnimationFrame(tick);
+      if (fillRef.current) {
+        const elapsed   = (performance.now() - anchorRef.current.time) / 1000;
+        const increment = (elapsed * playbackSpeed / totalDuration) * 100;
+        const projected = Math.min(anchorRef.current.percent + increment, 100);
+        fillRef.current.style.width = `${projected}%`;
+        if (timeRef.current) {
+          timeRef.current.textContent = formatSeconds((projected / 100) * totalDuration);
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
     };
-
-    animationRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [isPlaying, totalDuration, playbackSpeed]);
 
-  return smoothPercent;
+  return { fillRef, timeRef };
 }
 
 export default function SessionControl() {
@@ -58,10 +68,15 @@ export default function SessionControl() {
   const [dragPercent, setDragPercent] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Estado local para velocidad
   const progressBarRef = useRef(null);
-  
-  // Progreso suave
+
   const targetProgress = sessionStatus?.progress_percent || 0;
-  const smoothProgress = useSmoothProgress(targetProgress, sessionStatus?.total_duration || 0, isPlaying && !isDragging, playbackSpeed);
+  const { fillRef: progressFillRef, timeRef: currentTimeRef } = useProgressAnimation(
+    targetProgress,
+    sessionStatus?.total_duration || 0,
+    isPlaying && !isDragging,
+    playbackSpeed
+  );
+  const [displayPercent, setDisplayPercent] = useState(0);
 
   // Fetch session status cada 2s (rate limit: 60 r/min → 1 req/seg máx)
   useEffect(() => {
@@ -70,14 +85,23 @@ export default function SessionControl() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE}/session/status`);
-        if (res.status === 429) return;
+        if (res.status === 429) { console.warn('[SessionControl] 429 rate limited'); return; }
         const data = await res.json();
+        console.log(`[SessionControl] poll → pos=${data.current_position?.toFixed(2)}s  progress=${data.progress_percent?.toFixed(2)}%  playing=${data.is_playing}`);
         if (data.session_active) {
+          const prevStatus = sessionStatus;
+          const isGlitch = !data.is_playing
+            && (data.current_position ?? 0) < 1.0
+            && prevStatus?.is_playing === true
+            && (prevStatus?.current_position ?? 0) > 5.0;
+          if (isGlitch) {
+            console.warn(`[SessionControl] Skipping glitch reading: playing=false pos=0 while was at ${prevStatus.current_position?.toFixed(1)}s`);
+            return;
+          }
           setSessionStatus(data);
           if (data.is_playing !== undefined) {
             setIsPlaying(data.is_playing);
           }
-          // Sincronizar velocidad desde backend
           if (data.playback_speed !== undefined) {
             setPlaybackSpeed(data.playback_speed);
           }
@@ -262,21 +286,24 @@ export default function SessionControl() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Progress bar drag handling
   const handleProgressMouseDown = useCallback((e) => {
     if (!sessionStatus) return;
     setIsDragging(true);
     const rect = progressBarRef.current.getBoundingClientRect();
     const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
     setDragPercent(percent);
-  }, [sessionStatus]);
+    setDisplayPercent(percent);
+    if (progressFillRef.current) progressFillRef.current.style.width = `${percent}%`;
+  }, [sessionStatus, progressFillRef]);
 
   const handleProgressMouseMove = useCallback((e) => {
     if (!isDragging || !progressBarRef.current) return;
     const rect = progressBarRef.current.getBoundingClientRect();
     const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
     setDragPercent(percent);
-  }, [isDragging]);
+    setDisplayPercent(percent);
+    if (progressFillRef.current) progressFillRef.current.style.width = `${percent}%`;
+  }, [isDragging, progressFillRef]);
 
   const handleProgressMouseUp = useCallback((e) => {
     if (!isDragging || !sessionStatus) return;
@@ -285,7 +312,6 @@ export default function SessionControl() {
     seekTo(seekTime);
   }, [isDragging, dragPercent, sessionStatus]);
 
-  // Global mouse events for drag
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleProgressMouseMove);
@@ -297,7 +323,6 @@ export default function SessionControl() {
     }
   }, [isDragging, handleProgressMouseMove, handleProgressMouseUp]);
 
-  // Click to seek
   const handleProgressClick = (e) => {
     if (!sessionStatus) return;
     const rect = progressBarRef.current.getBoundingClientRect();
@@ -306,8 +331,7 @@ export default function SessionControl() {
     seekTo(seekTime);
   };
 
-  // Current progress (drag or smooth)
-  const displayProgress = isDragging ? dragPercent : smoothProgress;
+  const displayProgress = isDragging ? displayPercent : targetProgress;
   
   if (!sessionActive) {
     return (
@@ -381,11 +405,10 @@ export default function SessionControl() {
             style={{
               width: '100%',
               height: '4px',
-              background: 'rgba(255, 255, 255, 0.1)',
+              background: 'rgba(255, 255, 255, 0.15)',
               borderRadius: '2px',
               position: 'relative',
               cursor: 'pointer',
-              transition: 'height 0.1s ease'
             }}
             onMouseDown={handleProgressMouseDown}
             onClick={handleProgressClick}
@@ -402,28 +425,19 @@ export default function SessionControl() {
               }
             }}
           >
-            {/* Loaded/buffered indicator (subtle) */}
-            <div style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: '100%',
-              height: '100%',
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '2px'
-            }} />
-            
-            {/* Progress fill */}
-            <div style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: `${displayProgress}%`,
-              height: '100%',
-              background: 'white',
-              borderRadius: '2px',
-              transition: isDragging ? 'none' : 'width 0.1s linear'
-            }} />
+            {/* Progress fill — width mutated directly by rAF hook */}
+            <div
+              ref={progressFillRef}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: `${targetProgress}%`,
+                height: '100%',
+                background: 'white',
+                borderRadius: '2px',
+              }}
+            />
             
             {/* Draggable knob */}
             <div 
@@ -454,8 +468,8 @@ export default function SessionControl() {
             color: 'rgba(255, 255, 255, 0.5)',
             fontVariantNumeric: 'tabular-nums'
           }}>
-            <span>{formatTime(isDragging ? (dragPercent / 100) * sessionStatus.total_duration : sessionStatus.current_position)}</span>
-            <span>{formatTime(sessionStatus.total_duration)}</span>
+            <span ref={currentTimeRef}>{formatSeconds((targetProgress / 100) * (sessionStatus?.total_duration || 0))}</span>
+            <span>{formatSeconds(sessionStatus.total_duration)}</span>
           </div>
         </div>
       )}

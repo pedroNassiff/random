@@ -65,14 +65,15 @@ export const useBrainStore = create((set) => ({
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data)
 
-        // Debug: log first WS message and then every 100th to verify data pipeline
+        // Debug: log every 10th WS message (~2s at 5Hz) to see if values are actually changing
         const count = (useBrainStore.getState()._msgCount || 0) + 1
-        if (count === 1 || count % 100 === 0) {
+        if (count === 1 || count % 10 === 0) {
           const b = data.bands || {}
           console.log(
             `%c[Brain WS #${count}]%c source=${data.source || '?'}  coherence=${(data.coherence||0).toFixed(3)}` +
             `  δ=${(b.delta||0).toFixed(3)} θ=${(b.theta||0).toFixed(3)} α=${(b.alpha||0).toFixed(3)}` +
-            `  β=${(b.beta||0).toFixed(3)} γ=${(b.gamma||0).toFixed(3)}`,
+            `  β=${(b.beta||0).toFixed(3)} γ=${(b.gamma||0).toFixed(3)}` +
+            `  state=${data.state || '?'}`,
             'background:#6366f1;color:#fff;font-weight:bold;border-radius:3px;padding:1px 4px',
             'color:#aaa'
           )

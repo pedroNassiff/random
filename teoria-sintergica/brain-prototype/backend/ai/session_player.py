@@ -511,10 +511,21 @@ class SessionPlayer:
         # Calcular cuánto tiempo real ha pasado desde la última llamada
         if self._last_advance_time is not None:
             elapsed_real_time = current_time - self._last_advance_time
-            # Avanzar en la sesión proporcional al tiempo real
-            # (multiplicado por playback_speed)
+
+            # BUG FIX: cap elapsed to max 1s para evitar saltos grandes cuando
+            # el WebSocket se reconecta tras un gap (ej: Context Lost de WebGL).
+            # Sin este cap: elapsed = segundos de gap → current_position salta
+            # más allá de total_duration → reset a 0.0 → barra siempre en 0.
+            if elapsed_real_time > 1.0:
+                print(f"[SessionPlayer] ⚠ Large time gap detected: {elapsed_real_time:.1f}s → capping to 1s to prevent position reset")
+                elapsed_real_time = 1.0
+
             advance_amount = elapsed_real_time * self.playback_speed
+            prev_pos = self.current_position
             self.current_position += advance_amount
+            # Log de diagnóstico cada 5 segundos de posición
+            if int(prev_pos) % 5 == 0 and int(self.current_position) % 5 != 0:
+                print(f"[SessionPlayer] ▶ pos={self.current_position:.1f}s / {self.total_duration:.1f}s ({self.current_position/self.total_duration*100:.1f}%) speed={self.playback_speed}x")
         
         self._last_advance_time = current_time
         
@@ -591,11 +602,15 @@ class SessionPlayer:
         """
         Retorna estado actual del reproductor.
         """
+        import time
+        progress = (self.current_position / self.total_duration * 100) if self.total_duration > 0 else 0
+        last_advance_age = (time.time() - self._last_advance_time) if self._last_advance_time else None
+        print(f"[SessionPlayer] get_status() → pos={self.current_position:.2f}s progress={progress:.2f}% is_playing={self.is_playing} last_advance_age={last_advance_age:.2f}s ago" if last_advance_age else f"[SessionPlayer] get_status() → pos={self.current_position:.2f}s progress={progress:.2f}% is_playing={self.is_playing} last_advance_age=None")
         return {
             'is_playing': self.is_playing,
             'current_position': self.current_position,
             'total_duration': self.total_duration,
-            'progress_percent': (self.current_position / self.total_duration * 100) if self.total_duration > 0 else 0,
+            'progress_percent': progress,
             'playback_speed': self.playback_speed,
             'session_metadata': self.session_metadata
         }
