@@ -2,8 +2,26 @@ import { useBrainStore } from '../store'
 import { useEffect, useRef } from 'react'
 
 export function FrequencySpectrum() {
-  const { bands } = useBrainStore()
+  // bandsDisplay: 1/f-corregido para visualización (delta ~22% en vez de ~60%)
+  // bands: potencia relativa cruda (delta siempre domina por la física 1/f del EEG)
+  const { bandsDisplay, bands } = useBrainStore()
   const canvasRef = useRef(null)
+
+  // Usar bandsDisplay si disponible (backend nuevo), sino corregir client-side
+  const displayBands = (bandsDisplay && bandsDisplay.delta < 0.55)
+    ? bandsDisplay
+    : (() => {
+        // Correción 1/f client-side cuando el backend no envía bands_display
+        const centres = { delta: 2.25, theta: 6, alpha: 10.5, beta: 21.5, gamma: 40 }
+        const beta = 1.5
+        const corrected = Object.fromEntries(
+          Object.entries(bands).map(([k, v]) => [k, v * Math.pow(centres[k], beta)])
+        )
+        const total = Object.values(corrected).reduce((a, b) => a + b, 0)
+        return total > 0
+          ? Object.fromEntries(Object.entries(corrected).map(([k, v]) => [k, v / total]))
+          : { delta: 0.2, theta: 0.2, alpha: 0.2, beta: 0.2, gamma: 0.2 }
+      })()
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -17,41 +35,37 @@ export function FrequencySpectrum() {
     ctx.clearRect(0, 0, width, height)
 
     // Define band colors (neurociencia estándar)
+    // Usar displayBands (1/f-corregido): todas las bandas en escala comparable
     const bandData = [
       { 
         name: 'Delta', 
-        value: bands.delta, 
+        value: displayBands.delta, 
         color: '#8b5cf6',
-        region: 'Central/Tálamo',
-        description: 'Sueño profundo'
+        description: '0.5–4Hz'
       },
       { 
         name: 'Theta', 
-        value: bands.theta, 
+        value: displayBands.theta, 
         color: '#3b82f6',
-        region: 'Temporal/Hipocampo',
-        description: 'Meditación, memoria'
+        description: '4–8Hz'
       },
       { 
         name: 'Alpha', 
-        value: bands.alpha, 
+        value: displayBands.alpha, 
         color: '#10b981',
-        region: 'Occipital',
-        description: 'Relajación, coherencia'
+        description: '8–13Hz'
       },
       { 
         name: 'Beta', 
-        value: bands.beta, 
+        value: displayBands.beta, 
         color: '#f59e0b',
-        region: 'Frontal',
-        description: 'Concentración activa'
+        description: '13–30Hz'
       },
       { 
         name: 'Gamma', 
-        value: bands.gamma, 
+        value: displayBands.gamma, 
         color: '#ef4444',
-        region: 'Prefrontal',
-        description: 'Insight, binding'
+        description: '30–50Hz'
       }
     ]
 
@@ -84,7 +98,7 @@ export function FrequencySpectrum() {
         ctx.fillText((band.value * 100).toFixed(0) + '%', x + barWidth / 2, y + 12)
       }
     })
-  }, [bands])
+  }, [displayBands])
 
   return (
     <div style={{
@@ -105,6 +119,14 @@ export function FrequencySpectrum() {
           fontFamily: 'monospace'
         }}>
           Frequency Bands
+        </span>
+        <span style={{
+          color: 'rgba(255,255,255,0.18)',
+          fontSize: '0.45rem',
+          fontFamily: 'monospace',
+          letterSpacing: '0.1em',
+        }}>
+          1/f corrected
         </span>
       </div>
       <canvas

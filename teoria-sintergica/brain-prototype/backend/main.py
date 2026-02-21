@@ -1005,6 +1005,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     "gamma": sanitize_value(bands.get("gamma", 0), 0)
                 }
             
+            bands_display = ai_state.get("bands_display")
+            if bands_display:
+                bands_display = {
+                    "delta": sanitize_value(bands_display.get("delta", 0), 0),
+                    "theta": sanitize_value(bands_display.get("theta", 0), 0),
+                    "alpha": sanitize_value(bands_display.get("alpha", 0), 0),
+                    "beta": sanitize_value(bands_display.get("beta", 0), 0),
+                    "gamma": sanitize_value(bands_display.get("gamma", 0), 0)
+                }
+            
             # Construir objeto Pydantic con nuevos campos
             state = SyntergicState(
                 timestamp=current_t,
@@ -1013,6 +1023,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 focal_point=Vector3(**focal_point),
                 frequency=frequency,
                 bands=FrequencyBands(**bands) if bands else None,
+                bands_display=FrequencyBands(**bands_display) if bands_display else None,
                 state=ai_state.get("state", "neutral"),
                 plv=plv,
                 source=ai_state.get("source"),

@@ -50,11 +50,14 @@ class SyntergicMetrics:
         signal_main = eeg_data.get('signal')
         if signal_main is not None and len(signal_main) > 0:
             results['bands'] = SpectralAnalyzer.compute_frequency_bands(signal_main, fs)
+            # Versión 1/f-corregida para visualización (evita delta siempre al 60%)
+            results['bands_display'] = SpectralAnalyzer.compute_frequency_bands_display(signal_main, fs)
             results['dominant_frequency'] = SpectralAnalyzer.get_dominant_frequency(signal_main, fs)
             results['state'] = SpectralAnalyzer.get_state_from_bands(results['bands'])
         else:
             # Fallback: valores default
             results['bands'] = {band: 0.2 for band in SpectralAnalyzer.BANDS.keys()}
+            results['bands_display'] = {band: 0.2 for band in SpectralAnalyzer.BANDS.keys()}
             results['dominant_frequency'] = 10.0
             results['state'] = 'neutral'
         

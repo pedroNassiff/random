@@ -92,6 +92,56 @@ class SpectralAnalyzer:
             band_powers = {k: 0.2 for k in band_powers.keys()}
         
         return band_powers
+
+    @staticmethod
+    def compute_frequency_bands_display(eeg_signal: np.ndarray, fs: int = 256) -> Dict[str, float]:
+        """
+        Versión corregida para VISUALIZACIÓN usando normalización por ancho de banda.
+
+        El EEG sigue un espectro 1/f; delta siempre domina en potencia absoluta.
+        Esta función corrige por (f_centre / bandwidth), que compensa AMBAS:
+          - La caída espectral 1/f (f_centre alto = más boost)
+          - El ancho de banda desigual (gamma 20Hz vs delta 3.5Hz)
+
+        Por qué NO usar f^1.5 directamente:
+          - gamma(40Hz)^1.5 = 252 vs delta(2.25Hz)^1.5 = 3.4  → ratio 74x
+          - Un gamma raw=0.007 (tiny) × 252 = 1.77 → aparece como 17% visual ← incorrecto
+          - Con f/bw: gamma 0.007 × (40/20)=2.0 = 0.014 → 1.6% visual ← correcto
+
+        Resultados esperados con datos sub-001 meditación vipassana:
+          - Relajación profunda (δ raw ~0.78): δ≈58% θ≈16% α≈19% β≈5%  γ≈2%
+          - Meditación       (α raw ~0.35): δ≈9%  θ≈21% α≈48% β≈11% γ≈12%
+          - Activo           (γ raw ~0.09): δ≈10% θ≈16% α≈36% β≈19% γ≈12%
+        """
+        raw = SpectralAnalyzer.compute_frequency_bands(eeg_signal, fs)
+
+        # Corrección: f_centre / bandwidth
+        # Frecuencias centrales y anchos de banda de cada banda estándar
+        centre_freqs = {
+            'delta': 2.25,   # (0.5+4)/2
+            'theta': 6.0,    # (4+8)/2
+            'alpha': 10.5,   # (8+13)/2
+            'beta':  21.5,   # (13+30)/2
+            'gamma': 40.0,   # (30+50)/2
+        }
+        bandwidths = {
+            'delta': 3.5,    # 0.5-4 Hz
+            'theta': 4.0,    # 4-8 Hz
+            'alpha': 5.0,    # 8-13 Hz
+            'beta':  17.0,   # 13-30 Hz
+            'gamma': 20.0,   # 30-50 Hz
+        }
+
+        corrected = {k: raw[k] * (centre_freqs[k] / bandwidths[k]) for k in raw}
+
+        # Renormalizar a suma = 1.0
+        total = sum(corrected.values())
+        if total > 0:
+            corrected = {k: v / total for k, v in corrected.items()}
+        else:
+            corrected = {k: 0.2 for k in corrected}
+
+        return corrected
     
     @staticmethod
     def get_dominant_frequency(eeg_signal: np.ndarray, fs: int = 256) -> float:
@@ -123,29 +173,30 @@ class SpectralAnalyzer:
     def get_state_from_bands(bands: Dict[str, float]) -> str:
         """
         Determina el estado mental basado en las bandas dominantes.
-        
-        Args:
-            bands: Dict con potencias normalizadas
-            
-        Returns:
-            str: 'deep_meditation', 'meditation', 'relaxed', 'focused', 'alert', 'insight'
+
+        Thresholds calibrados con datos reales de sub-001 meditation (PhysioNet):
+          - alpha raw: 0.08–0.48 (nunca supera 0.50 en meditación normal)
+          - delta raw: 0.12–0.78
+          - theta raw: 0.09–0.38
+          - beta  raw: 0.03–0.21
+          - gamma raw: 0.00–0.14
         """
-        # Encontrar banda dominante
+        # Banda dominante
         dominant_band = max(bands, key=bands.get)
-        dominant_power = bands[dominant_band]
-        
-        # Reglas heurísticas basadas en literatura
-        if bands['delta'] > 0.4:
-            return 'deep_sleep'
-        elif bands['theta'] > 0.35 and bands['alpha'] > 0.25:
-            return 'deep_meditation'  # Theta + Alpha = Meditación profunda
-        elif bands['alpha'] > 0.4:
-            return 'meditation'  # Alpha dominante = Relajación consciente
-        elif bands['alpha'] > 0.3 and bands['beta'] < 0.25:
-            return 'relaxed'  # Alpha alto, Beta bajo
-        elif bands['beta'] > 0.35:
-            return 'focused'  # Beta dominante = Concentración
-        elif bands['gamma'] > 0.2:
-            return 'insight'  # Gamma elevado = Procesamiento superior
+
+        if bands['delta'] > 0.55:
+            return 'deep_relaxation'   # Delta muy alto: sueño/anestesia/relajación muy profunda
+        elif bands['alpha'] > 0.35:
+            return 'meditation'        # Alpha claro: relajación consciente, meditación
+        elif bands['alpha'] > 0.28 and bands['theta'] > 0.18:
+            return 'deep_meditation'   # Alpha+Theta: meditación profunda
+        elif bands['theta'] > 0.30:
+            return 'relaxed'           # Theta dominante: somnolencia creativa
+        elif bands['alpha'] > 0.22:
+            return 'relaxed'           # Alpha moderado: reposo con ojos cerrados
+        elif bands['beta'] > 0.17 or bands['gamma'] > 0.10:
+            return 'focused'           # Beta/Gamma: actividad cognitiva
+        elif bands['delta'] > 0.38:
+            return 'deep_relaxation'
         else:
-            return 'neutral'
+            return 'transitioning'     # Ninguna banda es claramente dominante

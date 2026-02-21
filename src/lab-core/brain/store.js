@@ -24,7 +24,10 @@ export const useBrainStore = create((set) => ({
   isPlaying:     true,
 
   // Scientific metrics
-  bands:     { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
+  bands:        { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
+  // 1/f-corrected for visualization (see spectral.py — compensates the natural
+  // 1/f^1.5 EEG power law so delta doesn't always dominate the bar chart)
+  bandsDisplay: { delta: 0.2, theta: 0.2, alpha: 0.2, beta: 0.2, gamma: 0.2 },
   state:     'unknown',
   plv:       0.0,
   frequency: 0.0,
@@ -46,6 +49,7 @@ export const useBrainStore = create((set) => ({
     focalPoint:       newState.focal_point,
     frequency:        newState.frequency        || 0,
     bands:            newState.bands            || { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
+    bandsDisplay:     newState.bands_display    || newState.bands || { delta: 0.2, theta: 0.2, alpha: 0.2, beta: 0.2, gamma: 0.2 },
     state:            newState.state            || 'unknown',
     plv:              newState.plv              || 0,
     source:           newState.source           || null,
@@ -74,11 +78,13 @@ export const useBrainStore = create((set) => ({
         const count = (useBrainStore.getState()._msgCount || 0) + 1
         if (count === 1 || count % 10 === 0) {
           const b = data.bands || {}
+          const bd = data.bands_display || {}
           console.log(
             `%c[Brain WS #${count}]%c source=${data.source || '?'}  coherence=${(data.coherence||0).toFixed(3)}` +
             `  δ=${(b.delta||0).toFixed(3)} θ=${(b.theta||0).toFixed(3)} α=${(b.alpha||0).toFixed(3)}` +
             `  β=${(b.beta||0).toFixed(3)} γ=${(b.gamma||0).toFixed(3)}` +
-            `  state=${data.state || '?'}`,
+            `  state=${data.state || '?'}` +
+            `\n  display: δ=${(bd.delta||0).toFixed(3)} θ=${(bd.theta||0).toFixed(3)} α=${(bd.alpha||0).toFixed(3)} β=${(bd.beta||0).toFixed(3)} γ=${(bd.gamma||0).toFixed(3)}`,
             'background:#6366f1;color:#fff;font-weight:bold;border-radius:3px;padding:1px 4px',
             'color:#aaa'
           )

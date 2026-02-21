@@ -10,6 +10,8 @@ import sys
 # Agregar path del backend para importar análisis
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from analysis.metrics import SyntergicMetrics
+from analysis.spectral import SpectralAnalyzer
+from analysis.coherence import CoherenceAnalyzer
 
 # Type hints para hardware (evitar import circular)
 from typing import TYPE_CHECKING
@@ -321,11 +323,16 @@ class SyntergicBrain:
     
     def _process_eeg_window(self, real_eeg_input, session_timestamp=None):
         """
-        Procesa ventana EEG y retorna estado sintérgico.
-        
+        Procesa ventana EEG de dataset PhysioNet o sesión (fallback sin métricas grabadas).
+
+        IMPORTANTE: Solo se llama con datos ya normalizados al formato VAE:
+          - 64 canales × 161 timepoints @ 160Hz, aplanados a (1, 10304)
+          - Origen: DataLoader PhysioNet, o sesión antigua resampleada en next_state()
+          - NO se llama desde _process_muse_window() — ese path es independiente.
+
         Args:
-            real_eeg_input: Tensor EEG (1, features)
-            session_timestamp: Timestamp de la sesión (opcional)
+            real_eeg_input: Tensor shape (1, 10304) = 64ch × 161tp
+            session_timestamp: Posición temporal en la sesión (opcional)
         """
         
         # --- PARTE 1: INFERENCIA VAE (Focal Point) ---
@@ -336,20 +343,29 @@ class SyntergicBrain:
             _, logvar = self.model.encode(real_eeg_input)
             variance_mean = torch.mean(torch.exp(logvar)).item()
         
-        # --- PARTE 2: ANÁLISIS CIENTÍFICO (Nuevo) ---
-        # Convertir tensor a numpy para análisis
-        eeg_numpy = real_eeg_input.cpu().numpy().flatten()
+        # --- PARTE 2: ANÁLISIS CIENTÍFICO ---
+        # El tensor de entrada tiene shape (1, 64*161) = (1, 10304)
+        # NO aplanar todo como una sola señal: eso mezcla 64 canales
+        # y da un espectro sin sentido lleno de artefactos inter-canal.
+        n_channels = 64
+        eeg_tensor = real_eeg_input.cpu().numpy()  # (1, 10304) o (1, n_features)
+        total_features = eeg_tensor.shape[-1]
+        n_timepoints = total_features // n_channels  # 161 a 160Hz
         
-        # Simular split de hemisferios (64 canales PhysioNet)
-        # Canales 0-31: Izquierdo, 32-63: Derecho (simplificación)
-        # En realidad deberíamos mapear según 10-20 system, pero esto funciona
-        mid_point = len(eeg_numpy) // 2
-        left_hemisphere = eeg_numpy[:mid_point]
-        right_hemisphere = eeg_numpy[mid_point:]
+        if total_features == n_channels * n_timepoints:
+            # Reshape correcto: (64, 161)
+            eeg_2d = eeg_tensor.reshape(n_channels, n_timepoints)
+        else:
+            # Fallback: usar como un solo canal si la forma no encaja
+            eeg_2d = eeg_tensor.reshape(1, -1)
         
-        # Preparar datos para SyntergicMetrics
+        # Promediar hemisferios (canales 0-31 izq, 32-63 der según PhysioNet 10-20)
+        left_hemisphere  = np.mean(eeg_2d[:n_channels//2], axis=0)   # (161,)
+        right_hemisphere = np.mean(eeg_2d[n_channels//2:], axis=0)   # (161,)
+        signal_main = np.mean(eeg_2d, axis=0)                        # (161,) promedio global
+
         eeg_data = {
-            'signal': eeg_numpy,
+            'signal': signal_main,
             'left_hemisphere': left_hemisphere,
             'right_hemisphere': right_hemisphere,
             'raw_variance': variance_mean
@@ -357,6 +373,23 @@ class SyntergicBrain:
         
         # Calcular TODAS las métricas científicas
         metrics = SyntergicMetrics.compute_all(eeg_data, fs=self.fs)
+
+        # OVERRIDE coherencia: evitar MSC trivialmente = 1.000 o NaN
+        # MSC (Welch) necesita múltiples segmentos: con 161 pts a 160Hz → 1 segmento → NaN en alpha
+        # PLV (Hilbert phase) funciona bien con señales cortas → lo usamos por pares de canales
+        if eeg_2d.shape[0] >= 2:
+            n_half = n_channels // 2  # 32
+            step = max(1, n_half // 8)  # ~8 pares para cubrir todo el scalp
+            pair_plvs = []
+            for i in range(0, n_half, step):
+                plv = CoherenceAnalyzer.compute_phase_locking_value(
+                    eeg_2d[i],          # canal izquierdo i
+                    eeg_2d[i + n_half], # canal derecho simétrico
+                    fs=self.fs
+                )
+                if np.isfinite(plv):
+                    pair_plvs.append(plv)
+            metrics['coherence'] = float(np.mean(pair_plvs)) if pair_plvs else metrics['coherence']
         
         # --- PARTE 3: SMOOTHING TEMPORAL ---
         # Aplicar promedio móvil para transiciones suaves
@@ -366,26 +399,19 @@ class SyntergicBrain:
         
         # Smooth de bandas (cada una por separado)
         smoothed_bands = {}
+        smoothed_bands_display = {}
         for band_name in ['delta', 'theta', 'alpha', 'beta', 'gamma']:
             smoothed_bands[band_name] = self._smooth_value(
                 self.bands_history[band_name], 
                 metrics['bands'][band_name]
             )
+            # bands_display también se suaviza (reutilizamos el mismo history)
+            smoothed_bands_display[band_name] = metrics.get('bands_display', metrics['bands'])[band_name]
         
         # Re-inferir estado basado en valores suavizados
-        # Usar alpha suavizado para determinar estado más estable
-        if smoothed_bands['alpha'] > 0.5:
-            smoothed_state = "meditation"
-        elif smoothed_bands['beta'] + smoothed_bands['gamma'] > 0.6:
-            smoothed_state = "focused"
-        elif smoothed_bands['theta'] > 0.4:
-            smoothed_state = "relaxed"
-        elif smoothed_bands['gamma'] > 0.3:
-            smoothed_state = "insight"
-        elif smoothed_bands['delta'] > 0.4:
-            smoothed_state = "deep_relaxation"
-        else:
-            smoothed_state = "transitioning"
+        # Thresholds calibrados con datos reales de sub-001 PhysioNet (meditación vipassana)
+        # Ver SpectralAnalyzer.get_state_from_bands() para los thresholds actualizados
+        smoothed_state = SpectralAnalyzer.get_state_from_bands(smoothed_bands)
         
         # --- PARTE 4: COMBINAR RESULTADOS ---
         # Focal point viene del VAE (mapeo 3D del espacio latente)
@@ -396,9 +422,11 @@ class SyntergicBrain:
             "entropy": smoothed_entropy,
             "focal_point": focal_point,
             "bands": smoothed_bands,
-            "dominant_frequency": metrics['dominant_frequency'],  # Esta la dejamos sin smooth
+            "bands_display": smoothed_bands_display,  # 1/f corregido para la UI
+            "dominant_frequency": metrics['dominant_frequency'],
             "state": smoothed_state,
-            "plv": smoothed_plv
+            "plv": smoothed_plv,
+            "source": "dataset",
         }
         
         # Si estamos en modo sesión, agregar metadata temporal
@@ -448,11 +476,22 @@ class SyntergicBrain:
         for key in focal_point:
             focal_point[key] = max(-1, min(1, focal_point[key]))
         
+        # Corrección para display: f_centre/bandwidth (ver SpectralAnalyzer.compute_frequency_bands_display)
+        # Usa f_centre/bandwidth en lugar de f^1.5 para evitar sobreboost de gamma:
+        #   - Con f^1.5: gamma raw 0.007 × 252 = 1.77 → 17% visual ← incorrecto
+        #   - Con f/bw:  gamma raw 0.007 × 2.0  = 0.014 → 1.6% visual ← correcto
+        _centre_freqs = {'delta': 2.25, 'theta': 6.0, 'alpha': 10.5, 'beta': 21.5, 'gamma': 40.0}
+        _bandwidths   = {'delta': 3.5,  'theta': 4.0, 'alpha': 5.0,  'beta': 17.0, 'gamma': 20.0}
+        _corr = {k: bands[k] * (_centre_freqs[k] / _bandwidths[k]) for k in bands}
+        _total = sum(_corr.values()) or 1
+        bands_display = {k: v / _total for k, v in _corr.items()}
+
         result = {
             "coherence": coherence,
             "entropy": entropy,
             "focal_point": focal_point,
             "bands": bands,
+            "bands_display": bands_display,  # 1/f corregido para la UI
             "dominant_frequency": recorded_metrics.get('dominant_frequency', 10.0),
             "state": state,
             "plv": recorded_metrics.get('plv', coherence),
@@ -508,24 +547,24 @@ class SyntergicBrain:
                 self.bands_history[band_name], 
                 metrics['bands'][band_name]
             )
+        # bands_display ya viene 1/f-corregido de SyntergicMetrics.compute_all().
+        # Si no disponible (backwards compat), aplicar corrección manualmente.
+        if 'bands_display' in metrics:
+            smoothed_bands_display = metrics['bands_display']
+        else:
+            # Fallback: corrección f_centre/bandwidth (NO f^1.5, ver nota en _use_recorded_metrics)
+            _centre_freqs = {'delta': 2.25, 'theta': 6.0, 'alpha': 10.5, 'beta': 21.5, 'gamma': 40.0}
+            _bandwidths   = {'delta': 3.5,  'theta': 4.0, 'alpha': 5.0,  'beta': 17.0, 'gamma': 20.0}
+            _corr = {k: smoothed_bands[k] * (_centre_freqs[k] / _bandwidths[k]) for k in smoothed_bands}
+            _total = sum(_corr.values()) or 1
+            smoothed_bands_display = {k: v / _total for k, v in _corr.items()}
         
         # Generar focal point sintético basado en bandas
         # (No usamos VAE porque fue entrenado con 64 canales)
         focal_point = MuseToSyntergicAdapter.compute_focal_point_from_bands(smoothed_bands)
         
-        # Determinar estado mental
-        if smoothed_bands['alpha'] > 0.5:
-            state = "meditation"
-        elif smoothed_bands['beta'] + smoothed_bands['gamma'] > 0.6:
-            state = "focused"
-        elif smoothed_bands['theta'] > 0.4:
-            state = "relaxed"
-        elif smoothed_bands['gamma'] > 0.3:
-            state = "insight"
-        elif smoothed_bands['delta'] > 0.4:
-            state = "deep_relaxation"
-        else:
-            state = "transitioning"
+        # Determinar estado mental (thresholds calibrados con datos reales)
+        state = SpectralAnalyzer.get_state_from_bands(smoothed_bands)
         
         # Obtener calidad de señal
         signal_quality = self.muse_connector.get_signal_quality()
@@ -536,6 +575,7 @@ class SyntergicBrain:
             "entropy": smoothed_entropy,
             "focal_point": focal_point,
             "bands": smoothed_bands,
+            "bands_display": smoothed_bands_display,  # 1/f corregido para la UI
             "dominant_frequency": metrics['dominant_frequency'],
             "state": state,
             "plv": smoothed_plv,

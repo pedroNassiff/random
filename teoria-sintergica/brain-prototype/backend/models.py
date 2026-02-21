@@ -35,6 +35,11 @@ class SyntergicState(BaseModel):
     # NUEVO: Análisis espectral completo
     bands: Optional[FrequencyBands] = None
     
+    # Versión 1/f-corregida para visualización (ver spectral.py)
+    # delta ~22%, theta ~20%, alpha ~22%, beta ~20%, gamma ~16% en reposo
+    # Muestra desviaciones respecto a la línea base, no potencia absoluta
+    bands_display: Optional[FrequencyBands] = None
+    
     # NUEVO: Estado mental inferido
     state: Optional[str] = "neutral"  # 'meditation', 'focused', 'relaxed', etc.
     
