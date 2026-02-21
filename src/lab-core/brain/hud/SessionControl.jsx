@@ -6,9 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useBrainStore } from '../store';
-
-const API_BASE = 'https://api.random-lab.es';
+import { useBrainStore, API_BASE } from '../store';
 
 /**
  * Hook que anima la barra de progreso directamente en el DOM (sin setState),
@@ -76,6 +74,7 @@ export default function SessionControl() {
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [hoveredSession, setHoveredSession] = useState(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [sessionError, setSessionError] = useState(null);  // mensaje de error al conectar
   const [isDragging, setIsDragging] = useState(false);
   const [dragPercent, setDragPercent] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Estado local para velocidad
@@ -105,7 +104,7 @@ export default function SessionControl() {
         const res = await fetch(`${API_BASE}/session/status`);
         if (res.status === 429) { console.warn('[SessionControl] 429 rate limited'); return; }
         const data = await res.json();
-        console.log(`[SessionControl] poll → pos=${data.current_position?.toFixed(2)}s  progress=${data.progress_percent?.toFixed(2)}%  playing=${data.is_playing}`);
+        console.log(`[SessionControl] poll → pos=${data.current_position?.toFixed(2)}s  progress=${data.progress_percent?.toFixed(2)}%  playing=${data.is_playing}  session_active=${data.session_active}`);
         if (data.session_active) {
           // Guard: ignorar lecturas glitch (playing=false, pos≈0 mientras estábamos reproduciendo)
           // Usa ref para prevStatus — el closure del setInterval es stale si usamos el state directamente
@@ -127,6 +126,14 @@ export default function SessionControl() {
           if (data.playback_speed !== undefined) {
             setPlaybackSpeed(data.playback_speed);
           }
+        } else {
+          // Backend dice que no hay sesión activa — puede que el backend local
+          // no tenga ficheros EDF cargados. Reseteamos para no quedar en Loading…
+          console.warn('[SessionControl] Backend reports session_active=false, resetting to idle.');
+          setSessionActive(false);
+          setSessionStatus(null);
+          sessionStatusRef.current = null;
+          setSessionError(`No session active on ${API_BASE}. Start a session on the backend first.`);
         }
       } catch (err) {
         console.error('Error fetching session status:', err);
@@ -171,15 +178,30 @@ export default function SessionControl() {
   }, [sessionActive]);
   
   const activateSessionMode = async () => {
+    setSessionError(null);
+    setIsLoadingSession(true);
+    // Timeout de 8s para no quedarse en loading si el backend no responde
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      const res = await fetch(`${API_BASE}/set-mode/session`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/set-mode/session`, { method: 'POST', signal: controller.signal });
+      clearTimeout(timeout);
       const data = await res.json();
       if (data.status === 'success') {
         setSessionActive(true);
         setIsPlaying(true);
+      } else {
+        setSessionError(`Backend error: ${data.message || 'Unknown error'}`);
       }
     } catch (err) {
-      console.error('Error activating session mode:', err);
+      clearTimeout(timeout);
+      const msg = err.name === 'AbortError'
+        ? `Timeout connecting to ${API_BASE}. Is the backend running?`
+        : `Cannot connect to ${API_BASE}. Is the backend running?`;
+      console.error('[SessionControl] activateSessionMode failed:', err);
+      setSessionError(msg);
+    } finally {
+      setIsLoadingSession(false);
     }
   };
   
@@ -367,42 +389,64 @@ export default function SessionControl() {
         zIndex: 100,
         background: 'rgba(18, 18, 18, 0.95)',
         backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: `1px solid ${sessionError ? 'rgba(255,80,80,0.35)' : 'rgba(255,255,255,0.1)'}`,
         borderRadius: '8px',
         padding: '12px 24px',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: '#fff',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        gap: '15px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+        gap: '10px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+        minWidth: '280px',
       }}>
-        <div style={{ fontSize: '11px', opacity: 0.5, letterSpacing: '0.5px' }}>
-          📼 SESSION PLAYER
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', justifyContent: 'center' }}>
+          <div style={{ fontSize: '11px', opacity: 0.5, letterSpacing: '0.5px' }}>
+            📼 SESSION PLAYER
+          </div>
+          <button
+            onClick={togglePlayPause}
+            disabled={isLoadingSession}
+            style={{
+              background: isLoadingSession ? 'rgba(255,255,255,0.3)' : 'white',
+              border: 'none',
+              padding: '10px 24px',
+              borderRadius: '24px',
+              color: 'black',
+              cursor: isLoadingSession ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              fontSize: '13px',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.15s ease',
+              transform: 'scale(1)'
+            }}
+            onMouseEnter={(e) => !isLoadingSession && (e.target.style.transform = 'scale(1.04)')}
+            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+          >
+            {isLoadingSession ? '⏳ Connecting...' : '▶ PLAY'}
+          </button>
         </div>
-        <button
-          onClick={togglePlayPause}
-          style={{
-            background: 'white',
-            border: 'none',
-            padding: '10px 24px',
-            borderRadius: '24px',
-            color: 'black',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '13px',
-            fontFamily: 'inherit',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease',
-            transform: 'scale(1)'
-          }}
-          onMouseEnter={(e) => e.target.style.transform = 'scale(1.04)'}
-          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-        >
-          ▶ PLAY
-        </button>
+        {sessionError && (
+          <div style={{
+            fontSize: '10px',
+            color: 'rgba(255,120,120,0.9)',
+            fontFamily: 'monospace',
+            textAlign: 'center',
+            maxWidth: '340px',
+            lineHeight: '1.4',
+          }}>
+            ⚠ {sessionError}
+          </div>
+        )}
       </div>
     );
   }

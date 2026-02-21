@@ -7,8 +7,13 @@
  */
 import { create } from 'zustand'
 
-export const API_BASE = 'https://api.random-lab.es'
-export const WS_URL   = 'wss://api.random-lab.es/ws/brain-state'
+// Lee de variables de entorno Vite:
+//   .env.development  → localhost:8000  (npm run dev)
+//   .env.production   → api.random-lab.es  (Vercel build)
+export const API_BASE = import.meta.env.VITE_BRAIN_API_BASE || 'http://localhost:8000'
+export const WS_URL   = import.meta.env.VITE_BRAIN_WS_URL   || 'ws://localhost:8000/ws/brain-state'
+
+console.log(`[Brain Store] API_BASE=${API_BASE}`)
 
 export const useBrainStore = create((set) => ({
   // Syntergic parameters

@@ -10,8 +10,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-
-const API_BASE = 'https://api.random-lab.es';
+import { API_BASE } from '../store';
 
 const MUSE_STATUS = {
   DISCONNECTED: 'disconnected',
