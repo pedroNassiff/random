@@ -10,45 +10,36 @@ import { useBrainStore } from '../../store/brainStore';
 
 const API_BASE = 'http://localhost:8000';
 
-// Hook para barra de progreso suave
-function useSmoothProgress(targetPercent, duration, isPlaying) {
-  const [smoothPercent, setSmoothPercent] = useState(targetPercent);
+// Hook para barra de progreso suave con interpolación temporal real
+function useSmoothProgress(serverPercent, totalDuration, isPlaying, playbackSpeed = 1) {
+  const [smoothPercent, setSmoothPercent] = useState(serverPercent);
   const animationRef = useRef(null);
-  const lastUpdateRef = useRef(Date.now());
-  const lastPercentRef = useRef(targetPercent);
+  const anchorRef = useRef({ percent: serverPercent, time: performance.now() });
 
   useEffect(() => {
-    if (!isPlaying) {
-      setSmoothPercent(targetPercent);
+    anchorRef.current = { percent: serverPercent, time: performance.now() };
+    setSmoothPercent(serverPercent);
+  }, [serverPercent]);
+
+  useEffect(() => {
+    if (!isPlaying || totalDuration <= 0) {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
       return;
     }
 
-    // Calcular velocidad de interpolación
-    const now = Date.now();
-    const elapsed = now - lastUpdateRef.current;
-    lastUpdateRef.current = now;
-    lastPercentRef.current = targetPercent;
-
-    // Interpolar suavemente
-    const animate = () => {
-      setSmoothPercent(prev => {
-        const diff = targetPercent - prev;
-        // Interpolación suave: avanzar 10% de la diferencia por frame
-        const step = diff * 0.1;
-        if (Math.abs(diff) < 0.01) return targetPercent;
-        return prev + step;
-      });
-      animationRef.current = requestAnimationFrame(animate);
+    const tick = () => {
+      const elapsed = (performance.now() - anchorRef.current.time) / 1000;
+      const increment = (elapsed * playbackSpeed / totalDuration) * 100;
+      const projected = Math.min(anchorRef.current.percent + increment, 100);
+      setSmoothPercent(projected);
+      animationRef.current = requestAnimationFrame(tick);
     };
 
-    animationRef.current = requestAnimationFrame(animate);
-
+    animationRef.current = requestAnimationFrame(tick);
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [targetPercent, isPlaying]);
+  }, [isPlaying, totalDuration, playbackSpeed]);
 
   return smoothPercent;
 }
@@ -70,15 +61,16 @@ export default function SessionControl() {
   
   // Progreso suave
   const targetProgress = sessionStatus?.progress_percent || 0;
-  const smoothProgress = useSmoothProgress(targetProgress, sessionStatus?.total_duration || 0, isPlaying && !isDragging);
+  const smoothProgress = useSmoothProgress(targetProgress, sessionStatus?.total_duration || 0, isPlaying && !isDragging, playbackSpeed);
 
-  // Fetch session status cada 500ms para progreso más fluido
+  // Fetch session status cada 2s (rate limit: 60 r/min → 1 req/seg máx)
   useEffect(() => {
     if (!sessionActive) return;
     
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE}/session/status`);
+        if (res.status === 429) return;
         const data = await res.json();
         if (data.session_active) {
           setSessionStatus(data);
@@ -93,7 +85,7 @@ export default function SessionControl() {
       } catch (err) {
         console.error('Error fetching session status:', err);
       }
-    }, 500); // Más frecuente para mejor fluidez
+    }, 2000); // 2s → 30 req/min, bajo el límite de 60 r/min
     
     return () => clearInterval(interval);
   }, [sessionActive]);
