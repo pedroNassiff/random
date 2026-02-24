@@ -28,6 +28,10 @@ export const useBrainStore = create((set) => ({
   // 1/f-corrected for visualization (see spectral.py — compensates the natural
   // 1/f^1.5 EEG power law so delta doesn't always dominate the bar chart)
   bandsDisplay: { delta: 0.2, theta: 0.2, alpha: 0.2, beta: 0.2, gamma: 0.2 },
+  // Pre-smoothing (raw) values — para comparar con reference_data.json
+  bandsRaw:        null,
+  bandsDisplayRaw: null,
+  stateRaw:        null,
   state:     'unknown',
   plv:       0.0,
   frequency: 0.0,
@@ -50,6 +54,9 @@ export const useBrainStore = create((set) => ({
     frequency:        newState.frequency        || 0,
     bands:            newState.bands            || { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 },
     bandsDisplay:     newState.bands_display    || newState.bands || { delta: 0.2, theta: 0.2, alpha: 0.2, beta: 0.2, gamma: 0.2 },
+    bandsRaw:         newState.bands_raw        || null,
+    bandsDisplayRaw:  newState.bands_display_raw|| null,
+    stateRaw:         newState.state_raw        || null,
     state:            newState.state            || 'unknown',
     plv:              newState.plv              || 0,
     source:           newState.source           || null,

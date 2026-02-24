@@ -423,8 +423,12 @@ class SyntergicBrain:
             "focal_point": focal_point,
             "bands": smoothed_bands,
             "bands_display": smoothed_bands_display,  # 1/f corregido para la UI
+            # Raw = pre-smoothing, para comparar con referencia y diagnosticar el EMA
+            "bands_raw": {k: round(float(metrics['bands'][k]), 4) for k in metrics['bands']},
+            "bands_display_raw": {k: round(float(metrics.get('bands_display', metrics['bands'])[k]), 4) for k in metrics['bands']},
             "dominant_frequency": metrics['dominant_frequency'],
             "state": smoothed_state,
+            "state_raw": SpectralAnalyzer.get_state_from_bands(metrics['bands']),
             "plv": smoothed_plv,
             "source": "dataset",
         }
@@ -492,6 +496,10 @@ class SyntergicBrain:
             "focal_point": focal_point,
             "bands": bands,
             "bands_display": bands_display,  # 1/f corregido para la UI
+            # Pre-EMA raw values (recorded metrics have no EMA smoothing applied here)
+            "bands_raw": {k: round(float(bands[k]), 4) for k in bands},
+            "bands_display_raw": {k: round(float(bands_display[k]), 4) for k in bands_display},
+            "state_raw": SpectralAnalyzer.get_state_from_bands(bands),
             "dominant_frequency": recorded_metrics.get('dominant_frequency', 10.0),
             "state": state,
             "plv": recorded_metrics.get('plv', coherence),
@@ -576,8 +584,11 @@ class SyntergicBrain:
             "focal_point": focal_point,
             "bands": smoothed_bands,
             "bands_display": smoothed_bands_display,  # 1/f corregido para la UI
+            "bands_raw": {k: round(float(metrics['bands'][k]), 4) for k in metrics['bands']},
+            "bands_display_raw": {k: round(float(metrics.get('bands_display', metrics['bands'])[k]), 4) for k in metrics['bands']},
             "dominant_frequency": metrics['dominant_frequency'],
             "state": state,
+            "state_raw": SpectralAnalyzer.get_state_from_bands(metrics['bands']),
             "plv": smoothed_plv,
             "source": "muse2",
             "signal_quality": signal_quality,

@@ -421,11 +421,6 @@ export default function SessionControl() {
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              fontSize: '13px',
-              fontFamily: 'inherit',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
               transition: 'all 0.15s ease',
               transform: 'scale(1)'
             }}

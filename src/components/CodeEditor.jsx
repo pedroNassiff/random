@@ -53,11 +53,14 @@ export const EDITOR_STYLES = `
   .lab-source-btn::before { color: #E040FB; left: -1px; }
   .lab-source-btn::after  { color: #00B4FF; left:  1px; }
   .lab-source-btn:hover::before,
-  .lab-source-btn:hover::after {
+  .lab-source-btn:hover::after,
+  .lab-source-btn.is-glitching::before,
+  .lab-source-btn.is-glitching::after {
     opacity: 0.7;
     animation: glitch-clip 0.35s steps(1) infinite;
   }
-  .lab-source-btn:hover::after {
+  .lab-source-btn:hover::after,
+  .lab-source-btn.is-glitching::after {
     animation-delay: 0.05s;
     animation-direction: reverse;
   }
@@ -164,9 +167,27 @@ function CodeArea({ value, onChange, onCursorChange, onForceCompile, fontSize = 
 // SourceButton — vertical pill tab on right edge
 // ─────────────────────────────────────────────
 export function SourceButton({ onClick }) {
+  const [glitching, setGlitching] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    const schedule = () => {
+      const delay = (1 + Math.random() * 4) * 1000
+      timerRef.current = setTimeout(() => {
+        setGlitching(true)
+        setTimeout(() => {
+          setGlitching(false)
+          schedule()
+        }, 350)
+      }, delay)
+    }
+    schedule()
+    return () => clearTimeout(timerRef.current)
+  }, [])
+
   return (
     <button
-      className="lab-source-btn"
+      className={`lab-source-btn${glitching ? ' is-glitching' : ''}`}
       data-text=">_ source"
       onClick={onClick}
       style={{
@@ -261,6 +282,28 @@ function MarkdownView({ content }) {
         }
         if (line.trim() === '') {
           return <div key={i} style={{ height: 14 }} />
+        }
+        // Inline link: [text](url)
+        const linkMatch = line.match(/^\[(.+?)\]\((https?:\/\/.+?)\)$/)
+        if (linkMatch) {
+          return (
+            <div key={i} style={{ marginTop: 10, lineHeight: '1.9' }}>
+              <a
+                href={linkMatch[2]}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: '#00FFD1',
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  textDecoration: 'none',
+                  borderBottom: '1px solid rgba(0,255,209,0.35)',
+                  paddingBottom: 1,
+                  cursor: 'pointer',
+                }}
+              >{linkMatch[1]}</a>
+            </div>
+          )
         }
         return (
           <div key={i} style={{

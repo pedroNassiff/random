@@ -50,9 +50,9 @@ still rotating. still becoming.
     es: `# tesseract.dimensión
 
 un cubo entiende tres direcciones.
-un hipercubo insiste en una cuarta.
+un hipercubo agrega en una cuarta.
 
-no podemos verla — no directamente —
+no podemos verla, no directamente,
 pero podemos observar su sombra girar
 y sentir la forma de algo
 más allá del marco.
@@ -80,13 +80,12 @@ todavía girando. todavía convirtiéndose.
   galaxy: {
     en: `# galaxy.home
 
-you are made of stellar remnants —
-every atom in your body
-passed through a star
+we are made of stellar remnants —
+every atom in your body passed through a star
 before it passed through you.
 
 the galaxy is not a backdrop.
-it is the living context:
+it is the living context —
 billions of fires spinning in conversation,
 the same geometry at every scale.
 
@@ -95,25 +94,21 @@ look inward and you look outward.
 
 zoom in, find the whole.
 zoom out, find yourself.
-the mandelbrot truth: it's the same.
+the truth according to the kybalion:
+everything is the same in different degree.
 
-we are the universe become briefly local,
-briefly aware,
-briefly capable of wondering why.
-
-this is your home.
-it has always been moving.
+this is our home.
+it has always been moving, always flowing.
 
 — random() lab`,
     es: `# galaxia.hogar
 
-estás hecho de restos estelares —
-cada átomo en tu cuerpo
-pasó por una estrella
+estamos hecho de restos estelares
+cada átomo en tu cuerpo pasó por una estrella
 antes de pasar por vos.
 
 la galaxia no es un fondo de pantalla.
-es el contexto vivo:
+es el contexto vivo
 miles de millones de fuegos girando en conversación,
 la misma geometría a cada escala.
 
@@ -122,70 +117,58 @@ mirá hacia adentro y mirás hacia afuera.
 
 acercate, encontrás el todo.
 alejate, te encontrás a vos.
-la verdad mandelbrot: es lo mismo.
+la verdad según el kybalion: 
+todo es lo mismo en distinto grado.
 
-somos el universo que se vuelve brevemente local,
-brevemente consciente,
-brevemente capaz de preguntarse por qué.
-
-este es tu hogar.
-siempre estuvo en movimiento.
+esta es nuestra casa.
+siempre estuvo en movimiento, siempre fluyendo.
 
 — random() lab`,
   },
   holographic: {
     en: `# holographic.being
 
-vibration is the first language —
-before thought, before image,
-there is oscillation.
-
-the holographic model is the body as signal:
+the holographic model is the body as signal —
+vibration as the first language.
 each color a frequency,
-each frequency a state,
-each state a question
-posed to the present moment.
+each frequency a state.
 
-chakras are not metaphor here.
-they are standing waves in the field of flesh,
+chakras are not a metaphor.
+they are standing waves in our field,
 interference patterns where attention pools
 and consciousness gathers.
 
-watch it long enough
-and you will feel the resonance —
-something in you follows the geometry,
-something older than language says yes.
-
 this is not a representation of the self.
-this is the self,
-at a different resolution.
+this is the self.
+
+Inspired by the book
+"Hey despierta! Todo el universo depende de ello!"
+by my great friend Anibal Estigarribia,
+an explorer of consciousness and spirituality.
+[link to the book](https://www.instagram.com/hey.despierta/)
 
 — random() lab`,
     es: `# holográfico.ser
 
-la vibración es el primer lenguaje —
-antes del pensamiento, antes de la imagen,
-existe la oscilación.
 
-el modelo holográfico es el cuerpo como señal:
+el modelo holográfico es el cuerpo como señal
+la vibración como primer lenguaje 
 cada color una frecuencia,
-cada frecuencia un estado,
-cada estado una pregunta
-hecha al momento presente.
+cada frecuencia un estado.
 
-los chakras no son metáfora acá.
-son ondas estacionarias en el campo de la carne,
+los chakras no son una metáfora.
+son ondas estacionarias en nuestro campo,
 patrones de interferencia donde la atención se acumula
 y la conciencia se reúne.
 
-observalo el tiempo suficiente
-y vas a sentir la resonancia —
-algo en vos sigue la geometría,
-algo más viejo que el lenguaje dice sí.
-
 esto no es una representación del ser.
-esto es el ser,
-en una resolución diferente.
+esto es el ser.
+
+Inspirado por el libro 
+"Hey despierta! Todo el universo depende de ello!"
+de mi gran amigo Anibal Estigarribia, 
+un explorador de la conciencia y la espiritualidad.
+[link al libro](https://www.instagram.com/hey.despierta/)
 
 — random() lab`,
   },

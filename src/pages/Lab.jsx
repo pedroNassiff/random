@@ -19,21 +19,6 @@ import RetratatarteModel from '../lab-core/retratarte/RetratatarteModel'
 // ─────────────────────────────────────────────
 const EXPERIMENTS = [
   {
-    id: 'holographic',
-    name: 'HOLOGRAPHIC',
-    Component: HolographicModel,
-    // Modelo malebase.glb ~14 unidades alto → cámara muy atrás
-    camera: { position: [0, 0.5, 9], fov: 40 },
-    model: { scale: 0.20, position: [0, -1.7, 0], autoRotate: true, opacity: 0.9 },
-    bg: '#000308',
-    tags: ['glitch', 'shaders', 'chakras'],
-    lights: [
-      { type: 'ambient', intensity: 0.3 },
-      { type: 'point', pos: [2, 3, 2], intensity: 2.2, color: '#70c1ff' },
-      { type: 'point', pos: [-2, -1, 1], intensity: 0.8, color: '#3040ff' },
-    ],
-  },
-  {
     id: 'brain',
     name: 'HERMES',
     Component: BrainModel,
@@ -48,24 +33,9 @@ const EXPERIMENTS = [
     ],
   },
   {
-    id: 'retratarte',
-    name: 'RETRATARTE',
-    Component: RetratatarteModel,
-    // PlaneGeometry(2,2) → ocupa 2 units → cámara a z=3 con fov estrecho
-    camera: { position: [0, 0, 3.2], fov: 36 },
-    model: { scale: 0.9, position: [0, 0, 0], autoRotate: false, opacity: 1 },
-    bg: '#050200',
-    tags: ['face tracking', 'audio reactive', 'GLSL'],
-    lights: [
-      { type: 'ambient', intensity: 0.5 },
-      { type: 'point', pos: [2, 2, 2], intensity: 1.2, color: '#FFD700' },
-    ],
-  },
-  {
     id: 'tesseract',
     name: 'TESSERACT',
     Component: TesseractModel,
-    // Cubo 0.5 units → muy pequeño desde lejos
     camera: { position: [0, 0.3, 3.2], fov: 34 },
     model: { scale: 0.5, position: [0, 0, 0], autoRotate: true, opacity: 1 },
     bg: '#020201',
@@ -76,10 +46,36 @@ const EXPERIMENTS = [
     ],
   },
   {
+    id: 'holographic',
+    name: 'HOLOGRAPHIC',
+    Component: HolographicModel,
+    camera: { position: [0, 0.5, 9], fov: 40 },
+    model: { scale: 0.20, position: [0, -1.7, 0], autoRotate: true, opacity: 0.9 },
+    bg: '#000308',
+    tags: ['glitch', 'shaders', 'chakras'],
+    lights: [
+      { type: 'ambient', intensity: 0.3 },
+      { type: 'point', pos: [2, 3, 2], intensity: 2.2, color: '#70c1ff' },
+      { type: 'point', pos: [-2, -1, 1], intensity: 0.8, color: '#3040ff' },
+    ],
+  },
+  {
+    id: 'retratarte',
+    name: 'RETRATARTE',
+    Component: RetratatarteModel,
+    camera: { position: [0, 0, 3.2], fov: 36 },
+    model: { scale: 0.9, position: [0, 0, 0], autoRotate: false, opacity: 1 },
+    bg: '#050200',
+    tags: ['face tracking', 'audio reactive', 'GLSL'],
+    lights: [
+      { type: 'ambient', intensity: 0.5 },
+      { type: 'point', pos: [2, 2, 2], intensity: 1.2, color: '#FFD700' },
+    ],
+  },
+  {
     id: 'galaxy',
     name: 'GALAXY',
     Component: GalaxyModel,
-    // radius=3 → necesita cámara alta+lejos para ver galaxia completa
     camera: { position: [0, 3.5, 7], fov: 48 },
     model: { scale: 2, position: [0, 0, 0], autoRotate: true, opacity: 1 },
     bg: '#000005',
