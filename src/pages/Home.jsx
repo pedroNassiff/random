@@ -28,6 +28,7 @@ import ndsHome from '../img/nds/home.png';
 import { Water } from 'three/examples/jsm/Addons.js';
 
 import MatrixRain from '../components/MatrixRain';
+import FrequencyWidget from '../components/FrequencyWidget';
 
 
 
@@ -56,7 +57,22 @@ export default function Home() {
   const project3Ref = useRef(null);
   const project4Ref = useRef(null);
   const project5Ref = useRef(null);
-  
+  const globalScanRef = useRef(0); // scan compartido entre las 4 cards de servicios
+
+  // Master rAF para el scan line global (avanza de 0→4, una unidad por card)
+  useEffect(() => {
+    let lastT = 0;
+    let rafId;
+    const tick = (ts) => {
+      const dt = Math.min((ts - lastT) / 1000, 0.05);
+      lastT = ts;
+      globalScanRef.current = (globalScanRef.current + dt * 0.12) % 4;
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
   // Textos rotativos para el badge
   const badgeTexts = [
     "donde fluyen caos y orden",
@@ -438,7 +454,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       </section>
 
       {/* Projects Section */}
-      <section id="proyectos" ref={projectsRef} className="relative w-full min-h-[2400px] md:min-h-[4600px] lg:min-h-[4800px] bg-[#F8F8F7] px-6 md:px-16 py-24 pb-32 md:pb-24 max-w-[1600px] mx-auto mt-20">
+      <section id="proyectos" ref={projectsRef} className="relative w-full min-h-[2400px] md:min-h-[4000px] lg:min-h-[4200px] bg-[#F8F8F7] px-6 md:px-16 py-24 pb-32 md:pb-24 max-w-[1600px] mx-auto mt-20">
         {/* Title */}
         <div className="absolute top-0 left-6 md:left-16">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.work_title')}</h2>
@@ -451,7 +467,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'hermes', '.project-card');
             navigate('/work/hermes');
           }}
-          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -473,7 +489,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'calavera-sur', '.project-card');
             navigate('/work/calavera-sur');
           }}
-          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -495,7 +511,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'misia', '.project-card');
             navigate('/work/misia');
           }}
-          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -517,7 +533,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'hub-city-guides', '.project-card');
             navigate('/work/hub-city-guides');
           }}
-          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -539,7 +555,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'nds', '.project-card');
             navigate('/work/nds');
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -555,7 +571,14 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         </div>
 
         {/* CTA Section */}
-        <div className="absolute top-[2150px] md:top-[4400px] lg:top-[4300px] left-6 md:left-16 right-6 md:right-auto max-w-[800px] flex flex-col gap-10 z-50">
+        <div
+          className="absolute left-6 md:left-16 right-6 md:right-auto max-w-[800px] flex flex-col gap-10 z-50 cta-work"
+          style={{ top: '2150px' }}
+        >
+          <style>{`
+            @media (min-width: 768px) and (max-width: 1023px) { .cta-work { top: 3050px !important; } }
+            @media (min-width: 1024px) { .cta-work { top: 3700px !important; } }
+          `}</style>
           <p className="text-xl md:text-2xl text-[#1A1A1A] leading-[1.6] text-left">
             {t('home.cta_description')}
           </p>
@@ -574,68 +597,121 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
 
       {/* Services Section */}
-      <section id="servicios" ref={servicesRef} className="w-full px-6 md:px-16 py-10 md:py-[10px] mt-[200px] md:mt-0 max-w-[1600px] mx-auto">
+      <section id="servicios" ref={servicesRef} className="w-full px-6 md:px-16 py-10 md:py-[10px] mt-[80px] md:mt-0 max-w-[1600px] mx-auto">
         <div className="flex items-center gap-3 mb-12 md:mb-16 pl-0 md:pl-4">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.services_title')}</h2>
         </div>
 
         {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-0 md:px-4">
-          {/* Service Card 1 */}
-          <div className="flex flex-col p-10 bg-white rounded-2xl border border-[#E8E8E8] hover:border-[#E85A4F] hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-20">
-              <span className="text-xl text-[#CCCCCC]">1.</span>
-              <div className="w-8 h-8 rounded-full bg-[#E85A4F]" />
-            </div>
-            <div className="flex flex-col gap-6">
-              <h3 className="text-[32px] font-semibold text-[#1A1A1A] leading-tight">{t('home.services.web_dev.title')}</h3>
-              <p className="text-base text-[#666666] leading-[1.6]">
-                {t('home.services.web_dev.description')}
-              </p>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-0 md:px-4">
 
-          {/* Service Card 2 */}
-          <div className="flex flex-col p-10 bg-white rounded-2xl border border-[#E8E8E8] hover:border-[#1A1A1A] hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-20">
-              <span className="text-xl text-[#CCCCCC]">2.</span>
-              <div className="w-8 h-8 rounded-full bg-[#1A1A1A]" />
-            </div>
-            <div className="flex flex-col gap-6">
-              <h3 className="text-[32px] font-semibold text-[#1A1A1A] leading-tight">{t('home.services.cloud.title')}</h3>
-              <p className="text-base text-[#666666] leading-[1.6]">
-                {t('home.services.cloud.description')}
-              </p>
-            </div>
-          </div>
+          {/* Service Card 1 — Web Dev — coral */}
+          {(() => {
+            const theme = '#E85A4F';
+            return (
+              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>01</span>
+                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>WEB</span>
+                </div>
 
-          {/* Service Card 3 */}
-          <div className="flex flex-col p-10 bg-white rounded-2xl border border-[#E8E8E8] hover:border-[#4A90E2] hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-20">
-              <span className="text-xl text-[#CCCCCC]">3.</span>
-              <div className="w-8 h-8 rounded-full bg-[#4A90E2]" />
-            </div>
-            <div className="flex flex-col gap-6">
-              <h3 className="text-[32px] font-semibold text-[#1A1A1A] leading-tight">{t('home.services.ai.title')}</h3>
-              <p className="text-base text-[#666666] leading-[1.6]">
-                {t('home.services.ai.description')}
-              </p>
-            </div>
-          </div>
+                {/* Frequency widget */}
+                <div className="relative w-full" style={{ height: 100 }}>
+                  <FrequencyWidget color={theme} barCount={36} speed={0.8} profile="interference" sharedScan={globalScanRef} cardIndex={0} />
+                </div>
 
-          {/* Service Card 4 */}
-          <div className="flex flex-col p-10 bg-white rounded-2xl border border-[#E8E8E8] hover:border-[#8BC34A] hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-20">
-              <span className="text-xl text-[#CCCCCC]">4.</span>
-              <div className="w-8 h-8 rounded-full bg-[#8BC34A]" />
-            </div>
-            <div className="flex flex-col gap-6">
-              <h3 className="text-[32px] font-semibold text-[#1A1A1A] leading-tight">{t('home.services.3d.title')}</h3>
-              <p className="text-base text-[#666666] leading-[1.6]">
-                {t('home.services.3d.description')}
-              </p>
-            </div>
-          </div>
+                {/* Title + description */}
+                <div className="flex flex-col gap-3 mt-2">
+                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
+                    {t('home.services.web_dev.title')}
+                  </h3>
+                  <p className="text-[13px] leading-[1.7] text-[#666666]">
+                    {t('home.services.web_dev.description')}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Service Card 2 — Cloud — silver */}
+          {(() => {
+            const theme = '#C9BFA8';
+            return (
+              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
+                <div className="flex items-start justify-between">
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>02</span>
+                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>CLOUD</span>
+                </div>
+
+                <div className="relative w-full" style={{ height: 100 }}>
+                  <FrequencyWidget color={theme} barCount={36} speed={0.5} profile="coherent" sharedScan={globalScanRef} cardIndex={1} />
+                </div>
+
+                <div className="flex flex-col gap-3 mt-2">
+                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
+                    {t('home.services.cloud.title')}
+                  </h3>
+                  <p className="text-[13px] leading-[1.7] text-[#666666]">
+                    {t('home.services.cloud.description')}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Service Card 3 — AI — blue */}
+          {(() => {
+            const theme = '#6EC6CC';
+            return (
+              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
+                <div className="flex items-start justify-between">
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>03</span>
+                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>AI</span>
+                </div>
+
+                <div className="relative w-full" style={{ height: 100 }}>
+                  <FrequencyWidget color={theme} barCount={36} speed={1.4} profile="chaos" sharedScan={globalScanRef} cardIndex={2} />
+                </div>
+
+                <div className="flex flex-col gap-3 mt-2">
+                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
+                    {t('home.services.ai.title')}
+                  </h3>
+                  <p className="text-[13px] leading-[1.7] text-[#666666]">
+                    {t('home.services.ai.description')}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Service Card 4 — 3D/Creative — green */}
+          {(() => {
+            const theme = '#C8A96E';
+            return (
+              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
+                <div className="flex items-start justify-between">
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>04</span>
+                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>3D</span>
+                </div>
+
+                <div className="relative w-full" style={{ height: 100 }}>
+                  <FrequencyWidget color={theme} barCount={36} speed={1.0} profile="harmonic" sharedScan={globalScanRef} cardIndex={3} />
+                </div>
+
+                <div className="flex flex-col gap-3 mt-2">
+                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
+                    {t('home.services.3d.title')}
+                  </h3>
+                  <p className="text-[13px] leading-[1.7] text-[#666666]">
+                    {t('home.services.3d.description')}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
         </div>
       </section>
 

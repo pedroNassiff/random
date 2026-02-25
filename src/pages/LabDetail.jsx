@@ -126,9 +126,9 @@ siempre estuvo en movimiento, siempre fluyendo.
 — random() lab`,
   },
   holographic: {
-    en: `# holographic.being
+    en: `# thorus.being
 
-the holographic model is the body as signal —
+the thorus is the body as signal —
 vibration as the first language.
 each color a frequency,
 each frequency a state.
@@ -141,17 +141,27 @@ and consciousness gathers.
 this is not a representation of the self.
 this is the self.
 
-Inspired by the book
-"Hey despierta! Todo el universo depende de ello!"
-by my great friend Anibal Estigarribia,
-an explorer of consciousness and spirituality.
+This model emerges from a frequency we share
+with my great friend Anibal Estigarribia —
+explorer of consciousness and spirituality,
+author of "Hey despierta! Todo el universo depende de ello!"
+
+Not just inspiration. The same point of view,
+seen through different languages.
+
+> "Our energy changes its composition, becoming more subtle,
+> detaching from its previous vessel which will transmute
+> into something else that forms part of the material world —
+> and in that moment our consciousness practically
+> changes vessels into what we know as the luminous body."
+
 [link to the book](https://www.instagram.com/hey.despierta/)
 
 — random() lab`,
-    es: `# holográfico.ser
+    es: `# thorus.ser
 
 
-el modelo holográfico es el cuerpo como señal
+el thorus es el cuerpo como señal
 la vibración como primer lenguaje 
 cada color una frecuencia,
 cada frecuencia un estado.
@@ -164,10 +174,20 @@ y la conciencia se reúne.
 esto no es una representación del ser.
 esto es el ser.
 
-Inspirado por el libro 
-"Hey despierta! Todo el universo depende de ello!"
-de mi gran amigo Anibal Estigarribia, 
-un explorador de la conciencia y la espiritualidad.
+Este modelo nace desde una frecuencia que compartimos
+con mi gran amigo Anibal Estigarribia —
+explorador de la conciencia y la espiritualidad,
+autor de "Hey despierta! Todo el universo depende de ello!"
+
+No es solo inspiración. Es el mismo punto de vista
+visto desde distintos lenguajes.
+
+> "Nuestra energía cambia su composición volviéndose más sutil,
+> desprendiéndose de su envase anterior el cual se va a transmutar
+> en otra cosa que forme parte del mundo material,
+> y en ese momento nuestra consciencia prácticamente
+> cambia de envase a lo que conocemos cómo cuerpo luminoso."
+
 [link al libro](https://www.instagram.com/hey.despierta/)
 
 — random() lab`,
@@ -445,7 +465,7 @@ void main() {
 
 const DETAIL_CONFIG = {
   holographic: {
-    name: 'HOLOGRAPHIC',
+    name: 'THORUS',
     Component: HolographicModel,
     camera: { position: [0, 0.5, 7], fov: 44 },
     model: { scale: 0.17, position: [0, -1.5, 0], autoRotate: true, opacity: 0.9 },
@@ -455,8 +475,8 @@ const DETAIL_CONFIG = {
       { type: 'point', pos: [2, 3, 2], intensity: 2.2, color: '#70c1ff' },
       { type: 'point', pos: [-2, -1, 1], intensity: 0.8, color: '#3040ff' },
     ],
-    desc: 'Human form, rendered in light.',
-    tags: ['glitch', 'shaders', 'chakras'],
+    desc: 'Human form, rendered in light. — thorus.',
+    tags: ['glitch', 'shaders', 'chakras', 'thorus'],
   },
   tesseract: {
     name: 'TESSERACT',

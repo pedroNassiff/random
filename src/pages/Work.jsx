@@ -200,7 +200,7 @@ export default function Work() {
             trackClick('work_project_click', projects[0].id, '.work-project-card');
             navigate(`/work/${projects[0].id}`);
           }}
-          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[0].image} 
@@ -218,7 +218,7 @@ export default function Work() {
             trackClick('work_project_click', projects[1].id, '.work-project-card');
             navigate(`/work/${projects[1].id}`);
           }}
-          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[1].image} 
@@ -236,7 +236,7 @@ export default function Work() {
             trackClick('work_project_click', projects[2].id, '.work-project-card');
             navigate(`/work/${projects[2].id}`);
           }}
-          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[2].image} 
@@ -254,7 +254,7 @@ export default function Work() {
             trackClick('work_project_click', projects[3].id, '.work-project-card');
             navigate(`/work/${projects[3].id}`);
           }}
-          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[3].image} 
@@ -272,7 +272,7 @@ export default function Work() {
             trackClick('work_project_click', projects[4].id, '.work-project-card');
             navigate(`/work/${projects[4].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[4].image} 
@@ -290,7 +290,7 @@ export default function Work() {
             trackClick('work_project_click', projects[5].id, '.work-project-card');
             navigate(`/work/${projects[5].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[5].image} 
@@ -308,7 +308,7 @@ export default function Work() {
             trackClick('work_project_click', projects[6].id, '.work-project-card');
             navigate(`/work/${projects[6].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[6].image} 
@@ -326,7 +326,7 @@ export default function Work() {
             trackClick('work_project_click', projects[7].id, '.work-project-card');
             navigate(`/work/${projects[7].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[7].image} 
