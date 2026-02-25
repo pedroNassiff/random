@@ -17,6 +17,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 // Analytics
 import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
+import ProjectHoverOverlay from '../components/ProjectHoverOverlay';
 
 // Project images
 import hermesDashboard from '../img/hermes/dashboard.png';
@@ -264,7 +265,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -70,
+        xPercent: -90,
         scrollTrigger: {
           trigger: project1Ref.current,
           start: 'top bottom',
@@ -281,7 +282,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -40,
+        xPercent: -10,
         scrollTrigger: {
           trigger: project2Ref.current,
           start: 'top bottom',
@@ -298,7 +299,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -70,
+        xPercent: -90,
         scrollTrigger: {
           trigger: project3Ref.current,
           start: 'top bottom',
@@ -315,7 +316,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -40,
+        xPercent: -10,
         scrollTrigger: {
           trigger: project4Ref.current,
           start: 'top bottom',
@@ -332,7 +333,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -70,
+        xPercent: -90,
         scrollTrigger: {
           trigger: project5Ref.current,
           start: 'top bottom',
@@ -437,7 +438,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       </section>
 
       {/* Projects Section */}
-      <section id="proyectos" ref={projectsRef} className="relative w-full min-h-[3200px] md:min-h-[3600px] bg-[#F8F8F7] px-6 md:px-16 py-24 pb-32 md:pb-24 max-w-[1600px] mx-auto mt-20">
+      <section id="proyectos" ref={projectsRef} className="relative w-full min-h-[2400px] md:min-h-[4600px] lg:min-h-[4800px] bg-[#F8F8F7] px-6 md:px-16 py-24 pb-32 md:pb-24 max-w-[1600px] mx-auto mt-20">
         {/* Title */}
         <div className="absolute top-0 left-6 md:left-16">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.work_title')}</h2>
@@ -450,7 +451,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'hermes', '.project-card');
             navigate('/work/hermes');
           }}
-          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -462,15 +463,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {/* Overlay oscuro */}
           <div className="absolute inset-0 bg-black/50"></div>
 
-          {/* Contenido */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              HERMES
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title="HERMES" viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 2 - Calavera Sur */}
@@ -480,7 +473,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'calavera-sur', '.project-card');
             navigate('/work/calavera-sur');
           }}
-          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -492,15 +485,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {/* Overlay oscuro */}
           <div className="absolute inset-0 bg-black/80"></div>
 
-          {/* Contenido */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              CALAVERA SUR
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title="CALAVERA SUR" viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 3 - Misia */}
@@ -510,7 +495,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'misia', '.project-card');
             navigate('/work/misia');
           }}
-          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -522,15 +507,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {/* Overlay oscuro */}
           <div className="absolute inset-0 bg-black/80"></div>
 
-          {/* Contenido */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              MISIA
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title="MISIA" viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 4 - Hub City Guides */}
@@ -540,7 +517,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'hub-city-guides', '.project-card');
             navigate('/work/hub-city-guides');
           }}
-          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -552,15 +529,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {/* Overlay oscuro */}
           <div className="absolute inset-0 bg-black/80"></div>
 
-          {/* Contenido */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              HUB CITY GUIDES
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title="HUB CITY GUIDES" viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 5 - NDS */}
@@ -570,7 +539,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
             trackClick('project_card_click', 'nds', '.project-card');
             navigate('/work/nds');
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           {/* Imagen de fondo */}
           <img 
@@ -582,19 +551,11 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {/* Overlay oscuro */}
           <div className="absolute inset-0 bg-black/80"></div>
 
-          {/* Contenido */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              NDS
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title="NDS" viewLabel={t('home.view_project')} />
         </div>
 
         {/* CTA Section */}
-        <div className="absolute top-[2700px] md:top-[3200px] left-6 md:left-16 right-6 md:right-auto max-w-[800px] flex flex-col gap-10 z-50">
+        <div className="absolute top-[2150px] md:top-[4400px] lg:top-[4300px] left-6 md:left-16 right-6 md:right-auto max-w-[800px] flex flex-col gap-10 z-50">
           <p className="text-xl md:text-2xl text-[#1A1A1A] leading-[1.6] text-left">
             {t('home.cta_description')}
           </p>
@@ -613,7 +574,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
 
       {/* Services Section */}
-      <section id="servicios" ref={servicesRef} className="w-full px-6 md:px-16 py-20 md:py-[120px] mt-16 md:mt-0 max-w-[1600px] mx-auto">
+      <section id="servicios" ref={servicesRef} className="w-full px-6 md:px-16 py-10 md:py-[10px] mt-[200px] md:mt-0 max-w-[1600px] mx-auto">
         <div className="flex items-center gap-3 mb-12 md:mb-16 pl-0 md:pl-4">
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.services_title')}</h2>
         </div>

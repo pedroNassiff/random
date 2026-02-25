@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
 import { projects } from '../data/projects';
+import ProjectHoverOverlay from '../components/ProjectHoverOverlay';
 import GlitchButton from '../components/GlitchButton';
 import ScrollingText from '../components/ScrollingText';
 import Navbar from '../components/Navbar';
@@ -39,12 +40,12 @@ export default function Work() {
     }
 
     // Proyecto 1 - desde la izquierda, termina en -70%
-    gsap.fromTo(
+     gsap.fromTo(
       project1Ref.current,
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -70,
+        xPercent: -90,
         scrollTrigger: {
           trigger: project1Ref.current,
           start: 'top bottom',
@@ -61,7 +62,7 @@ export default function Work() {
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -40,
+        xPercent: -10,
         scrollTrigger: {
           trigger: project2Ref.current,
           start: 'top bottom',
@@ -72,13 +73,13 @@ export default function Work() {
       }
     );
 
-    // Proyecto 3 - desde la izquierda, termina en -70%
+    // Proyecto 3 - desde la izquierda, termina en -90%
     gsap.fromTo(
       project3Ref.current,
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -70,
+        xPercent: -90,
         scrollTrigger: {
           trigger: project3Ref.current,
           start: 'top bottom',
@@ -95,7 +96,7 @@ export default function Work() {
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -40,
+        xPercent: -10,
         scrollTrigger: {
           trigger: project4Ref.current,
           start: 'top bottom',
@@ -112,7 +113,7 @@ export default function Work() {
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -70,
+        xPercent: -90,
         scrollTrigger: {
           trigger: project5Ref.current,
           start: 'top bottom',
@@ -129,7 +130,7 @@ export default function Work() {
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -40,
+        xPercent: -10,
         scrollTrigger: {
           trigger: project6Ref.current,
           start: 'top bottom',
@@ -146,7 +147,7 @@ export default function Work() {
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -70,
+        xPercent: -90,
         scrollTrigger: {
           trigger: project7Ref.current,
           start: 'top bottom',
@@ -163,7 +164,7 @@ export default function Work() {
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -40,
+        xPercent: -10,
         scrollTrigger: {
           trigger: project8Ref.current,
           start: 'top bottom',
@@ -199,7 +200,7 @@ export default function Work() {
             trackClick('work_project_click', projects[0].id, '.work-project-card');
             navigate(`/work/${projects[0].id}`);
           }}
-          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[0].image} 
@@ -207,14 +208,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/50"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[0].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[0].title} viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 2 */}
@@ -224,7 +218,7 @@ export default function Work() {
             trackClick('work_project_click', projects[1].id, '.work-project-card');
             navigate(`/work/${projects[1].id}`);
           }}
-          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[1].image} 
@@ -232,14 +226,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/80"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[1].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[1].title} viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 3 */}
@@ -249,7 +236,7 @@ export default function Work() {
             trackClick('work_project_click', projects[2].id, '.work-project-card');
             navigate(`/work/${projects[2].id}`);
           }}
-          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[2].image} 
@@ -257,14 +244,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/80"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[2].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[2].title} viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 4 */}
@@ -274,7 +254,7 @@ export default function Work() {
             trackClick('work_project_click', projects[3].id, '.work-project-card');
             navigate(`/work/${projects[3].id}`);
           }}
-          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[3].image} 
@@ -282,14 +262,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/80"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[3].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[3].title} viewLabel={t('home.view_project')} />
         </div>
 
          {/* Project 5 */}
@@ -299,7 +272,7 @@ export default function Work() {
             trackClick('work_project_click', projects[4].id, '.work-project-card');
             navigate(`/work/${projects[4].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[4].image} 
@@ -307,14 +280,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/80"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[4].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[4].title} viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 6 */}
@@ -324,7 +290,7 @@ export default function Work() {
             trackClick('work_project_click', projects[5].id, '.work-project-card');
             navigate(`/work/${projects[5].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[5].image} 
@@ -332,14 +298,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/80"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[5].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[5].title} viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 7 */}
@@ -349,7 +308,7 @@ export default function Work() {
             trackClick('work_project_click', projects[6].id, '.work-project-card');
             navigate(`/work/${projects[6].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[6].image} 
@@ -357,14 +316,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/80"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[6].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[6].title} viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 8 */}
@@ -374,7 +326,7 @@ export default function Work() {
             trackClick('work_project_click', projects[7].id, '.work-project-card');
             navigate(`/work/${projects[7].id}`);
           }}
-          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[1000px] h-[500px] md:h-[600px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+          className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[700px] lg:max-w-[760px] h-[400px] md:h-[720px] lg:h-[820px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <img 
             src={projects[7].image} 
@@ -382,14 +334,7 @@ export default function Work() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/80"></div>
-          <div className="relative z-10 h-full flex flex-col items-center justify-center gap-6">
-            <h3 className="text-[36px] font-semibold text-white text-center px-10">
-              {projects[7].title}
-            </h3>
-            <GlitchButton variant="primary" className="w-[200px]">
-              <ScrollingText text={t('home.view_project')} speed={8} textColor="text-[#1A1A1A]" />
-            </GlitchButton>
-          </div>
+          <ProjectHoverOverlay title={projects[7].title} viewLabel={t('home.view_project')} />
         </div>
 
         {/* CTA Section */}
