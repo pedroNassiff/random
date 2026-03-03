@@ -475,7 +475,7 @@ const DETAIL_CONFIG = {
       { type: 'point', pos: [2, 3, 2], intensity: 2.2, color: '#70c1ff' },
       { type: 'point', pos: [-2, -1, 1], intensity: 0.8, color: '#3040ff' },
     ],
-    desc: 'Human form, rendered in light. — thorus.',
+    desc: 'Ser, rendered in light. — thorus.',
     tags: ['glitch', 'shaders', 'chakras', 'thorus'],
   },
   tesseract: {

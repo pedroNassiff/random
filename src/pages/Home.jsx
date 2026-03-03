@@ -28,7 +28,7 @@ import ndsHome from '../img/nds/home.png';
 import { Water } from 'three/examples/jsm/Addons.js';
 
 import MatrixRain from '../components/MatrixRain';
-import FrequencyWidget from '../components/FrequencyWidget';
+import GlitchCard from '../components/GlitchCard';
 
 
 
@@ -57,22 +57,6 @@ export default function Home() {
   const project3Ref = useRef(null);
   const project4Ref = useRef(null);
   const project5Ref = useRef(null);
-  const globalScanRef = useRef(0); // scan compartido entre las 4 cards de servicios
-
-  // Master rAF para el scan line global (avanza de 0→4, una unidad por card)
-  useEffect(() => {
-    let lastT = 0;
-    let rafId;
-    const tick = (ts) => {
-      const dt = Math.min((ts - lastT) / 1000, 0.05);
-      lastT = ts;
-      globalScanRef.current = (globalScanRef.current + dt * 0.12) % 4;
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
-
   // Textos rotativos para el badge
   const badgeTexts = [
     "donde fluyen caos y orden",
@@ -609,20 +593,12 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {(() => {
             const theme = '#E85A4F';
             return (
-              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
-                {/* Header */}
+              <GlitchCard color={theme}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>01</span>
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>01</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>WEB</span>
                 </div>
-
-                {/* Frequency widget */}
-                <div className="relative w-full" style={{ height: 100 }}>
-                  <FrequencyWidget color={theme} barCount={36} speed={0.8} profile="interference" sharedScan={globalScanRef} cardIndex={0} />
-                </div>
-
-                {/* Title + description */}
-                <div className="flex flex-col gap-3 mt-2">
+                <div className="flex flex-col gap-3">
                   <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
                     {t('home.services.web_dev.title')}
                   </h3>
@@ -630,7 +606,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
                     {t('home.services.web_dev.description')}
                   </p>
                 </div>
-              </div>
+              </GlitchCard>
             );
           })()}
 
@@ -638,17 +614,12 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {(() => {
             const theme = '#C9BFA8';
             return (
-              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
+              <GlitchCard color={theme}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>02</span>
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>02</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>CLOUD</span>
                 </div>
-
-                <div className="relative w-full" style={{ height: 100 }}>
-                  <FrequencyWidget color={theme} barCount={36} speed={0.5} profile="coherent" sharedScan={globalScanRef} cardIndex={1} />
-                </div>
-
-                <div className="flex flex-col gap-3 mt-2">
+                <div className="flex flex-col gap-3">
                   <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
                     {t('home.services.cloud.title')}
                   </h3>
@@ -656,25 +627,20 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
                     {t('home.services.cloud.description')}
                   </p>
                 </div>
-              </div>
+              </GlitchCard>
             );
           })()}
 
-          {/* Service Card 3 — AI — blue */}
+          {/* Service Card 3 — AI — teal */}
           {(() => {
             const theme = '#6EC6CC';
             return (
-              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
+              <GlitchCard color={theme}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>03</span>
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>03</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>AI</span>
                 </div>
-
-                <div className="relative w-full" style={{ height: 100 }}>
-                  <FrequencyWidget color={theme} barCount={36} speed={1.4} profile="chaos" sharedScan={globalScanRef} cardIndex={2} />
-                </div>
-
-                <div className="flex flex-col gap-3 mt-2">
+                <div className="flex flex-col gap-3">
                   <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
                     {t('home.services.ai.title')}
                   </h3>
@@ -682,25 +648,20 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
                     {t('home.services.ai.description')}
                   </p>
                 </div>
-              </div>
+              </GlitchCard>
             );
           })()}
 
-          {/* Service Card 4 — 3D/Creative — green */}
+          {/* Service Card 4 — 3D/Creative — amber */}
           {(() => {
             const theme = '#C8A96E';
             return (
-              <div className="flex flex-col justify-between p-8 bg-[#0a0a0a] rounded-2xl overflow-hidden" style={{ minHeight: 340 }}>
+              <GlitchCard color={theme}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'cc' }}>04</span>
+                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>04</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>3D</span>
                 </div>
-
-                <div className="relative w-full" style={{ height: 100 }}>
-                  <FrequencyWidget color={theme} barCount={36} speed={1.0} profile="harmonic" sharedScan={globalScanRef} cardIndex={3} />
-                </div>
-
-                <div className="flex flex-col gap-3 mt-2">
+                <div className="flex flex-col gap-3">
                   <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
                     {t('home.services.3d.title')}
                   </h3>
@@ -708,7 +669,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
                     {t('home.services.3d.description')}
                   </p>
                 </div>
-              </div>
+              </GlitchCard>
             );
           })()}
 
