@@ -12,7 +12,7 @@ import { EditorPanel, SourceButton, EDITOR_STYLES } from '../components/CodeEdit
 // ─────────────────────────────────────────────
 // Editor file tabs
 // ─────────────────────────────────────────────
-const RETRATARTE_ABOUT = `# retratarte.mirror
+const RETRATARTE_ABOUT_INGLES = `# retratarte.mirror
 
 every mandala begins at the center —
 the point before division,
@@ -37,13 +37,46 @@ the one contains the whole.
 the whole folds back into the one.
 
 at la vaca —
-in the middle of buenos aires —
-we built a small paradise to practice this.
+in the middle of Barcelona —
+they built a small paradise to practice this.
 
 beauty is not decoration here.
 beauty is the method.
 
 — random() lab`
+
+const RETRATARTE_ABOUT_ES = `# retratarte.espejo
+
+
+los patrones no decoran la realidad.
+son la gramática de la materia
+la forma en que el universo  escribe
+
+retrat - arte es volverte a retratar, a trazar, a uno,
+mirarte en la geometría,
+encontrarte en la frecuencia.
+encontrar el mandala, encontrar la simetría,
+encontrar tu sonrisa en el centro.
+
+la respiración consciente es la herramienta más antigua:
+inhalar, el patrón se forma.
+exhalar, el todo se revela.
+
+el uno contiene el todo.
+el todo contiene a uno.
+
+en la vaca,
+inspiración del mejor coworking de Barcelona
+donde el Montjuïc mira
+donde las ideas se encuentran
+donde se teje la creatividad
+
+[conocé este oasis](https://www.instagram.com/lavacacoworking/)
+
+, random() lab`
+
+const isSpanish = typeof navigator !== 'undefined' && navigator.language.startsWith('es')
+const RETRATARTE_ABOUT = isSpanish ? RETRATARTE_ABOUT_ES : RETRATARTE_ABOUT_INGLES
 
 const RETRATARTE_FILES = [
   { name: 'vertex.glsl',   lang: 'glsl',     live: true,  code: vertexShader },

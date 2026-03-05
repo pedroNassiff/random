@@ -46,6 +46,7 @@ export const EDITOR_STYLES = `
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
     writing-mode: vertical-rl;
+    -webkit-writing-mode: vertical-rl;
     font: inherit; letter-spacing: inherit;
     pointer-events: none; opacity: 0;
     padding: inherit;
@@ -196,6 +197,7 @@ export function SourceButton({ onClick }) {
         transform: 'translateY(-50%) rotate(180deg)',
         zIndex: 150,
         writingMode: 'vertical-rl',
+        WebkitWritingMode: 'vertical-rl',
         background: 'rgba(0,255,209,0.04)',
         border: '1px solid rgba(0,255,209,0.25)',
         borderRight: 'none',
@@ -205,8 +207,11 @@ export function SourceButton({ onClick }) {
         fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
         fontSize: '10px',
         letterSpacing: '0.18em',
-        cursor: 'none',
+        cursor: 'pointer',
         pointerEvents: 'auto',
+        touchAction: 'manipulation',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.background = 'rgba(0,255,209,0.1)'
