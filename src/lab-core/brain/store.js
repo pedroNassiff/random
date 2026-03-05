@@ -10,10 +10,15 @@ import { create } from 'zustand'
 // Lee de variables de entorno Vite:
 //   .env.development  → localhost:8000  (npm run dev)
 //   .env.production   → api.random-lab.es  (Vercel build)
-export const API_BASE = import.meta.env.VITE_BRAIN_API_BASE || 'http://localhost:8000'
-export const WS_URL   = import.meta.env.VITE_BRAIN_WS_URL   || 'ws://localhost:8000/ws/brain-state'
+// En producción SIN env vars configuradas, usa null para desactivar conexión
+const isDevelopment = import.meta.env.DEV
+const defaultBase = isDevelopment ? 'http://localhost:8000' : null
+const defaultWs = isDevelopment ? 'ws://localhost:8000/ws/brain-state' : null
 
-console.log(`[Brain Store] API_BASE=${API_BASE}`)
+export const API_BASE = import.meta.env.VITE_BRAIN_API_BASE || defaultBase
+export const WS_URL   = import.meta.env.VITE_BRAIN_WS_URL   || defaultWs
+
+console.log(`[Brain Store] ENV=${isDevelopment ? 'development' : 'production'} API_BASE=${API_BASE} WS_URL=${WS_URL}`)
 
 export const useBrainStore = create((set) => ({
   // Syntergic parameters
@@ -67,6 +72,12 @@ export const useBrainStore = create((set) => ({
   socket: null,
 
   connectToField: () => {
+    // En producción sin env vars configuradas, no intentar conectar
+    if (!WS_URL) {
+      console.warn('[Brain Store] No WS_URL configured, skipping WebSocket connection')
+      return
+    }
+
     const existing = useBrainStore.getState().socket
     if (existing && existing.readyState === WebSocket.OPEN) return
 

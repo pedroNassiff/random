@@ -97,7 +97,7 @@ export default function SessionControl() {
   // Fetch session status cada 2s (rate limit: 60 r/min → 1 req/seg máx)
   // La barra de progreso se interpola localmente para mantener fluidez visual
   useEffect(() => {
-    if (!sessionActive) return;
+    if (!sessionActive || !API_BASE) return;
     
     const interval = setInterval(async () => {
       try {
@@ -145,7 +145,7 @@ export default function SessionControl() {
   
   // Cargar timeline al activar
   useEffect(() => {
-    if (!sessionActive) return;
+    if (!sessionActive || !API_BASE) return;
     
     (async () => {
       try {
@@ -162,7 +162,7 @@ export default function SessionControl() {
   
   // Cargar playlist al activar
   useEffect(() => {
-    if (!sessionActive) return;
+    if (!sessionActive || !API_BASE) return;
     
     (async () => {
       try {
@@ -178,6 +178,10 @@ export default function SessionControl() {
   }, [sessionActive]);
   
   const activateSessionMode = async () => {
+    if (!API_BASE) {
+      setSessionError('Brain backend not configured. Please check environment variables.');
+      return;
+    }
     setSessionError(null);
     setIsLoadingSession(true);
     // Timeout de 8s para no quedarse en loading si el backend no responde
@@ -209,6 +213,7 @@ export default function SessionControl() {
     if (!sessionActive) {
       await activateSessionMode();
     } else {
+      if (!API_BASE) return;
       try {
         if (isPlaying) {
           const res = await fetch(`${API_BASE}/session/pause`, { method: 'POST' });
@@ -234,7 +239,9 @@ export default function SessionControl() {
   const stopSession = async () => {
     try {
       // Tell backend to go back to idle so next activate starts fresh
-      await fetch(`${API_BASE}/set-mode/idle`, { method: 'POST' }).catch(() => {});
+      if (API_BASE) {
+        await fetch(`${API_BASE}/set-mode/idle`, { method: 'POST' }).catch(() => {});
+      }
     } catch (_) {}
     setSessionActive(false);
     setIsPlaying(false);
@@ -245,6 +252,7 @@ export default function SessionControl() {
   };
   
   const seekTo = async (seconds) => {
+    if (!API_BASE) return;
     try {
       await fetch(`${API_BASE}/session/seek/${seconds}`, { method: 'POST' });
     } catch (err) {
@@ -254,6 +262,7 @@ export default function SessionControl() {
   
   const setSpeed = async (speed) => {
     setPlaybackSpeed(speed); // Actualizar UI inmediatamente
+    if (!API_BASE) return;
     try {
       await fetch(`${API_BASE}/session/speed/${speed}`, { method: 'POST' });
     } catch (err) {
@@ -263,6 +272,7 @@ export default function SessionControl() {
 
   // Helper: refresh playlist and force play
   const refreshPlaylistAndPlay = async () => {
+    if (!API_BASE) return;
     const [playlistRes] = await Promise.all([
       fetch(`${API_BASE}/playlist`),
       fetch(`${API_BASE}/session/play`, { method: 'POST' }),
@@ -275,6 +285,7 @@ export default function SessionControl() {
 
   // Seleccionar sesión directamente por índice
   const selectSession = async (index) => {
+    if (!API_BASE) return;
     setIsLoadingSession(true);
     setSessionStatus(null); // clear stale data before loading new session
     try {
@@ -292,6 +303,7 @@ export default function SessionControl() {
   };
   
   const nextSession = async () => {
+    if (!API_BASE) return;
     setIsLoadingSession(true);
     setSessionStatus(null);
     try {
@@ -309,6 +321,7 @@ export default function SessionControl() {
   };
   
   const previousSession = async () => {
+    if (!API_BASE) return;
     setIsLoadingSession(true);
     setSessionStatus(null);
     try {
