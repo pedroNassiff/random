@@ -12,7 +12,7 @@ import GalaxyModel from './galaxy/GalaxyModel'
 export const LAB_EXPERIMENTS = {
   brain: {
     id: 'brain',
-    name: 'HERMES',
+    name: 'ADA',
     description: 'Neurofeedback & Teoría Sintergética',
     component: BrainModel,
     link: '/hermes',
