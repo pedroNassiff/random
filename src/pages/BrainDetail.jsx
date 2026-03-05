@@ -263,16 +263,7 @@ export default function BrainDetail() {
       </div>
 
       {/* ── Bottom panel: SessionControl or MuseControl ── */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: isMobile ? 0 : 310,
-        zIndex: 150,
-        pointerEvents: 'auto',
-      }}>
-        {dataSource === 'dataset' ? <SessionControl isMobile={false} /> : <MuseControl />}
-      </div>
+      {dataSource === 'dataset' ? <SessionControl isMobile={isMobile} /> : <MuseControl />}
 
       {/* ── Bottom tags (canvas area) ── */}
       {/* <div style={{

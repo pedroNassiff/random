@@ -39,7 +39,7 @@ export function AudioControl() {
           color: 'rgba(255,255,255,0.35)', fontSize: '0.55rem',
           letterSpacing: '0.25em', textTransform: 'uppercase', fontFamily: 'monospace'
         }}>
-          Binaural
+          Escucha el campo sintergico
         </span>
       </div>
 
@@ -79,6 +79,11 @@ export function AudioControl() {
           </>
         )}
       </button>
+
+      {/* aviso de conectar headphones para mejorar la experiencia */}
+      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontFamily: 'monospace', display: 'block', marginTop: 8 }}>
+        Conecta tus headphones para una mejor experiencia
+      </span>
 
       {/* CSS Animations */}
       <style>{`
