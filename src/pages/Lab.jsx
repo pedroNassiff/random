@@ -20,7 +20,7 @@ import RetratatarteModel from '../lab-core/retratarte/RetratatarteModel'
 const EXPERIMENTS = [
   {
     id: 'brain',
-    name: 'HERMES',
+    name: 'ADA',
     Component: BrainModel,
     camera: { position: [0, 0, 7], fov: 32 },
     model: { scale: 1.5, position: [0, 0, 0], autoRotate: true, opacity: 1, wireframe: true },

@@ -445,7 +445,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.work_title')}</h2>
         </div>
   
-        {/* Project 1 - Hermes */}
+        {/* Project 1 - ADA */}
         <div 
           ref={project1Ref} 
           onClick={() => {
@@ -457,14 +457,14 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {/* Imagen de fondo */}
           <img 
             src={hermesDashboard} 
-            alt="Hermes Dashboard" 
+            alt="ADA Dashboard" 
             className="absolute inset-0 w-full h-full object-cover"
           />
           
           {/* Overlay oscuro */}
           <div className="absolute inset-0 bg-black/50"></div>
 
-          <ProjectHoverOverlay title="HERMES" viewLabel={t('home.view_project')} />
+          <ProjectHoverOverlay title="ADA" viewLabel={t('home.view_project')} />
         </div>
 
         {/* Project 2 - Calavera Sur */}
@@ -686,7 +686,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         {/* Lab Grid - 4 Different Experiments */}
         <div className="bg-[#0a0a0a] rounded-3xl p-6 md:p-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Experiment 1 - Brain/Hermes */}
+            {/* Experiment 1 - Brain/ADA */}
             <Suspense fallback={
               <div className="h-[400px] flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />

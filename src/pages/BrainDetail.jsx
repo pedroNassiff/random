@@ -1,5 +1,5 @@
 /**
- * BrainDetail — /lab/brain  (HERMES)
+ * BrainDetail — /lab/brain  (ADA)
  *
  * Full feature parity with brain-prototype:
  *  - Live 3D SyntergicBrain (R3F) fed by Zustand store
@@ -150,7 +150,7 @@ export default function BrainDetail() {
           .RANDOM() / LAB
         </p>
         <p style={{ fontSize: '0.7rem', letterSpacing: '0.4em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0' }}>
-          HERMES
+          ADA
         </p>
       </div>
 
