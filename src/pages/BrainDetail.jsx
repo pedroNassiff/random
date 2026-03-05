@@ -193,15 +193,14 @@ export default function BrainDetail() {
         left: isMobile ? 0 : 'auto',
         height: isMobile ? 'auto' : '100vh',
         width: isMobile ? '100%' : 310,
-        minHeight: isMobile ? '100vh' : 'auto',
         background: isMobile
           ? 'linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,5,10,1) 100%)'
           : 'linear-gradient(270deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 100%)',
         backdropFilter: isMobile ? 'none' : 'blur(12px)',
         borderLeft: isMobile ? 'none' : '1px solid rgba(100, 200, 255, 0.12)',
-        overflowY: 'auto',
+        overflowY: isMobile ? 'visible' : 'auto',
         overflowX: 'hidden',
-        padding: isMobile ? '24px 16px 280px' : '80px 16px 160px',
+        padding: isMobile ? '24px 16px 300px' : '80px 16px 160px',
         zIndex: isMobile ? 10 : 100,
         pointerEvents: 'auto',
         display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 14,
