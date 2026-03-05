@@ -14,34 +14,29 @@ import { EditorPanel, SourceButton, EDITOR_STYLES } from '../components/CodeEdit
 // ─────────────────────────────────────────────
 const RETRATARTE_ABOUT_INGLES = `# retratarte.mirror
 
-every mandala begins at the center —
-the point before division,
-the breath before the name.
-
 patterns do not decorate reality.
-they are the grammar of matter:
-how the universe writes itself
-onto the surface of things.
+they are the grammar of matter,
+the way the universe writes itself.
 
-retratarte means re-portrait, re-trace, re-self —
-see yourself in the geometry,
-find your face in the frequency.
+retrat-arte means re-portrait, re-trace, re-self,
+look at yourself in the geometry,
+find yourself in the frequency.
 find the mandala, find the symmetry,
-find the smile at the center.
+find your smile at the center.
 
 conscious breath is the oldest tool:
-inhale, pattern forms.
+inhale, the pattern forms.
 exhale, the whole reveals itself.
 
 the one contains the whole.
-the whole folds back into the one.
+the whole contains the one.
 
-at la vaca —
-in the middle of Barcelona —
-they built a small paradise to practice this.
+inspired by la vaca coworking,
+where Montjuïc watches,
+where ideas meet,
+where creativity is woven.
 
-beauty is not decoration here.
-beauty is the method.
+[discover this oasis](https://www.instagram.com/lavacacoworking/)
 
 — random() lab`
 
@@ -65,13 +60,12 @@ exhalar, el todo se revela.
 el uno contiene el todo.
 el todo contiene a uno.
 
-en la vaca,
-inspiración del mejor coworking de Barcelona
+inspirado por el coworking la vaca,
 donde el Montjuïc mira
 donde las ideas se encuentran
 donde se teje la creatividad
 
-[conocé este oasis](https://www.instagram.com/lavacacoworking/)
+[conocé este oasis en Barcelona](https://www.instagram.com/lavacacoworking/)
 
 , random() lab`
 

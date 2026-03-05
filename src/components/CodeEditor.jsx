@@ -45,11 +45,10 @@ export const EDITOR_STYLES = `
     content: attr(data-text);
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    writing-mode: vertical-rl;
-    -webkit-writing-mode: vertical-rl;
     font: inherit; letter-spacing: inherit;
     pointer-events: none; opacity: 0;
     padding: inherit;
+    white-space: nowrap;
   }
   .lab-source-btn::before { color: #E040FB; left: -1px; }
   .lab-source-btn::after  { color: #00B4FF; left:  1px; }
@@ -193,17 +192,16 @@ export function SourceButton({ onClick }) {
       onClick={onClick}
       style={{
         position: 'fixed',
-        right: 0, top: '50%',
-        transform: 'translateY(-50%) rotate(180deg)',
+        right: '15px', top: '50%',
+        transform: 'translateY(-50%) translateX(50%) rotate(-90deg)',
+        transformOrigin: 'center center',
         zIndex: 150,
-        writingMode: 'vertical-rl',
-        WebkitWritingMode: 'vertical-rl',
         background: 'rgba(0,255,209,0.04)',
         border: '1px solid rgba(0,255,209,0.25)',
         borderRight: 'none',
-        borderRadius: '6px 0 0 6px',
+        borderRadius: '6px 6px 0 0',
         color: '#00FFD1',
-        padding: '14px 7px',
+        padding: '7px 14px',
         fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
         fontSize: '10px',
         letterSpacing: '0.18em',
@@ -212,6 +210,7 @@ export function SourceButton({ onClick }) {
         touchAction: 'manipulation',
         userSelect: 'none',
         WebkitUserSelect: 'none',
+        whiteSpace: 'nowrap',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.background = 'rgba(0,255,209,0.1)'
