@@ -556,48 +556,40 @@ export default function SessionControl({ isMobile = false }) {
       {/* Main controls row */}
       <div style={{
         display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        alignItems: isMobile ? 'stretch' : 'center',
-        gap: isMobile ? '12px' : '16px'
+        alignItems: 'center',
+        gap: '16px'
       }}>
-        {/* First row in mobile: Session info + playback controls */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          flex: isMobile ? 'none' : 1
+        {/* Session info */}
+        <div style={{ 
+          flex: '0 0 200px',
+          overflow: 'hidden'
         }}>
-          {/* Session info */}
-          <div style={{ 
-            flex: isMobile ? 1 : '0 0 200px',
-            overflow: 'hidden'
+          <div style={{
+            fontSize: '13px',
+            fontWeight: '500',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
           }}>
-            <div style={{
-              fontSize: '13px',
-              fontWeight: '500',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {sessionStatus?.session_metadata?.name || 'Loading...'}
-            </div>
-            <div style={{
-              fontSize: '11px',
-              color: 'rgba(255, 255, 255, 0.5)',
-              marginTop: '2px'
-            }}>
-              {playlist?.current?.category || 'Session'}
-            </div>
+            {sessionStatus?.session_metadata?.name || 'Loading...'}
           </div>
-
-          {/* Playback controls - Center */}
-          <div style={{ 
-            flex: isMobile ? 'none' : 1,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '16px'
+          <div style={{
+            fontSize: '11px',
+            color: 'rgba(255, 255, 255, 0.5)',
+            marginTop: '2px'
           }}>
+            {playlist?.current?.category || 'Session'}
+          </div>
+        </div>
+
+        {/* Playback controls - Center */}
+        <div style={{ 
+          flex: 1,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
           {/* Previous */}
           <button
             onClick={previousSession}
@@ -659,158 +651,83 @@ export default function SessionControl({ isMobile = false }) {
             ⏭
           </button>
         </div>
-        {!isMobile && (
-          /* Right controls - Desktop only in first row */
-          <div style={{ 
-            flex: '0 0 200px',
-            display: 'flex', 
-            gap: '12px', 
-            alignItems: 'center',
-            justifyContent: 'flex-end'
-          }}>
-            {/* Speed selector */}
-            {sessionStatus && (
-              <select
-                onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                value={playbackSpeed}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  padding: '6px 10px',
-                  borderRadius: '4px',
-                  color: '#fff',
-                  fontSize: '11px',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
-              >
-                <option value={0.5}>0.5x</option>
-                <option value={1.0}>1.0x</option>
-                <option value={2.0}>2.0x</option>
-                <option value={5.0}>5.0x</option>
-              </select>
-            )}
-            
-            {/* Playlist toggle */}
-            <button
-              onClick={() => setShowPlaylist(!showPlaylist)}
-              style={{
-                background: showPlaylist ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                border: showPlaylist ? '1px solid rgba(29, 185, 84, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
-                padding: '6px 14px',
-                borderRadius: '4px',
-                color: showPlaylist ? '#1db954' : '#fff',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontFamily: 'inherit',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              ☰ Queue
-            </button>
 
-            {/* Stop */}
-            <button
-              onClick={stopSession}
+        {/* Right controls */}
+        <div style={{ 
+          flex: '0 0 200px',
+          display: 'flex', 
+          gap: '12px', 
+          alignItems: 'center',
+          justifyContent: 'flex-end'
+        }}>
+          {/* Speed selector */}
+          {sessionStatus && (
+            <select
+              onChange={(e) => setSpeed(parseFloat(e.target.value))}
+              value={playbackSpeed}
               style={{
-                background: 'none',
-                border: '1px solid rgba(255, 100, 100, 0.3)',
-                padding: '6px 12px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '6px 10px',
                 borderRadius: '4px',
-                color: '#ff6b6b',
-                cursor: 'pointer',
+                color: '#fff',
                 fontSize: '11px',
                 fontFamily: 'inherit',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(255, 100, 100, 0.1)';
-                e.target.style.borderColor = 'rgba(255, 100, 100, 0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'none';
-                e.target.style.borderColor = 'rgba(255, 100, 100, 0.3)';
+                cursor: 'pointer',
+                outline: 'none'
               }}
             >
-              ✕
-            </button>
-          </div>
-        )}
+              <option value={0.5}>0.5x</option>
+              <option value={1.0}>1.0x</option>
+              <option value={2.0}>2.0x</option>
+              <option value={5.0}>5.0x</option>
+            </select>
+          )}
+          
+          {/* Playlist toggle */}
+          <button
+            onClick={() => setShowPlaylist(!showPlaylist)}
+            style={{
+              background: showPlaylist ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+              border: showPlaylist ? '1px solid rgba(29, 185, 84, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '6px 14px',
+              borderRadius: '4px',
+              color: showPlaylist ? '#1db954' : '#fff',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            ☰ Queue
+          </button>
+
+          {/* Stop */}
+          <button
+            onClick={stopSession}
+            style={{
+              background: 'none',
+              border: '1px solid rgba(255, 100, 100, 0.3)',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              color: '#ff6b6b',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'rgba(255, 100, 100, 0.1)';
+              e.target.style.borderColor = 'rgba(255, 100, 100, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'none';
+              e.target.style.borderColor = 'rgba(255, 100, 100, 0.3)';
+            }}
+          >
+            ✕
+          </button>
         </div>
-
-        {/* Second row - Mobile only: Speed + Queue + Stop */}
-        {isMobile && (
-          <div style={{ 
-            display: 'flex', 
-            gap: '8px', 
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            {/* Speed selector */}
-            {sessionStatus && (
-              <select
-                onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                value={playbackSpeed}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flex: 1
-                }}
-              >
-                <option value={0.5}>0.5x</option>
-                <option value={1.0}>1.0x</option>
-                <option value={2.0}>2.0x</option>
-                <option value={5.0}>5.0x</option>
-              </select>
-            )}
-            
-            {/* Playlist toggle */}
-            <button
-              onClick={() => setShowPlaylist(!showPlaylist)}
-              style={{
-                background: showPlaylist ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                border: showPlaylist ? '1px solid rgba(29, 185, 84, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                color: showPlaylist ? '#1db954' : '#fff',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontFamily: 'inherit',
-                transition: 'all 0.15s ease',
-                flex: 1
-              }}
-            >
-              ☰ Queue
-            </button>
-
-            {/* Stop */}
-            <button
-              onClick={stopSession}
-              style={{
-                background: 'none',
-                border: '1px solid rgba(255, 100, 100, 0.3)',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                color: '#ff6b6b',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontFamily: 'inherit',
-                transition: 'all 0.15s ease',
-                flex: 1
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
       </div>
       
       {/* Playlist popup */}

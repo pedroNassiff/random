@@ -110,20 +110,23 @@ export default function BrainDetail() {
   })
 
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#00050a', cursor: isMobile ? 'auto' : 'none', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ width: '100vw', background: '#00050a', cursor: isMobile ? 'auto' : 'none', position: 'relative', overflow: isMobile ? 'auto' : 'hidden', height: isMobile ? 'auto' : '100vh', minHeight: '100vh' }}>
       {!isMobile && <CustomCursor />}
 
-      {/* ── Canvas (full screen on desktop, top section on mobile) ── */}
+      {/* ── Canvas (full screen on desktop, fixed top section on mobile) ── */}
       <Canvas
         camera={{ position: [0, 0, 1.5], fov: 45 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         dpr={[1, 2]}
         frameloop="always"
         style={{
-          position: isMobile ? 'relative' : 'absolute',
+          position: isMobile ? 'fixed' : 'absolute',
+          top: 0,
+          left: 0,
           inset: isMobile ? 'auto' : 0,
-          height: isMobile ? '40vh' : '100vh',
+          height: isMobile ? '42vh' : '100vh',
           width: '100%',
+          zIndex: isMobile ? 1 : 'auto',
         }}
       >
         <color attach="background" args={['#00050a']} />
@@ -140,11 +143,14 @@ export default function BrainDetail() {
         <OrbitControls enableZoom enablePan={false} enableDamping dampingFactor={0.06} minDistance={0.8} maxDistance={5} />
       </Canvas>
 
+      {/* ── Spacer so content starts below fixed canvas on mobile ── */}
+      {isMobile && <div style={{ height: '42vh' }} />}
+
       {/* ── Back ── */}
       <button
         onClick={() => navigate('/lab')}
         style={{
-          position: isMobile ? 'absolute' : 'fixed',
+          position: 'fixed',
           top: isMobile ? 16 : 32,
           left: isMobile ? 16 : 32,
           zIndex: 200,
@@ -164,7 +170,7 @@ export default function BrainDetail() {
 
       {/* ── Header ── */}
       <div style={{
-        position: isMobile ? 'absolute' : 'fixed',
+        position: 'fixed',
         top: isMobile ? 16 : 32,
         left: '50%', transform: 'translateX(-50%)',
         zIndex: 200, pointerEvents: 'none', textAlign: 'center', fontFamily: 'monospace',
@@ -194,14 +200,15 @@ export default function BrainDetail() {
         height: isMobile ? 'auto' : '100vh',
         width: isMobile ? '100%' : 310,
         background: isMobile
-          ? 'linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,5,10,1) 100%)'
+          ? 'rgba(0,5,10,1)'
           : 'linear-gradient(270deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 100%)',
         backdropFilter: isMobile ? 'none' : 'blur(12px)',
         borderLeft: isMobile ? 'none' : '1px solid rgba(100, 200, 255, 0.12)',
         overflowY: isMobile ? 'visible' : 'auto',
         overflowX: 'hidden',
-        padding: isMobile ? '24px 16px 300px' : '80px 16px 160px',
-        zIndex: isMobile ? 10 : 100,
+        /* On mobile: extra bottom padding = height of SessionControl so last chart is fully visible */
+        padding: isMobile ? '24px 16px 180px' : '80px 16px 160px',
+        zIndex: isMobile ? 5 : 100,
         pointerEvents: 'auto',
         display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 14,
         scrollbarWidth: 'none',
@@ -255,16 +262,16 @@ export default function BrainDetail() {
         <AudioControl />
       </div>
 
-      {/* ── Bottom panel: SessionControl or MuseControl (sticky on mobile) ── */}
+      {/* ── Bottom panel: SessionControl or MuseControl ── */}
       <div style={{
         position: 'fixed',
         bottom: 0,
-        left: isMobile ? 0 : 0,
+        left: 0,
         right: isMobile ? 0 : 310,
         zIndex: 150,
         pointerEvents: 'auto',
       }}>
-        {dataSource === 'dataset' ? <SessionControl isMobile={isMobile} /> : <MuseControl />}
+        {dataSource === 'dataset' ? <SessionControl isMobile={false} /> : <MuseControl />}
       </div>
 
       {/* ── Bottom tags (canvas area) ── */}
