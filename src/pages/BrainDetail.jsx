@@ -122,7 +122,7 @@ export default function BrainDetail() {
         style={{
           position: isMobile ? 'relative' : 'absolute',
           inset: isMobile ? 'auto' : 0,
-          height: isMobile ? '35vh' : '100vh',
+          height: isMobile ? '40vh' : '100vh',
           width: '100%',
         }}
       >
@@ -134,7 +134,7 @@ export default function BrainDetail() {
         <BrainBridge brainStateRef={brainStateRef} />
 
         <Suspense fallback={null}>
-          <SyntergicBrain brainStateRef={brainStateRef} scale={isMobile ? 0.16 : 0.2} autoRotate />
+          <SyntergicBrain brainStateRef={brainStateRef} scale={isMobile ? 0.28 : 0.2} autoRotate />
         </Suspense>
 
         <OrbitControls enableZoom enablePan={false} enableDamping dampingFactor={0.06} minDistance={0.8} maxDistance={5} />
@@ -193,7 +193,7 @@ export default function BrainDetail() {
         left: isMobile ? 0 : 'auto',
         height: isMobile ? 'auto' : '100vh',
         width: isMobile ? '100%' : 310,
-        minHeight: isMobile ? 'calc(65vh - 140px)' : 'auto', // Space for SessionControl
+        minHeight: isMobile ? '100vh' : 'auto',
         background: isMobile
           ? 'linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,5,10,1) 100%)'
           : 'linear-gradient(270deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 100%)',
@@ -201,8 +201,7 @@ export default function BrainDetail() {
         borderLeft: isMobile ? 'none' : '1px solid rgba(100, 200, 255, 0.12)',
         overflowY: 'auto',
         overflowX: 'hidden',
-        padding: isMobile ? '24px 16px 160px' : '80px 16px 160px',
-        paddingBottom: isMobile ? '160px' : '160px', // Extra space for sticky controls
+        padding: isMobile ? '24px 16px 280px' : '80px 16px 160px',
         zIndex: isMobile ? 10 : 100,
         pointerEvents: 'auto',
         display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 14,
@@ -266,7 +265,7 @@ export default function BrainDetail() {
         zIndex: 150,
         pointerEvents: 'auto',
       }}>
-        {dataSource === 'dataset' ? <SessionControl /> : <MuseControl />}
+        {dataSource === 'dataset' ? <SessionControl isMobile={isMobile} /> : <MuseControl />}
       </div>
 
       {/* ── Bottom tags (canvas area) ── */}
