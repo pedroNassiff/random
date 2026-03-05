@@ -235,35 +235,23 @@ export default function BrainDetail() {
             Dataset
           </button>
           <button
-            disabled
-            title="Muse 2 — próximamente"
-            style={{
-              ...tabStyle(false, isMobile),
-              opacity: 0.3,
-              cursor: 'not-allowed',
-              position: 'relative',
-            }}
+            onClick={() => setDataSource('muse')}
+            style={tabStyle(dataSource === 'muse', isMobile)}
           >
             Muse 2
-            <span style={{
-              marginLeft: 5,
-              fontSize: '0.55rem',
-              letterSpacing: '0.06em',
-              color: 'rgba(255,255,255,0.4)',
-              verticalAlign: 'middle',
-            }}>WIP</span>
           </button>
         </div>
 
         {/* HUD panels */}
+        {dataSource === 'muse' && <MuseControl />}
         <StateIndicator />
         <FrequencySpectrum />
         <CoherenceMeter />
         <AudioControl />
       </div>
 
-      {/* ── Bottom panel: SessionControl or MuseControl ── */}
-      {dataSource === 'dataset' ? <SessionControl isMobile={isMobile} /> : <MuseControl />}
+      {/* ── Bottom panel: SessionControl (dataset only, fixed bottom) ── */}
+      {dataSource === 'dataset' && <SessionControl isMobile={isMobile} />}
 
       {/* ── Bottom tags (canvas area) ── */}
       {/* <div style={{

@@ -45,7 +45,7 @@ export default function ProjectHoverOverlay({ title, viewLabel = 'ver proyecto' 
         style={{
           position: 'absolute',
           left: centerX,
-          top: centerY - (isMobile ? 32 : 64),
+          top: centerY - (isMobile ? 56 : 64),
           transform: 'translateX(-50%)',
           opacity: isVisible ? 1 : 0,
           transition: isMobile ? 'none' : 'opacity 0.15s ease',

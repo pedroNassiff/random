@@ -1,0 +1,2915 @@
+{
+  "session_start": 1772718092.104897,
+  "session_start_iso": "2026-03-05T14:41:32.104897",
+  "total_events": 127,
+  "events": [
+    {
+      "ts": 1772718092.104897,
+      "elapsed_s": 0.0,
+      "event": "calibration_start",
+      "phase": "init",
+      "data": {
+        "timestamp_iso": "2026-03-05T13:41:32.097Z",
+        "api_base": "http://localhost:8000"
+      }
+    },
+    {
+      "ts": 1772718094.114003,
+      "elapsed_s": 2.009,
+      "event": "signal_check_sample",
+      "phase": "signal_check",
+      "data": {
+        "elapsed_ms": 2000,
+        "bands": {
+          "delta": 565.4551856319807,
+          "theta": 244.5267916381339,
+          "alpha": 108.85730727535822,
+          "beta": 47.90931508573731,
+          "gamma": 323.00321579074176
+        },
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 1,
+          "TP10": 1
+        },
+        "coherence": 0.6908046406299498
+      }
+    },
+    {
+      "ts": 1772718094.30531,
+      "elapsed_s": 2.2,
+      "event": "signal_check_sample",
+      "phase": "signal_check",
+      "data": {
+        "elapsed_ms": 2200,
+        "bands": {
+          "delta": 641.4977928567642,
+          "theta": 351.827718460584,
+          "alpha": 176.14683317041445,
+          "beta": 47.36942473853796,
+          "gamma": 296.06923982127086
+        },
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.9760763954072715,
+          "TP10": 1
+        },
+        "coherence": 0.7124485635080082
+      }
+    },
+    {
+      "ts": 1772718094.512898,
+      "elapsed_s": 2.408,
+      "event": "signal_check_sample",
+      "phase": "signal_check",
+      "data": {
+        "elapsed_ms": 2400,
+        "bands": {
+          "delta": 714.8491328657371,
+          "theta": 323.5994206181098,
+          "alpha": 160.89047324570876,
+          "beta": 46.56751866773822,
+          "gamma": 275.9604619340157
+        },
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.3
+        },
+        "coherence": 0.7571216930941078
+      }
+    },
+    {
+      "ts": 1772718094.703454,
+      "elapsed_s": 2.599,
+      "event": "signal_check_sample",
+      "phase": "signal_check",
+      "data": {
+        "elapsed_ms": 2600,
+        "bands": {
+          "delta": 666.6353865807987,
+          "theta": 309.4496583717519,
+          "alpha": 119.44350860790722,
+          "beta": 42.04815259487611,
+          "gamma": 200.17971825297158
+        },
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.3
+        },
+        "coherence": 0.7330099926071192
+      }
+    },
+    {
+      "ts": 1772718094.903071,
+      "elapsed_s": 2.798,
+      "event": "signal_check_sample",
+      "phase": "signal_check",
+      "data": {
+        "elapsed_ms": 2800,
+        "bands": {
+          "delta": 1072.6499934362378,
+          "theta": 500.96601611629137,
+          "alpha": 158.44926314074706,
+          "beta": 39.674130417577125,
+          "gamma": 186.547581135409
+        },
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.3
+        },
+        "coherence": 0.6887034710057549
+      }
+    },
+    {
+      "ts": 1772718095.105781,
+      "elapsed_s": 3.001,
+      "event": "signal_check_sample",
+      "phase": "signal_check",
+      "data": {
+        "elapsed_ms": 3000,
+        "bands": {
+          "delta": 831.0087825554345,
+          "theta": 320.24178477224245,
+          "alpha": 92.45189301044338,
+          "beta": 38.12708088896021,
+          "gamma": 110.90381710233578
+        },
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.3
+        },
+        "coherence": 0.6681366764769149
+      }
+    },
+    {
+      "ts": 1772718095.105925,
+      "elapsed_s": 3.001,
+      "event": "signal_check_result",
+      "phase": "signal_check",
+      "data": {
+        "avgQuality": 0.5907,
+        "samplesCollected": 6,
+        "passed": true,
+        "threshold": 0.2,
+        "perElectrode_last": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718095.616364,
+      "elapsed_s": 3.511,
+      "event": "blink_test_start",
+      "phase": "blink_test",
+      "data": {
+        "target_blinks": 5,
+        "duration_ms": 20000,
+        "poll_interval_ms": 300
+      }
+    },
+    {
+      "ts": 1772718095.931184,
+      "elapsed_s": 3.826,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 300,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 86.59890893975133,
+        "threshold": 221.28305442622553,
+        "baseline": 41.446740555772934,
+        "noise_level": 44.959078467613146,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 0.9733197980687532,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718096.226822,
+      "elapsed_s": 4.122,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 600,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 97.88849147988421,
+        "threshold": 153.79567733908374,
+        "baseline": 22.59414968202484,
+        "noise_level": 32.800381914264726,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 0.981345496505371,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718096.5251389,
+      "elapsed_s": 4.42,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 900,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 88.52693616526844,
+        "threshold": 150,
+        "baseline": 34.856334024729776,
+        "noise_level": 23.1159163466964,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718096.826345,
+      "elapsed_s": 4.721,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 1200,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 114.25696854611603,
+        "threshold": 192.23933686507672,
+        "baseline": 27.10150853789071,
+        "noise_level": 41.2844570817965,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718097.126584,
+      "elapsed_s": 5.022,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 1500,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 416.1222446901578,
+        "threshold": 466.84191174696474,
+        "baseline": 97.95912577662828,
+        "noise_level": 92.22069649258411,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718097.429569,
+      "elapsed_s": 5.325,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 1800,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 506.99504017169954,
+        "threshold": 942.5698632609601,
+        "baseline": 132.54114544332927,
+        "noise_level": 202.50717945440772,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718097.723465,
+      "elapsed_s": 5.619,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 2100,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 813.7118209632775,
+        "threshold": 1492.762485735534,
+        "baseline": 430.8453771298432,
+        "noise_level": 265.4792771514227,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718098.027445,
+      "elapsed_s": 5.923,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 2400,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 836.2841853921855,
+        "threshold": 1971.2196508165862,
+        "baseline": 463.30472099658857,
+        "noise_level": 376.97873245499943,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718098.3257222,
+      "elapsed_s": 6.221,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 2700,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1462.6038283460373,
+        "threshold": 3069.718121819678,
+        "baseline": 270.94363715876847,
+        "noise_level": 699.6936211652273,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718098.6273348,
+      "elapsed_s": 6.522,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 3000,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 960.7543244443305,
+        "threshold": 1737.7282147796932,
+        "baseline": 348.2147933613418,
+        "noise_level": 347.3783553545879,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718098.924402,
+      "elapsed_s": 6.82,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 3300,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 938.2618984230875,
+        "threshold": 1713.3085692124355,
+        "baseline": 202.78904963395004,
+        "noise_level": 377.62987989462135,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718099.22754,
+      "elapsed_s": 7.123,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 3600,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1045.9120762160403,
+        "threshold": 1695.2159291115154,
+        "baseline": 245.37306346965767,
+        "noise_level": 362.46071641046444,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718099.5254982,
+      "elapsed_s": 7.421,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 3900,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1387.756929253802,
+        "threshold": 2116.125820750685,
+        "baseline": 397.6960771913615,
+        "noise_level": 429.60743588983087,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718099.82937,
+      "elapsed_s": 7.724,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 4200,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1561.8363724565797,
+        "threshold": 1659.5388373617411,
+        "baseline": 371.31373988906637,
+        "noise_level": 322.05627436816866,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718100.122987,
+      "elapsed_s": 8.018,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 4500,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1443.9520132434134,
+        "threshold": 2104.1805980915847,
+        "baseline": 494.8559196275056,
+        "noise_level": 402.33116961601974,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718100.428677,
+      "elapsed_s": 8.324,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 4800,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1356.0685813797263,
+        "threshold": 2646.394061841098,
+        "baseline": 642.1673412728394,
+        "noise_level": 501.0566801420646,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718100.727891,
+      "elapsed_s": 8.623,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 5100,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1616.8503930008249,
+        "threshold": 2561.393721227151,
+        "baseline": 412.9599424768138,
+        "noise_level": 537.1084446875843,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718101.022252,
+      "elapsed_s": 8.917,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 5400,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 2101.8751214938316,
+        "threshold": 2553.7789763132814,
+        "baseline": 343.9981718996854,
+        "noise_level": 552.445201103399,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718101.328367,
+      "elapsed_s": 9.223,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 5700,
+        "blink_count": 1,
+        "avg_amplitude": 1758.9492410374787,
+        "max_amplitude": 1758.9492410374787,
+        "threshold": 1216.0866734644203,
+        "baseline": 141.4086863670916,
+        "noise_level": 268.6694967743322,
+        "blink_times": [
+          0.05859375
+        ],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718101.351629,
+      "elapsed_s": 9.247,
+      "event": "blink_detected",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 5700,
+        "confirmed_total": 1,
+        "avg_amplitude": 1758.9492410374787,
+        "max_amplitude": 1758.9492410374787,
+        "threshold": 1216.0866734644203
+      }
+    },
+    {
+      "ts": 1772718102.224809,
+      "elapsed_s": 10.12,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 6600,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 615.8927134502736,
+        "threshold": 978.212879726337,
+        "baseline": 155.8191474416808,
+        "noise_level": 205.59843307116404,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718102.552505,
+      "elapsed_s": 10.448,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 6900,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 620.5116601554695,
+        "threshold": 1285.014894759977,
+        "baseline": 200.4637960683938,
+        "noise_level": 271.13777467289583,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718102.824842,
+      "elapsed_s": 10.72,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 7200,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1356.297375873413,
+        "threshold": 1962.6660580459493,
+        "baseline": 319.3804572309399,
+        "noise_level": 410.8214002037523,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718103.1274922,
+      "elapsed_s": 11.023,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 7500,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 975.0326545053731,
+        "threshold": 1431.8875972928386,
+        "baseline": 188.81721169692912,
+        "noise_level": 310.76759639897733,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718103.425065,
+      "elapsed_s": 11.32,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 7800,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 987.1476876422074,
+        "threshold": 1844.5577201266224,
+        "baseline": 438.683569906191,
+        "noise_level": 351.46853755510784,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718103.7266712,
+      "elapsed_s": 11.622,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 8100,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 950.8862019706185,
+        "threshold": 1966.4081321175183,
+        "baseline": 369.4911231284753,
+        "noise_level": 399.2292522472608,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718104.0250611,
+      "elapsed_s": 11.92,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 8400,
+        "blink_count": 1,
+        "avg_amplitude": 1128.9134192877668,
+        "max_amplitude": 1128.9134192877668,
+        "threshold": 1042.9709191067761,
+        "baseline": 222.53708940619566,
+        "noise_level": 205.10845742514513,
+        "blink_times": [
+          0.2421875
+        ],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718104.025865,
+      "elapsed_s": 11.921,
+      "event": "blink_detected",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 8400,
+        "confirmed_total": 2,
+        "avg_amplitude": 1128.9134192877668,
+        "max_amplitude": 1128.9134192877668,
+        "threshold": 1042.9709191067761
+      }
+    },
+    {
+      "ts": 1772718104.928837,
+      "elapsed_s": 12.824,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 9300,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1242.1835294716554,
+        "threshold": 2831.085399089812,
+        "baseline": 281.80864616841995,
+        "noise_level": 637.3191882303481,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718105.220834,
+      "elapsed_s": 13.116,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 9600,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1426.664945748593,
+        "threshold": 2626.2271091977946,
+        "baseline": 779.5089766925864,
+        "noise_level": 461.679533126302,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718105.524362,
+      "elapsed_s": 13.419,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 9900,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 997.6491607147461,
+        "threshold": 2846.9234006028787,
+        "baseline": 323.6442386760219,
+        "noise_level": 630.8197904817142,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718105.836142,
+      "elapsed_s": 13.731,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 10200,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1366.6313285279823,
+        "threshold": 2750.623632852826,
+        "baseline": 419.06834681206647,
+        "noise_level": 582.8888215101899,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718106.1198149,
+      "elapsed_s": 14.015,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 10500,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 993.2600457620631,
+        "threshold": 1495.1751253103896,
+        "baseline": 248.89936742899437,
+        "noise_level": 311.5689394703488,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718106.427765,
+      "elapsed_s": 14.323,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 10800,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 872.7362494079564,
+        "threshold": 1430.4182341566584,
+        "baseline": 161.31633528450982,
+        "noise_level": 317.2754747180371,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718106.7224362,
+      "elapsed_s": 14.618,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 11100,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1458.3305948706095,
+        "threshold": 3077.32934958759,
+        "baseline": 348.1421779099993,
+        "noise_level": 682.2967929193977,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718107.022787,
+      "elapsed_s": 14.918,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 11400,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1328.3246911393837,
+        "threshold": 3378.859424734228,
+        "baseline": 529.2676043628563,
+        "noise_level": 712.397955092843,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718107.321722,
+      "elapsed_s": 15.217,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 11700,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1390.7224208512785,
+        "threshold": 2956.5723537375243,
+        "baseline": 586.6091163605813,
+        "noise_level": 592.4908093442357,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718107.621612,
+      "elapsed_s": 15.517,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 12000,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1331.349547537244,
+        "threshold": 2451.078215595779,
+        "baseline": 479.99659119273537,
+        "noise_level": 492.77040610076097,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718107.923296,
+      "elapsed_s": 15.818,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 12300,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 2060.61534131857,
+        "threshold": 3004.8611693943385,
+        "baseline": 443.0382373872044,
+        "noise_level": 640.4557330017835,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718108.228493,
+      "elapsed_s": 16.124,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 12600,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 2066.9711856038934,
+        "threshold": 3080.9345324227143,
+        "baseline": 624.9954724729206,
+        "noise_level": 613.9847649874484,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718108.5232792,
+      "elapsed_s": 16.418,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 12900,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1528.499207898351,
+        "threshold": 3130.037022388018,
+        "baseline": 598.6803663327594,
+        "noise_level": 632.8391640138148,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718108.8259358,
+      "elapsed_s": 16.721,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 13200,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 2909.6206170655496,
+        "threshold": 3180.020472284457,
+        "baseline": 767.2817277627877,
+        "noise_level": 603.1846861304173,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718109.12545,
+      "elapsed_s": 17.021,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 13500,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1729.746226528403,
+        "threshold": 3861.6626415299925,
+        "baseline": 491.8341415663609,
+        "noise_level": 842.4571249909079,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718109.424406,
+      "elapsed_s": 17.32,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 13800,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1217.2876103597382,
+        "threshold": 3038.5059117158544,
+        "baseline": 548.4238854591861,
+        "noise_level": 622.5205065641671,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718109.7208,
+      "elapsed_s": 17.616,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 14100,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1382.0837276043414,
+        "threshold": 1986.0638811812573,
+        "baseline": 824.8875314795896,
+        "noise_level": 290.29408742541693,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718110.021226,
+      "elapsed_s": 17.916,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 14400,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 2306.8382198688537,
+        "threshold": 4106.905039635918,
+        "baseline": 603.458687985398,
+        "noise_level": 875.8615879126301,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718110.3321059,
+      "elapsed_s": 18.227,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 14700,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1550.8975333294195,
+        "threshold": 1678.748274449737,
+        "baseline": 169.45000841295416,
+        "noise_level": 377.3245665091957,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718110.628983,
+      "elapsed_s": 18.524,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 15000,
+        "blink_count": 1,
+        "avg_amplitude": 1782.6675476350672,
+        "max_amplitude": 1782.6675476350672,
+        "threshold": 1572.8519124256636,
+        "baseline": 228.49656541858764,
+        "noise_level": 336.088836751769,
+        "blink_times": [
+          0.09375
+        ],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718110.630961,
+      "elapsed_s": 18.526,
+      "event": "blink_detected",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 15000,
+        "confirmed_total": 3,
+        "avg_amplitude": 1782.6675476350672,
+        "max_amplitude": 1782.6675476350672,
+        "threshold": 1572.8519124256636
+      }
+    },
+    {
+      "ts": 1772718111.5252259,
+      "elapsed_s": 19.42,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 15900,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1558.0879015173998,
+        "threshold": 2390.452512950948,
+        "baseline": 474.6408129388535,
+        "noise_level": 478.9529250030236,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718111.824106,
+      "elapsed_s": 19.719,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 16200,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1544.044744340589,
+        "threshold": 3045.446350786985,
+        "baseline": 462.02188273260026,
+        "noise_level": 645.8561170135962,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718112.124453,
+      "elapsed_s": 20.02,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 16500,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1458.2148244719742,
+        "threshold": 3193.8881014085127,
+        "baseline": 653.0589244455622,
+        "noise_level": 635.2072942407376,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718112.42413,
+      "elapsed_s": 20.319,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 16800,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1473.9731067384357,
+        "threshold": 3349.9549307145126,
+        "baseline": 380.8733680858786,
+        "noise_level": 742.2703906571585,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718112.724782,
+      "elapsed_s": 20.62,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 17100,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1846.4954291124623,
+        "threshold": 3064.0432302517424,
+        "baseline": 754.6814987599473,
+        "noise_level": 577.3404328729488,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718113.0227,
+      "elapsed_s": 20.918,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 17400,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1269.246929254143,
+        "threshold": 3464.340378023247,
+        "baseline": 720.2504408930499,
+        "noise_level": 686.0224842825493,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718113.323425,
+      "elapsed_s": 21.219,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 17700,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1054.8911065547438,
+        "threshold": 2252.0988699747822,
+        "baseline": 334.25950815157967,
+        "noise_level": 479.4598404558007,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718113.621313,
+      "elapsed_s": 21.516,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 18000,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 797.126725343332,
+        "threshold": 2094.522627832829,
+        "baseline": 365.5391344636299,
+        "noise_level": 432.2458733422998,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718113.9262981,
+      "elapsed_s": 21.821,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 18300,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 799.7605342549888,
+        "threshold": 2131.5672373228035,
+        "baseline": 268.21553490168316,
+        "noise_level": 465.83792560528013,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718114.221457,
+      "elapsed_s": 22.117,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 18600,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 555.6789415255853,
+        "threshold": 1309.206448597355,
+        "baseline": 247.20202643087688,
+        "noise_level": 265.5011055416195,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718114.524817,
+      "elapsed_s": 22.42,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 18900,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1094.0726424280333,
+        "threshold": 2007.9049225927008,
+        "baseline": 385.3422256454105,
+        "noise_level": 405.6406742368226,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718114.824936,
+      "elapsed_s": 22.72,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 19200,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1121.0923057171776,
+        "threshold": 2630.9128665465746,
+        "baseline": 365.83037008829746,
+        "noise_level": 566.2706241145693,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718115.126666,
+      "elapsed_s": 23.022,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 19500,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1389.0022777692684,
+        "threshold": 2662.552876144837,
+        "baseline": 661.7038554643906,
+        "noise_level": 500.2122551701115,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718115.43172,
+      "elapsed_s": 23.327,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 19800,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1189.126956881406,
+        "threshold": 2987.627005565315,
+        "baseline": 519.5589943873542,
+        "noise_level": 617.0170027944902,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718115.7282429,
+      "elapsed_s": 23.623,
+      "event": "blink_poll",
+      "phase": "blink_test",
+      "data": {
+        "elapsed_ms": 20100,
+        "blink_count": 0,
+        "avg_amplitude": 0,
+        "max_amplitude": 1197.2390511174178,
+        "threshold": 2293.015874114877,
+        "baseline": 622.9788924213829,
+        "noise_level": 417.50924542337356,
+        "blink_times": [],
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718115.729624,
+      "elapsed_s": 23.625,
+      "event": "blink_test_result",
+      "phase": "blink_test",
+      "data": {
+        "outcome": "success_partial",
+        "confirmed_blinks": 3,
+        "target": 5,
+        "elapsed_ms": 20100
+      }
+    },
+    {
+      "ts": 1772718116.531447,
+      "elapsed_s": 24.427,
+      "event": "relaxation_start",
+      "phase": "eyes_open",
+      "data": {
+        "eyes_open_duration_ms": 4500,
+        "eyes_closed_duration_ms": 5000,
+        "warmup_skip_ms": 1500,
+        "poll_interval_ms": 200
+      }
+    },
+    {
+      "ts": 1772718116.736435,
+      "elapsed_s": 24.632,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 200,
+        "phase": "open",
+        "bands": {
+          "delta": 385202.14020094805,
+          "theta": 121356.61286960753,
+          "alpha": 19423.100895097363,
+          "beta": 21182.987683391384,
+          "gamma": 3318.1259093546737
+        },
+        "coherence": 0.7731411730697286,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718116.937918,
+      "elapsed_s": 24.833,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 400,
+        "phase": "open",
+        "bands": {
+          "delta": 354141.93755398423,
+          "theta": 102705.92078991407,
+          "alpha": 18959.47625779949,
+          "beta": 18691.477043961233,
+          "gamma": 3011.1003396654255
+        },
+        "coherence": 0.7723895236564673,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718117.1380029,
+      "elapsed_s": 25.033,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 600,
+        "phase": "open",
+        "bands": {
+          "delta": 349935.42099382245,
+          "theta": 94390.2817137739,
+          "alpha": 23124.990818373466,
+          "beta": 12967.577479505371,
+          "gamma": 2584.326242546752
+        },
+        "coherence": 0.7631421030125943,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718117.338708,
+      "elapsed_s": 25.234,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 800,
+        "phase": "open",
+        "bands": {
+          "delta": 298727.124356505,
+          "theta": 66886.2590481763,
+          "alpha": 11633.796917490297,
+          "beta": 8126.967292774687,
+          "gamma": 1987.8693432753848
+        },
+        "coherence": 0.7056162677706157,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718117.535357,
+      "elapsed_s": 25.43,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 1000,
+        "phase": "open",
+        "bands": {
+          "delta": 246878.78394959643,
+          "theta": 57935.91246789637,
+          "alpha": 19154.943873534714,
+          "beta": 8200.061959305378,
+          "gamma": 1978.4870783151564
+        },
+        "coherence": 0.642905059575364,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718117.736275,
+      "elapsed_s": 25.631,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 1200,
+        "phase": "open",
+        "bands": {
+          "delta": 213069.21517008936,
+          "theta": 54881.371138188915,
+          "alpha": 13999.144824035793,
+          "beta": 7071.026114432679,
+          "gamma": 1490.11491352372
+        },
+        "coherence": 0.595970554325721,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718117.935348,
+      "elapsed_s": 25.83,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 1400,
+        "phase": "open",
+        "bands": {
+          "delta": 159482.06167955865,
+          "theta": 31304.542171801666,
+          "alpha": 1826.3009302297758,
+          "beta": 3385.7205137127967,
+          "gamma": 698.0917296877892
+        },
+        "coherence": 0.5317428297735595,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718118.140608,
+      "elapsed_s": 26.036,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 1600,
+        "phase": "open",
+        "bands": {
+          "delta": 71577.83544373527,
+          "theta": 14615.50346213712,
+          "alpha": 61.38633250919813,
+          "beta": 1647.5852648968516,
+          "gamma": 423.2470852962212
+        },
+        "coherence": 0.3557172591757065,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718118.336419,
+      "elapsed_s": 26.232,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 1800,
+        "phase": "open",
+        "bands": {
+          "delta": 35635.66050531762,
+          "theta": 12297.341799555474,
+          "alpha": 19.984028954234216,
+          "beta": 1438.713871037111,
+          "gamma": 453.9139944584893
+        },
+        "coherence": 0.2150956412930619,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.9255253362990632,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718118.534007,
+      "elapsed_s": 26.429,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 2000,
+        "phase": "open",
+        "bands": {
+          "delta": 21538.135204211154,
+          "theta": 14012.034518412547,
+          "alpha": 13.690610028110608,
+          "beta": 1561.3655606139162,
+          "gamma": 594.9715646349463
+        },
+        "coherence": 0.19334042531654955,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718118.734336,
+      "elapsed_s": 26.629,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 2200,
+        "phase": "open",
+        "bands": {
+          "delta": 20812.774834292915,
+          "theta": 4742.593847525408,
+          "alpha": 13.68645523225966,
+          "beta": 1162.5564315755264,
+          "gamma": 441.86490055452634
+        },
+        "coherence": 0.3009602440125616,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718118.936842,
+      "elapsed_s": 26.832,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 2400,
+        "phase": "open",
+        "bands": {
+          "delta": 34651.567888215606,
+          "theta": 4040.777329963313,
+          "alpha": 11.750246327424986,
+          "beta": 974.2985721118887,
+          "gamma": 316.1469671477886
+        },
+        "coherence": 0.342931401074218,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718119.1353128,
+      "elapsed_s": 27.03,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 2600,
+        "phase": "open",
+        "bands": {
+          "delta": 19428.71450153693,
+          "theta": 3711.9537439820574,
+          "alpha": 9.066436581111367,
+          "beta": 1022.249739432318,
+          "gamma": 493.6895020715558
+        },
+        "coherence": 0.4049061639865304,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718119.33332,
+      "elapsed_s": 27.228,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 2800,
+        "phase": "open",
+        "bands": {
+          "delta": 10989.18377558779,
+          "theta": 1510.1270899080153,
+          "alpha": 8.183219741318219,
+          "beta": 825.1450137677757,
+          "gamma": 458.04999362014405
+        },
+        "coherence": 0.6305880681657242,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718119.5349052,
+      "elapsed_s": 27.43,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 3000,
+        "phase": "open",
+        "bands": {
+          "delta": 13911.943023800166,
+          "theta": 1880.704096843991,
+          "alpha": 5.9219747137428165,
+          "beta": 804.6656373788057,
+          "gamma": 487.5634014323002
+        },
+        "coherence": 0.7508848838847659,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718119.7371058,
+      "elapsed_s": 27.632,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 3200,
+        "phase": "open",
+        "bands": {
+          "delta": 7582.772739852951,
+          "theta": 1201.9452681655798,
+          "alpha": 5.877239200782195,
+          "beta": 811.1264217133925,
+          "gamma": 549.8499977995402
+        },
+        "coherence": 0.7734115418774534,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718119.934819,
+      "elapsed_s": 27.83,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 3400,
+        "phase": "open",
+        "bands": {
+          "delta": 10775.387590009435,
+          "theta": 1759.5229913881408,
+          "alpha": 5.1855439510734005,
+          "beta": 728.2844385751132,
+          "gamma": 462.66540792702233
+        },
+        "coherence": 0.6577995496998021,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718120.135839,
+      "elapsed_s": 28.031,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 3600,
+        "phase": "open",
+        "bands": {
+          "delta": 9404.432107598906,
+          "theta": 1586.8926413384042,
+          "alpha": 6.510437087422504,
+          "beta": 702.578628861787,
+          "gamma": 506.1779737550935
+        },
+        "coherence": 0.6709204387150179,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718120.336153,
+      "elapsed_s": 28.231,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 3800,
+        "phase": "open",
+        "bands": {
+          "delta": 2745.322308144556,
+          "theta": 497.0897970130995,
+          "alpha": 7.358393281390319,
+          "beta": 706.4052355264827,
+          "gamma": 581.3865731884244
+        },
+        "coherence": 0.6414606228250169,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718120.5364852,
+      "elapsed_s": 28.432,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 4000,
+        "phase": "open",
+        "bands": {
+          "delta": 887.6314109537287,
+          "theta": 203.18408228203103,
+          "alpha": 8.652781616205273,
+          "beta": 656.9576397295339,
+          "gamma": 507.3550213485072
+        },
+        "coherence": 0.5108634981021796,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718120.740194,
+      "elapsed_s": 28.635,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 4200,
+        "phase": "open",
+        "bands": {
+          "delta": 3221.109692088181,
+          "theta": 846.4856062668504,
+          "alpha": 51.119270953340546,
+          "beta": 733.2589989233504,
+          "gamma": 527.6914335240413
+        },
+        "coherence": 0.6292247187887985,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718120.936378,
+      "elapsed_s": 28.831,
+      "event": "relaxation_sample",
+      "phase": "eyes_open",
+      "data": {
+        "elapsed_ms": 4400,
+        "phase": "open",
+        "bands": {
+          "delta": 12782.730614408822,
+          "theta": 6328.151807862811,
+          "alpha": 199.1157117224122,
+          "beta": 1049.5605077688274,
+          "gamma": 580.1814782789088
+        },
+        "coherence": 0.6270982727831892,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718121.142251,
+      "elapsed_s": 29.037,
+      "event": "phase_changed",
+      "phase": "transition",
+      "data": {
+        "from": "eyes_open",
+        "to": "eyes_closed",
+        "elapsed_ms": 4600,
+        "open_samples_collected": 22,
+        "open_alpha_values": [
+          19423.100895097363,
+          18959.47625779949,
+          23124.990818373466,
+          11633.796917490297,
+          19154.943873534714,
+          13999.144824035793,
+          1826.3009302297758,
+          61.38633250919813,
+          19.984028954234216,
+          13.690610028110608,
+          13.68645523225966,
+          11.750246327424986,
+          9.066436581111367,
+          8.183219741318219,
+          5.9219747137428165,
+          5.877239200782195,
+          5.1855439510734005,
+          6.510437087422504,
+          7.358393281390319,
+          8.652781616205273,
+          51.119270953340546,
+          199.1157117224122
+        ]
+      }
+    },
+    {
+      "ts": 1772718121.14932,
+      "elapsed_s": 29.044,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 4600,
+        "phase": "closed",
+        "bands": {
+          "delta": 17252.678347385354,
+          "theta": 8635.511478975175,
+          "alpha": 164.44975219473426,
+          "beta": 998.5177826029551,
+          "gamma": 543.0448327926628
+        },
+        "coherence": 0.6326505265807754,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718121.352532,
+      "elapsed_s": 29.248,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 4800,
+        "phase": "closed",
+        "bands": {
+          "delta": 13221.614393310832,
+          "theta": 5456.857967650476,
+          "alpha": 152.3294873058941,
+          "beta": 911.8375868720306,
+          "gamma": 579.9058158337231
+        },
+        "coherence": 0.5828345141105916,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718121.556442,
+      "elapsed_s": 29.452,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 5000,
+        "phase": "closed",
+        "bands": {
+          "delta": 22457.78919021731,
+          "theta": 9460.328779481335,
+          "alpha": 229.4736046430016,
+          "beta": 1177.1720844861914,
+          "gamma": 643.5692896833907
+        },
+        "coherence": 0.5408749823191166,
+        "signal_quality": {
+          "TP9": 0.3,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.3
+        }
+      }
+    },
+    {
+      "ts": 1772718121.73723,
+      "elapsed_s": 29.632,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 5200,
+        "phase": "closed",
+        "bands": {
+          "delta": 25558.302238230368,
+          "theta": 7041.768267733249,
+          "alpha": 132.61278288861746,
+          "beta": 966.2710393262951,
+          "gamma": 585.6703115455861
+        },
+        "coherence": 0.525079109425775,
+        "signal_quality": {
+          "TP9": 0.8679752515887358,
+          "AF7": 0.3,
+          "AF8": 0.3,
+          "TP10": 0.9041613545829037
+        }
+      }
+    },
+    {
+      "ts": 1772718121.938329,
+      "elapsed_s": 29.833,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 5400,
+        "phase": "closed",
+        "bands": {
+          "delta": 21602.076477787887,
+          "theta": 7783.445969692104,
+          "alpha": 215.48668343658787,
+          "beta": 1106.5353002222773,
+          "gamma": 550.9130447969301
+        },
+        "coherence": 0.5112539225004836,
+        "signal_quality": {
+          "TP9": 0.9968324651931237,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718122.138324,
+      "elapsed_s": 30.033,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 5600,
+        "phase": "closed",
+        "bands": {
+          "delta": 25982.30769883629,
+          "theta": 8960.104681188353,
+          "alpha": 166.62931896934182,
+          "beta": 1059.6237707716025,
+          "gamma": 564.7006178682439
+        },
+        "coherence": 0.5043081594340518,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718122.342731,
+      "elapsed_s": 30.238,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 5800,
+        "phase": "closed",
+        "bands": {
+          "delta": 15122.856218465535,
+          "theta": 2733.2590735368426,
+          "alpha": 28.38049521547552,
+          "beta": 690.3089282979398,
+          "gamma": 430.3992596718006
+        },
+        "coherence": 0.49438487896850475,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718122.537884,
+      "elapsed_s": 30.433,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 6000,
+        "phase": "closed",
+        "bands": {
+          "delta": 6797.78130545945,
+          "theta": 212.41230960109394,
+          "alpha": 5.869338432352876,
+          "beta": 596.2042509438324,
+          "gamma": 405.8366622608999
+        },
+        "coherence": 0.4870410522218923,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718122.7403252,
+      "elapsed_s": 30.635,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 6200,
+        "phase": "closed",
+        "bands": {
+          "delta": 10715.065993788088,
+          "theta": 249.28629228580786,
+          "alpha": 6.59765361234715,
+          "beta": 562.6505486269589,
+          "gamma": 404.851044390961
+        },
+        "coherence": 0.34876353496739537,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718122.941183,
+      "elapsed_s": 30.836,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 6400,
+        "phase": "closed",
+        "bands": {
+          "delta": 4956.29450830033,
+          "theta": 187.0257845988902,
+          "alpha": 10.731874844258655,
+          "beta": 513.79798446334,
+          "gamma": 320.5738821892545
+        },
+        "coherence": 0.5796032229932895,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718123.1400378,
+      "elapsed_s": 31.035,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 6600,
+        "phase": "closed",
+        "bands": {
+          "delta": 731.0425901556159,
+          "theta": 76.77524711107036,
+          "alpha": 24.468908187059256,
+          "beta": 485.5737767108377,
+          "gamma": 318.9828339870455
+        },
+        "coherence": 0.7101850480351541,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718123.340529,
+      "elapsed_s": 31.236,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 6800,
+        "phase": "closed",
+        "bands": {
+          "delta": 383.33757893514354,
+          "theta": 58.00527879671125,
+          "alpha": 20.08418364014552,
+          "beta": 463.582585857395,
+          "gamma": 338.20195494276794
+        },
+        "coherence": 0.4748961757772762,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718123.539093,
+      "elapsed_s": 31.434,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 7000,
+        "phase": "closed",
+        "bands": {
+          "delta": 270.8062870357296,
+          "theta": 68.98618217593943,
+          "alpha": 18.75981229862356,
+          "beta": 479.6468890147918,
+          "gamma": 359.2492261891466
+        },
+        "coherence": 0.550788986440081,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718123.7411919,
+      "elapsed_s": 31.636,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 7200,
+        "phase": "closed",
+        "bands": {
+          "delta": 346.85436715954245,
+          "theta": 57.61330985773213,
+          "alpha": 22.918280601675686,
+          "beta": 452.0320399811294,
+          "gamma": 350.840108576083
+        },
+        "coherence": 0.5889052384121514,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718123.937845,
+      "elapsed_s": 31.833,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 7400,
+        "phase": "closed",
+        "bands": {
+          "delta": 334.342307064939,
+          "theta": 96.81113521081167,
+          "alpha": 19.976865454896394,
+          "beta": 422.02130860617586,
+          "gamma": 361.32325964470436
+        },
+        "coherence": 0.6043432941114278,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718124.1400452,
+      "elapsed_s": 32.035,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 7600,
+        "phase": "closed",
+        "bands": {
+          "delta": 372.44557181341156,
+          "theta": 112.18032192776386,
+          "alpha": 27.92091812828866,
+          "beta": 432.4015161037689,
+          "gamma": 377.8729509665329
+        },
+        "coherence": 0.6079759448913387,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718124.3383,
+      "elapsed_s": 32.233,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 7800,
+        "phase": "closed",
+        "bands": {
+          "delta": 294.4694331340479,
+          "theta": 73.10036821535482,
+          "alpha": 19.91732339374119,
+          "beta": 411.2292361764041,
+          "gamma": 341.42210167513167
+        },
+        "coherence": 0.6284138814996324,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718124.5363572,
+      "elapsed_s": 32.431,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 8000,
+        "phase": "closed",
+        "bands": {
+          "delta": 186.07012886407432,
+          "theta": 93.16020387613356,
+          "alpha": 13.230276004816048,
+          "beta": 386.1822602444443,
+          "gamma": 359.2330963471683
+        },
+        "coherence": 0.6248544646640425,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718124.73615,
+      "elapsed_s": 32.631,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 8200,
+        "phase": "closed",
+        "bands": {
+          "delta": 166.24502265599793,
+          "theta": 66.54114854542043,
+          "alpha": 11.888407535997162,
+          "beta": 386.86806974740205,
+          "gamma": 334.5800785290173
+        },
+        "coherence": 0.6018171222578919,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718124.939436,
+      "elapsed_s": 32.835,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 8400,
+        "phase": "closed",
+        "bands": {
+          "delta": 154.32355784405573,
+          "theta": 74.69151819934677,
+          "alpha": 14.92679817951068,
+          "beta": 348.00577074537085,
+          "gamma": 318.50058532682084
+        },
+        "coherence": 0.5997980968825761,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718125.136124,
+      "elapsed_s": 33.031,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 8600,
+        "phase": "closed",
+        "bands": {
+          "delta": 128.9784618412276,
+          "theta": 78.07653684071488,
+          "alpha": 16.11627378365062,
+          "beta": 330.24806797433314,
+          "gamma": 322.0591116716861
+        },
+        "coherence": 0.5868632094224666,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718125.335814,
+      "elapsed_s": 33.231,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 8800,
+        "phase": "closed",
+        "bands": {
+          "delta": 89.9133006453406,
+          "theta": 50.61985839634536,
+          "alpha": 16.0721576969419,
+          "beta": 323.54116111733197,
+          "gamma": 309.81262303497675
+        },
+        "coherence": 0.6184734106698451,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 0.9851381248915518,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718125.541888,
+      "elapsed_s": 33.437,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 9000,
+        "phase": "closed",
+        "bands": {
+          "delta": 89.14691174736211,
+          "theta": 54.32289371368154,
+          "alpha": 15.382609316510194,
+          "beta": 290.3056651655841,
+          "gamma": 309.18475606373863
+        },
+        "coherence": 0.6053402698902899,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 0.9686692008609179,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718125.740366,
+      "elapsed_s": 33.635,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 9200,
+        "phase": "closed",
+        "bands": {
+          "delta": 112.97880458324204,
+          "theta": 54.12135361491898,
+          "alpha": 19.98848261702236,
+          "beta": 291.9223500578869,
+          "gamma": 299.17249076445023
+        },
+        "coherence": 0.5854842907553328,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 0.9733332145598466,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718125.939681,
+      "elapsed_s": 33.835,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 9400,
+        "phase": "closed",
+        "bands": {
+          "delta": 161.87666148079757,
+          "theta": 55.07868242894028,
+          "alpha": 17.590370040127382,
+          "beta": 237.98930835893694,
+          "gamma": 303.8837519015177
+        },
+        "coherence": 0.5994749572932251,
+        "signal_quality": {
+          "TP9": 1,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 1
+        }
+      }
+    },
+    {
+      "ts": 1772718126.139114,
+      "elapsed_s": 34.034,
+      "event": "relaxation_sample",
+      "phase": "eyes_closed",
+      "data": {
+        "elapsed_ms": 9600,
+        "phase": "closed",
+        "bands": {
+          "delta": 231.93309732159653,
+          "theta": 76.72903881536222,
+          "alpha": 33.324841507481324,
+          "beta": 261.42241287848077,
+          "gamma": 299.4683912816014
+        },
+        "coherence": 0.7392705722132064,
+        "signal_quality": {
+          "TP9": 0.9215555153689788,
+          "AF7": 1,
+          "AF8": 0.3,
+          "TP10": 0.9410046611871604
+        }
+      }
+    },
+    {
+      "ts": 1772718126.1396139,
+      "elapsed_s": 34.035,
+      "event": "relaxation_computed",
+      "phase": "analysis",
+      "data": {
+        "eyes_open": {
+          "raw_samples_count": 22,
+          "warmup_skipped": 8,
+          "used_samples_count": 14,
+          "alpha_all_values": [
+            19423.100895097363,
+            18959.47625779949,
+            23124.990818373466,
+            11633.796917490297,
+            19154.943873534714,
+            13999.144824035793,
+            1826.3009302297758,
+            61.38633250919813,
+            19.984028954234216,
+            13.690610028110608,
+            13.68645523225966,
+            11.750246327424986,
+            9.066436581111367,
+            8.183219741318219,
+            5.9219747137428165,
+            5.877239200782195,
+            5.1855439510734005,
+            6.510437087422504,
+            7.358393281390319,
+            8.652781616205273,
+            51.119270953340546,
+            199.1157117224122
+          ],
+          "alpha_used_values": [
+            19.984028954234216,
+            13.690610028110608,
+            13.68645523225966,
+            11.750246327424986,
+            9.066436581111367,
+            8.183219741318219,
+            5.9219747137428165,
+            5.877239200782195,
+            5.1855439510734005,
+            6.510437087422504,
+            7.358393281390319,
+            8.652781616205273,
+            51.119270953340546,
+            199.1157117224122
+          ],
+          "avgAlpha": 8.717,
+          "avgBeta": 819.503,
+          "avgTheta": 1998.298,
+          "avgDelta": 10231.091,
+          "avgGamma": 473.179
+        },
+        "eyes_closed": {
+          "raw_samples_count": 26,
+          "alpha_all_values": [
+            164.44975219473426,
+            152.3294873058941,
+            229.4736046430016,
+            132.61278288861746,
+            215.48668343658787,
+            166.62931896934182,
+            28.38049521547552,
+            5.869338432352876,
+            6.59765361234715,
+            10.731874844258655,
+            24.468908187059256,
+            20.08418364014552,
+            18.75981229862356,
+            22.918280601675686,
+            19.976865454896394,
+            27.92091812828866,
+            19.91732339374119,
+            13.230276004816048,
+            11.888407535997162,
+            14.92679817951068,
+            16.11627378365062,
+            16.0721576969419,
+            15.382609316510194,
+            19.98848261702236,
+            17.590370040127382,
+            33.324841507481324
+          ],
+          "avgAlpha": 18.207,
+          "avgBeta": 418.297,
+          "avgTheta": 226.44,
+          "avgDelta": 1987.276,
+          "avgGamma": 343.272
+        },
+        "alpha_ratio": 2.0888,
+        "threshold": 0.5
+      }
+    },
+    {
+      "ts": 1772718126.1431649,
+      "elapsed_s": 34.038,
+      "event": "calibration_evaluated",
+      "phase": "result",
+      "data": {
+        "passed": true,
+        "blinks_detected": 3,
+        "target_blinks": 5,
+        "alpha_open": 8.717,
+        "alpha_closed": 18.207,
+        "alpha_ratio": 2.0888,
+        "alpha_ok": true,
+        "alpha_increased": true,
+        "threshold_ratio": 0.5,
+        "reason": "\u2713 Calibraci\u00f3n exitosa: Alpha aument\u00f3 109% al cerrar ojos"
+      }
+    },
+    {
+      "ts": 1772718126.143529,
+      "elapsed_s": 34.039,
+      "event": "calibration_complete",
+      "phase": "final",
+      "data": {
+        "passed": true,
+        "blinks_detected": 3,
+        "target_blinks": 5,
+        "alpha_open": 8.717,
+        "alpha_closed": 18.207,
+        "alpha_ratio": 2.0888,
+        "alpha_ok": true,
+        "alpha_increased": true,
+        "threshold_ratio": 0.5,
+        "reason": "\u2713 Calibraci\u00f3n exitosa: Alpha aument\u00f3 109% al cerrar ojos"
+      }
+    }
+  ]
+}

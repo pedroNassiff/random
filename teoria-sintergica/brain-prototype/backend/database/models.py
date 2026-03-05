@@ -238,20 +238,38 @@ class SessionDatabase:
             )
         return None
     
-    def list_sessions(self, limit: int = 50) -> List[Dict]:
-        """List recent sessions."""
+    def list_sessions(self, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """List recent sessions with aggregated metrics."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         cursor.execute('''
-            SELECT id, name, start_time, duration_seconds, 
-                   calibration_passed, avg_signal_quality, notes, tags
-            FROM sessions 
-            ORDER BY start_time DESC 
-            LIMIT ?
-        ''', (limit,))
-        
+            SELECT
+                s.id,
+                s.name,
+                s.start_time        AS started_at,
+                s.end_time          AS ended_at,
+                s.duration_seconds,
+                s.calibration_passed,
+                s.avg_signal_quality,
+                s.notes,
+                s.tags,
+                s.device,
+                (SELECT COUNT(*) FROM eeg_samples e WHERE e.session_id = s.id)  AS sample_count,
+                (SELECT COUNT(*) FROM metrics     m WHERE m.session_id = s.id)  AS metrics_count,
+                (SELECT AVG(m.alpha)     FROM metrics m WHERE m.session_id = s.id) AS avg_alpha,
+                (SELECT AVG(m.theta)     FROM metrics m WHERE m.session_id = s.id) AS avg_theta,
+                (SELECT AVG(m.delta)     FROM metrics m WHERE m.session_id = s.id) AS avg_delta,
+                (SELECT AVG(m.beta)      FROM metrics m WHERE m.session_id = s.id) AS avg_beta,
+                (SELECT AVG(m.gamma)     FROM metrics m WHERE m.session_id = s.id) AS avg_gamma,
+                (SELECT AVG(m.coherence) FROM metrics m WHERE m.session_id = s.id) AS avg_coherence,
+                (SELECT MAX(m.coherence) FROM metrics m WHERE m.session_id = s.id) AS peak_coherence
+            FROM sessions s
+            ORDER BY s.start_time DESC
+            LIMIT ? OFFSET ?
+        ''', (limit, offset))
+
         sessions = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return sessions

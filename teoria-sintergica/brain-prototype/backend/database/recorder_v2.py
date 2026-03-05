@@ -60,6 +60,8 @@ class SessionRecorderV2:
         # Stats
         self._samples_recorded = 0
         self._metrics_recorded = 0
+        self._influx_failures = 0  # Consecutive InfluxDB write failures
+        self._MAX_INFLUX_FAILURES = 5  # Stop recording after this many consecutive failures
         
         # Connect to databases
         self._connect()
@@ -125,6 +127,14 @@ class SessionRecorderV2:
         if not self.muse_connector.is_streaming:
             raise RuntimeError("Muse not streaming. Start stream first.")
         
+        # Verify InfluxDB is reachable before starting — fail loudly
+        try:
+            self.influx.connect()
+            if not self.influx._connected:
+                raise RuntimeError("InfluxDB is not reachable. Cannot start recording without time-series storage.")
+        except Exception as e:
+            raise RuntimeError(f"InfluxDB connection failed: {e}. Cannot start recording.")
+
         # Get device info
         device_address = ""
         if self.muse_connector.device_info:
@@ -149,7 +159,17 @@ class SessionRecorderV2:
         self._recording = True
         self._samples_recorded = 0
         self._metrics_recorded = 0
+        self._influx_failures = 0
         self._stop_event.clear()
+        
+        print(f"""\n{'='*60}
+🔴 RECORDING STARTED
+   PostgreSQL ID : #{self._recording_id}
+   Name          : {name or '(auto)'}
+   Tags          : {tags or '(none)'}
+   Base timestamp: {self._base_timestamp.isoformat()}Z
+   InfluxDB bucket: eeg-data  measurement: eeg_samples + eeg_metrics
+{'='*60}""")
         
         # Start sample collection thread
         self._sample_thread = threading.Thread(target=self._sample_loop, daemon=True)
@@ -159,7 +179,6 @@ class SessionRecorderV2:
         self._metrics_thread = threading.Thread(target=self._metrics_loop, daemon=True)
         self._metrics_thread.start()
         
-        print(f"🔴 Recording started: Recording #{self._recording_id} → PostgreSQL + InfluxDB")
         return self._recording_id
     
     def stop(self, calibration_passed: bool = False) -> Dict:
@@ -230,7 +249,22 @@ class SessionRecorderV2:
             'aggregated_metrics': aggregated_metrics
         }
         
-        print(f"⏹️ Recording stopped: {self._samples_recorded} samples, {self._metrics_recorded} metrics")
+        influx_summary = aggregated_metrics
+        print(f"""\n{'='*60}
+⏹️  RECORDING STOPPED  #{summary['recording_id']}
+   Duration       : {duration:.1f}s
+───────────────────────────────────────────────────────────
+   PostgreSQL     : ID #{summary['recording_id']} updated ✓
+     duration_seconds : {duration:.1f}
+     sample_count     : {self._samples_recorded}
+     metrics_count    : {self._metrics_recorded}
+───────────────────────────────────────────────────────────
+   InfluxDB       : eeg-data bucket
+     avg_coherence    : {influx_summary.get('avg_coherence', 'n/a')}
+     avg_alpha        : {influx_summary.get('avg_alpha', 'n/a')}
+     avg_theta        : {influx_summary.get('avg_theta', 'n/a')}
+     avg_signal_qual  : {avg_quality:.2f}
+{'='*60}\n""")
         
         self._recording_id = None
         
@@ -274,6 +308,7 @@ class SessionRecorderV2:
     def _sample_loop(self):
         """Background thread that collects raw EEG samples."""
         last_flush = time.time()
+        last_heartbeat = time.time()
         
         while not self._stop_event.is_set():
             try:
@@ -303,9 +338,18 @@ class SessionRecorderV2:
                             self._samples_recorded += 1
                 
                 # Flush buffer periodically
-                if time.time() - last_flush >= self._flush_interval:
+                now = time.time()
+                if now - last_flush >= self._flush_interval:
                     self._flush_samples()
-                    last_flush = time.time()
+                    last_flush = now
+                
+                # Heartbeat every 10s
+                if now - last_heartbeat >= 10.0:
+                    elapsed = now - self._start_time
+                    print(f"💓 [REC #{self._recording_id}] {elapsed:.0f}s elapsed | "
+                          f"samples: {self._samples_recorded} | metrics: {self._metrics_recorded} | "
+                          f"influx_failures: {self._influx_failures}")
+                    last_heartbeat = now
                 
                 time.sleep(0.05)  # 50ms between checks
                 
@@ -378,32 +422,44 @@ class SessionRecorderV2:
         self._flush_metrics()
     
     def _flush_samples(self):
-        """Flush sample buffer to InfluxDB."""
+        """Flush sample buffer to InfluxDB. Does NOT clear the buffer on failure."""
         with self._buffer_lock:
             if self._sample_buffer and self._recording_id:
+                n = len(self._sample_buffer)
                 try:
                     self.influx.write_samples(
                         recording_id=self._recording_id,
                         samples=self._sample_buffer,
                         base_timestamp=self._base_timestamp
                     )
+                    self._sample_buffer = []  # Only clear on success
+                    self._influx_failures = 0
+                    print(f"  📥 [InfluxDB] #{self._recording_id}: wrote {n} samples (total: {self._samples_recorded})")
                 except Exception as e:
-                    print(f"⚠️ Failed to flush samples: {e}")
-                self._sample_buffer = []
+                    self._influx_failures += 1
+                    print(f"❌ CRITICAL: InfluxDB sample write failed (attempt {self._influx_failures}): {e}")
+                    print(f"   {n} samples retained in buffer for retry.")
+                    if self._influx_failures >= self._MAX_INFLUX_FAILURES:
+                        print(f"❌ InfluxDB failed {self._MAX_INFLUX_FAILURES} times in a row. STOPPING RECORDING to prevent data loss.")
+                        self._recording = False
+                        self._stop_event.set()
     
     def _flush_metrics(self):
-        """Flush metrics buffer to InfluxDB."""
+        """Flush metrics buffer to InfluxDB. Does NOT clear the buffer on failure."""
         with self._buffer_lock:
             if self._metrics_buffer and self._recording_id:
+                n = len(self._metrics_buffer)
                 try:
                     self.influx.write_metrics(
                         recording_id=self._recording_id,
                         metrics=self._metrics_buffer,
                         base_timestamp=self._base_timestamp
                     )
+                    self._metrics_buffer = []  # Only clear on success
+                    print(f"  📊 [InfluxDB] #{self._recording_id}: wrote {n} metric snapshots (total: {self._metrics_recorded})")
                 except Exception as e:
-                    print(f"⚠️ Failed to flush metrics: {e}")
-                self._metrics_buffer = []
+                    print(f"❌ CRITICAL: InfluxDB metrics write failed: {e}")
+                    print(f"   {n} metric snapshots retained in buffer for retry.")
     
     def _flush_buffers(self):
         """Flush all buffers."""

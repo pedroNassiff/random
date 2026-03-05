@@ -1,0 +1,40 @@
+{
+  "session_start": 1772719452.038192,
+  "session_start_iso": "2026-03-05T15:04:12.038192",
+  "total_events": 3,
+  "events": [
+    {
+      "ts": 1772719452.038192,
+      "elapsed_s": 0.0,
+      "event": "calibration_start",
+      "phase": "init",
+      "data": {
+        "timestamp_iso": "2026-03-05T14:04:12.034Z",
+        "api_base": "http://localhost:8000"
+      }
+    },
+    {
+      "ts": 1772719455.043564,
+      "elapsed_s": 3.005,
+      "event": "signal_check_result",
+      "phase": "signal_check",
+      "data": {
+        "avgQuality": 0,
+        "samplesCollected": 0,
+        "passed": false,
+        "threshold": 0.2,
+        "perElectrode_last": null
+      }
+    },
+    {
+      "ts": 1772719455.04442,
+      "elapsed_s": 3.006,
+      "event": "calibration_failed",
+      "phase": "result",
+      "data": {
+        "reason": "signal_too_weak",
+        "avgQuality": 0
+      }
+    }
+  ]
+}

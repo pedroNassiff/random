@@ -2,11 +2,15 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Any
 import time
 import asyncio
 import asyncpg
 import os
+import json
+import random
+from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 from security import SecurityMiddleware
 
@@ -19,7 +23,8 @@ from hardware import MuseConnector, MuseToSyntergicAdapter
 # Legacy SQLite (for backward compatibility)
 from database import get_database, get_recorder, SessionRecorder
 # New PostgreSQL + InfluxDB
-from database import get_recorder_v2, SessionRecorderV2
+from database import get_recorder_v2, SessionRecorderV2, get_postgres_client_sync, get_influx_client
+from dataclasses import asdict
 # Analytics
 from analytics.router import router as analytics_router
 from analytics.service import AnalyticsService
@@ -35,6 +40,32 @@ class RecordingStartRequest(BaseModel):
     name: Optional[str] = ""
     notes: Optional[str] = ""
     tags: Optional[str] = ""
+
+class CalibrationEventRequest(BaseModel):
+    event: str          # e.g. 'blink_detected', 'relaxation_sample', 'calibration_complete'
+    phase: str          # e.g. 'blink_test', 'eyes_open', 'eyes_closed', 'result'
+    data: dict          # arbitrary payload from frontend
+
+# ---- Calibration Session Log (in-memory, saved to disk on complete/failed) ----
+_calib_log: List[dict] = []
+_calib_log_start_ts: Optional[float] = None
+_CALIB_LOGS_DIR = Path(__file__).parent / "calibration_logs"
+_CALIB_LOGS_DIR.mkdir(exist_ok=True)
+
+def _save_calib_log(label: str) -> str:
+    """Serialize current calibration log to JSON file and return path."""
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = _CALIB_LOGS_DIR / f"calib_{ts}_{label}.json"
+    payload = {
+        "session_start": _calib_log_start_ts,
+        "session_start_iso": datetime.fromtimestamp(_calib_log_start_ts).isoformat() if _calib_log_start_ts else None,
+        "total_events": len(_calib_log),
+        "events": _calib_log,
+    }
+    with open(filename, "w") as f:
+        json.dump(payload, f, indent=2, default=str)
+    print(f"📁 [Calibration Log] Saved {len(_calib_log)} events → {filename}")
+    return str(filename)
 
 class MarkerRequest(BaseModel):
     label: str
@@ -471,6 +502,56 @@ async def set_mode_muse():
     }
 
 
+@app.post("/hardware/calibration/event")
+async def log_calibration_event(request: CalibrationEventRequest):
+    """
+    Recibe un evento de calibración desde el frontend y lo acumula en memoria.
+    Cuando el evento es 'calibration_complete' o 'calibration_failed', guarda
+    el log completo a un archivo JSON en calibration_logs/.
+    """
+    global _calib_log, _calib_log_start_ts
+
+    now = time.time()
+    elapsed = round(now - _calib_log_start_ts, 3) if _calib_log_start_ts else 0.0
+
+    entry = {
+        "ts": now,
+        "elapsed_s": elapsed,
+        "event": request.event,
+        "phase": request.phase,
+        "data": request.data,
+    }
+    _calib_log.append(entry)
+
+    # Reset log on session start
+    if request.event == "calibration_start":
+        _calib_log = [entry]
+        _calib_log_start_ts = now
+        print(f"\n{'='*55}")
+        print(f"📋 [Calibration Log] NEW SESSION — {datetime.now().strftime('%H:%M:%S')}")
+        print(f"{'='*55}")
+    elif request.event in ("calibration_complete", "calibration_failed"):
+        label = "PASS" if request.data.get("passed") else "FAIL"
+        saved_path = _save_calib_log(label)
+        print(f"📋 [Calibration Log] {label} — {len(_calib_log)} events logged")
+    else:
+        # Verbose log for key events
+        if request.event in ("blink_detected", "phase_changed", "relaxation_computed", "calibration_evaluated"):
+            print(f"📋 [+{elapsed:.1f}s] {request.event} / {request.phase} → {request.data}")
+
+    return {"status": "ok", "events": len(_calib_log), "elapsed_s": elapsed}
+
+
+@app.get("/hardware/calibration/dump")
+async def dump_calibration_log():
+    """Devuelve el log de calibración en memoria (útil para inspección en tiempo real)."""
+    return {
+        "status": "ok",
+        "events": len(_calib_log),
+        "log": _calib_log,
+    }
+
+
 @app.get("/hardware/calibration/snapshot")
 async def get_calibration_snapshot():
     """
@@ -531,15 +612,26 @@ async def get_calibration_snapshot():
         bands = {
             'delta': band_power(psd_mean, freqs, 0.5, 4),
             'theta': band_power(psd_mean, freqs, 4, 8),
-            'alpha': band_power(psd_posterior, freqs, 8, 13),  # Alpha desde canales posteriores!
+            'alpha': band_power(psd_posterior, freqs, 8, 13),  # Alpha desde canales posteriores (TP9, TP10)!
             'beta': band_power(psd_mean, freqs, 13, 30),
             'gamma': band_power(psd_mean, freqs, 30, 50)
         }
         
+        # Bandas normalizadas (0-1, suma a 1) para display en UI
+        # La potencia bruta (µV²) no es intuitiva para barras de progreso
+        total_power = sum(bands.values()) or 1.0
+        bands_normalized = {k: float(v / total_power) for k, v in bands.items()}
+        
+        # Alpha por canal posterior individual (diagnóstico)
+        alpha_by_posterior = {}
+        for ch_name, ch_idx in [('TP9', 0), ('TP10', 3)]:
+            if ch_idx < data.shape[0]:
+                _, psd_ch = welch(data[ch_idx], fs=fs, nperseg=min(256, data.shape[1]))
+                alpha_by_posterior[ch_name] = float(band_power(psd_ch, freqs_welch, 8, 13))
+        
         # Log periódico para monitoreo de alpha
-        import random
         if random.random() < 0.1:
-            print(f"📊 Alpha snapshot: alpha={bands['alpha']:.2f}, beta={bands['beta']:.2f}, theta={bands['theta']:.2f}")
+            print(f"📊 Alpha snapshot: alpha_raw={bands['alpha']:.2f}µV², alpha_norm={bands_normalized['alpha']:.3f}, beta={bands_normalized['beta']:.3f}, theta={bands_normalized['theta']:.3f}")
         
         # Coherencia inter-hemisférica
         if data.shape[0] >= 4:
@@ -555,11 +647,24 @@ async def get_calibration_snapshot():
         # Calidad de señal por canal
         signal_quality = muse_connector.get_signal_quality()
         
+        # Calidad de canales posteriores (críticos para alpha)
+        posterior_quality = {
+            'TP9':  signal_quality.get('TP9', 0.0),
+            'TP10': signal_quality.get('TP10', 0.0),
+            'avg':  (signal_quality.get('TP9', 0.0) + signal_quality.get('TP10', 0.0)) / 2,
+        }
+        bad_posterior = [ch for ch, q in [('TP9', posterior_quality['TP9']), ('TP10', posterior_quality['TP10'])] if q < 0.5]
+        if bad_posterior:
+            print(f"⚠️  [Snapshot] Canales posteriores débiles {bad_posterior} — alpha puede ser impreciso (TP9={posterior_quality['TP9']:.2f}, TP10={posterior_quality['TP10']:.2f})")
+        
         return {
             "status": "success",
-            "bands": bands,
+            "bands": bands,                        # µV² — para cálculos (ratio alpha, calibración)
+            "bands_normalized": bands_normalized,  # 0-1  — para display en barras UI
             "coherence": coherence,
             "signal_quality": signal_quality,
+            "posterior_quality": posterior_quality,
+            "alpha_by_channel": alpha_by_posterior,  # Alpha TP9 vs TP10 individual
             "timestamp": window.timestamp
         }
         
@@ -628,15 +733,27 @@ async def detect_blinks():
         baseline = np.percentile(frontal_abs, 50)  # Mediana como baseline
         noise_level = np.percentile(frontal_abs, 75) - np.percentile(frontal_abs, 25)  # IQR
         
-        # UMBRAL FIJO - Los parpadeos reales son >100µV típicamente
-        # Subimos el umbral para evitar falsos positivos por ruido
-        threshold_fixed = 150.0  # µV - umbral absoluto para parpadeos (antes 75)
-        threshold_adaptive = baseline + 4.0 * max(noise_level, 20.0)  # 4x ruido (antes 3x)
+        # UMBRAL - Los parpadeos reales son >100µV típicamente
+        # threshold_fixed: mínimo absoluto para señal limpia
+        # threshold_adaptive: baseline + 4x ruido IQR
+        # Cap: el threshold nunca puede superar el 95th percentile de la ventana actual
+        # porque si lo hace nunca podremos detectar nada, el pico REAL quedará por debajo.
+        threshold_fixed = 150.0  # µV - mínimo absoluto
+        threshold_adaptive = baseline + 4.0 * max(noise_level, 20.0)
+        percentile_95 = float(np.percentile(frontal_abs, 95))
         
-        # Usar el MAYOR de los dos para ser más estrictos
-        min_amplitude = max(threshold_fixed, threshold_adaptive)
-        # Pero nunca menos de 120µV para evitar falsos positivos con señal ruidosa
+        # Cuando la señal es muy ruidosa, el adaptive sube a 3000-4000µV y no detecta nada.
+        # Cap al 95th percentile × 0.85 garantiza que al menos el pico más alto sea detectable.
+        threshold_cap = percentile_95 * 0.85
+        min_amplitude = max(threshold_fixed, min(threshold_adaptive, threshold_cap))
         min_amplitude = max(min_amplitude, 120.0)
+
+        # Obtener calidad de señal para advertencias
+        signal_quality = muse_connector.get_signal_quality()
+        avg_quality = sum(signal_quality.values()) / len(signal_quality) if signal_quality else 1.0
+        bad_channels = [ch for ch, q in signal_quality.items() if q < 0.4] if signal_quality else []
+        if bad_channels and random.random() < 0.05:
+            print(f"⚠️  [Blink] Mala señal en {bad_channels} (avg={avg_quality:.2f}) — threshold adaptado a {min_amplitude:.0f}µV (95th pct={percentile_95:.0f}µV)")
         
         # Detectar picos (parpadeos)
         # distance: mínimo 400ms entre parpadeos (fisiológicamente realista)
@@ -662,20 +779,16 @@ async def detect_blinks():
             blink_count = len(valid_blinks)
             # Log para debug
             if blink_count > 0:
-                print(f"👁️ BLINK DETECTED: count={blink_count}, max_amp={max_amplitude:.1f}µV, threshold={min_amplitude:.1f}µV")
+                print(f"👁️ BLINK DETECTED: count={blink_count}, max_amp={max_amplitude:.1f}µV, threshold={min_amplitude:.1f}µV (95th={percentile_95:.0f}µV)")
         else:
             avg_amplitude = 0.0
             max_amplitude = 0.0
             valid_blinks = []
             blink_count = 0
         
-        # Calidad de señal
-        signal_quality = muse_connector.get_signal_quality()
-        
-        # Log periódico para monitoreo (solo cada 10 llamadas aprox)
-        import random
+        # Log periódico para monitoreo
         if random.random() < 0.1:
-            print(f"📊 Blink monitor: max_signal={np.max(frontal_abs):.1f}µV, threshold={min_amplitude:.1f}µV, baseline={baseline:.1f}, noise={noise_level:.1f}")
+            print(f"📊 Blink monitor: max={np.max(frontal_abs):.0f}µV, threshold={min_amplitude:.0f}µV, 95pct={percentile_95:.0f}µV, baseline={baseline:.0f}, noise={noise_level:.0f}, quality={avg_quality:.2f}")
         
         return {
             "status": "success",
@@ -832,38 +945,47 @@ async def add_recording_marker(request: MarkerRequest):
 # =============================================================================
 
 @app.get("/sessions")
-async def list_sessions(limit: int = 50, offset: int = 0):
+async def list_sessions(limit: int = 200, offset: int = 0):
     """
-    Lista todas las sesiones grabadas.
-    
-    Args:
-        limit: Cantidad máxima de sesiones a devolver
-        offset: Offset para paginación
+    Lista todas las sesiones grabadas (PostgreSQL).
     """
-    sessions = session_db.list_sessions(limit, offset)
-    return {
-        "status": "success",
-        "sessions": sessions,
-        "count": len(sessions)
-    }
+    try:
+        pg = get_postgres_client_sync()
+        recordings = pg.get_all_recordings(limit=limit, offset=offset)
+        sessions = []
+        for r in recordings:
+            d = asdict(r)
+            # convert datetime to ISO strings for JSON serialisation
+            for k in ('started_at', 'ended_at'):
+                if d.get(k) and hasattr(d[k], 'isoformat'):
+                    d[k] = d[k].isoformat()
+            sessions.append(d)
+        return {"status": "success", "sessions": sessions, "count": len(sessions)}
+    except Exception as e:
+        # Fallback to legacy SQLite
+        sessions = session_db.list_sessions(limit, offset)
+        return {"status": "success", "sessions": sessions, "count": len(sessions), "source": "sqlite"}
 
 @app.get("/sessions/{session_id}")
 async def get_session(session_id: int):
     """
-    Obtiene detalles de una sesión específica.
+    Obtiene detalles de una sesión específica (PostgreSQL).
     """
-    session = session_db.get_session(session_id)
-    if session is None:
-        return {
-            "status": "error",
-            "message": f"Session {session_id} not found"
-        }
-    
-    summary = session_db.get_session_summary(session_id)
-    return {
-        "status": "success",
-        "session": summary
-    }
+    try:
+        pg = get_postgres_client_sync()
+        recording = pg.get_recording(session_id)
+        if recording is None:
+            return {"status": "error", "message": f"Session {session_id} not found"}
+        d = asdict(recording)
+        for k in ('started_at', 'ended_at'):
+            if d.get(k) and hasattr(d[k], 'isoformat'):
+                d[k] = d[k].isoformat()
+        return {"status": "success", "session": d}
+    except Exception as e:
+        session = session_db.get_session(session_id)
+        if session is None:
+            return {"status": "error", "message": f"Session {session_id} not found"}
+        return {"status": "success", "session": session_db.get_session_summary(session_id)}
 
 @app.get("/sessions/{session_id}/eeg")
 async def get_session_eeg(session_id: int, start: float = 0, end: float = None):
@@ -891,20 +1013,18 @@ async def get_session_eeg(session_id: int, start: float = 0, end: float = None):
 @app.get("/sessions/{session_id}/metrics")
 async def get_session_metrics(session_id: int):
     """
-    Obtiene todas las métricas de una sesión.
+    Obtiene todas las métricas de una sesión (InfluxDB).
     """
-    metrics = session_db.get_metrics(session_id)
-    if not metrics:
-        return {
-            "status": "error", 
-            "message": "No metrics found"
-        }
-    
-    return {
-        "status": "success",
-        "metrics": metrics,
-        "count": len(metrics)
-    }
+    try:
+        influx = get_influx_client()
+        metrics = influx.get_metrics(session_id)
+        if not metrics:
+            # fallback to SQLite for legacy sessions
+            metrics = session_db.get_metrics(session_id)
+        return {"status": "success", "metrics": metrics, "count": len(metrics)}
+    except Exception as e:
+        metrics = session_db.get_metrics(session_id)
+        return {"status": "success", "metrics": metrics, "count": len(metrics), "source": "sqlite"}
 
 @app.get("/sessions/{session_id}/events")
 async def get_session_events(session_id: int):

@@ -73,9 +73,18 @@ _heavy_store  = _BucketStore(rate=10 / 60, capacity=5)     # 1 req/6s avg, burst
 
 HEAVY_PATHS = {"/analytics/events", "/analytics/batch", "/automation"}
 
+# Paths exempt from rate limiting — internal hardware polling at high frequency
+EXEMPT_PATHS = ("/hardware/", "/recording/", "/set-mode/")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Known bad User-Agent patterns (scanner tools, exploit kits)
 # ─────────────────────────────────────────────────────────────────────────────
+
+_CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+}
 
 _BAD_UA_RE = re.compile(
     r"(sqlmap|nikto|masscan|nmap|zgrab|python-requests/2\.2[0-9]"
@@ -128,6 +137,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=404,
                 content={"detail": "Not found"},
+                headers=_CORS_HEADERS,
             )
 
         # ── 2. Bad User-Agent block ───────────────────────────────────────────
@@ -135,10 +145,14 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Forbidden"},
-                headers={"Retry-After": "3600"},
+                headers={**_CORS_HEADERS, "Retry-After": "3600"},
             )
 
         # ── 3. Tiered rate limiting ───────────────────────────────────────────
+        # Exempt hardware/recording paths — high-frequency local polling
+        if any(path.startswith(p) for p in EXEMPT_PATHS):
+            return await call_next(request)
+
         # Select store
         if any(path.startswith(p) for p in HEAVY_PATHS):
             store = _heavy_store
@@ -160,6 +174,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                     "hint": "Back off and retry after a few seconds",
                 },
                 headers={
+                    **_CORS_HEADERS,
                     "Retry-After": "10",
                     "X-RateLimit-Limit": str(bucket.capacity),
                     "X-RateLimit-Remaining": "0",

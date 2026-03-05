@@ -1,11 +1,13 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useReducer } from 'react'
 import { useBrainStore } from '../lab-core/brain/store.js'
 import referenceData from './analisis-datasets/reference_data.json'
 
-// ── Constantes ────────────────────────────────────────────────────────────────
+const API = 'http://localhost:8000'
+
+// ── Paleta / constantes ───────────────────────────────────────────────────────
 const BANDS = ['delta', 'theta', 'alpha', 'beta', 'gamma']
 const BAND_LABEL = { delta: 'δ', theta: 'θ', alpha: 'α', beta: 'β', gamma: 'γ' }
-const BAR_COLORS = {
+const BAND_COLORS = {
   delta: '#60a5fa', theta: '#34d399', alpha: '#a78bfa', beta: '#fbbf24', gamma: '#f87171'
 }
 const STATE_C = {
@@ -18,6 +20,45 @@ const STATE_C = {
   insight:         { bg: 'bg-pink-900/40',    text: 'text-pink-300',   dot: '#f472b6' },
 }
 
+// ── Hooks de datos ────────────────────────────────────────────────────────────
+function useSessions() {
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      const r = await fetch(`${API}/sessions?limit=200`)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data = await r.json()
+      setSessions(data.sessions ?? [])
+    } catch (e) { setError(e.message) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+  return { sessions, loading, error, reload: load }
+}
+
+const metricsCache = {}
+function useRecordingMetrics(id) {
+  const [state, dispatch] = useReducer((s, a) => ({ ...s, ...a }), { data: null, loading: false, error: null })
+
+  useEffect(() => {
+    if (!id) return
+    if (metricsCache[id]) { dispatch({ data: metricsCache[id], loading: false, error: null }); return }
+    dispatch({ loading: true, error: null })
+    fetch(`${API}/sessions/${id}/metrics`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then(d => { const m = d.metrics ?? d; metricsCache[id] = m; dispatch({ data: m, loading: false }) })
+      .catch(e => dispatch({ error: e.message, loading: false }))
+  }, [id])
+
+  return state
+}
+
+// ── Atoms ─────────────────────────────────────────────────────────────────────
 function StateBadge({ state }) {
   const c = STATE_C[state] || STATE_C.transitioning
   return (
@@ -42,7 +83,6 @@ function Bar({ value, color, maxVal = 0.8 }) {
   )
 }
 
-// Δ coloreado: verde ≤2%, amarillo ≤6%, rojo >6%
 function Delta({ a, b }) {
   if (b == null || a == null) return null
   const d = a - b
@@ -55,6 +95,245 @@ function Delta({ a, b }) {
   )
 }
 
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function QualityDot({ q }) {
+  const color = q >= 0.9 ? '#34d399' : q >= 0.6 ? '#fbbf24' : '#f87171'
+  return <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ backgroundColor: color }} />
+}
+
+function RecordingItem({ rec, active, onClick }) {
+  const date = rec.started_at ? new Date(rec.started_at).toLocaleString('es', {
+    month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  }) : '–'
+  const dur = rec.duration_seconds ? `${Math.round(rec.duration_seconds)}s` : '–'
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-3 py-2.5 border-b border-white/[0.04] transition-colors flex items-start gap-2 group
+        ${active ? 'bg-white/[0.06] border-l-2 border-l-purple-500' : 'hover:bg-white/[0.03] border-l-2 border-l-transparent'}`}
+    >
+      <QualityDot q={rec.avg_signal_quality ?? 0} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] text-white/80 font-medium truncate leading-tight">{rec.name || `Grabación #${rec.id}`}</p>
+        <p className="text-[9px] text-white/30 mt-0.5">{date} · {dur}</p>
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          {rec.calibration_passed && (
+            <span className="text-[8px] text-green-400 bg-green-900/30 px-1 py-0.5 rounded">CAL ✓</span>
+          )}
+          {rec.avg_coherence != null && (
+            <span className="text-[8px] text-purple-300 font-mono">coh {rec.avg_coherence.toFixed(2)}</span>
+          )}
+          {rec.avg_alpha != null && (
+            <span className="text-[8px] text-purple-300/60 font-mono">α {rec.avg_alpha.toFixed(3)}</span>
+          )}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function Sidebar({ sessions, loading, error, selected, onSelect, onReload }) {
+  const [q, setQ] = useState('')
+  const filtered = q
+    ? sessions.filter(s => (s.name || '').toLowerCase().includes(q.toLowerCase()) || String(s.id).includes(q))
+    : sessions
+
+  return (
+    <div className="w-64 flex-shrink-0 border-r border-white/[0.06] flex flex-col h-full">
+      <div className="px-3 py-3 border-b border-white/[0.06]">
+        <p className="text-[10px] text-white/30 uppercase tracking-widest mb-2">Grabaciones</p>
+        <input
+          value={q} onChange={e => setQ(e.target.value)}
+          placeholder="Buscar…"
+          className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-[11px] text-white/70
+            placeholder-white/20 focus:outline-none focus:border-purple-500/50"
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {loading && <p className="text-[10px] text-white/20 p-3">Cargando…</p>}
+        {error && <p className="text-[10px] text-red-400 p-3">Error: {error}</p>}
+        {!loading && !error && filtered.length === 0 && (
+          <p className="text-[10px] text-white/15 p-3">Sin grabaciones</p>
+        )}
+        {filtered.map(s => (
+          <RecordingItem key={s.id} rec={s} active={selected?.id === s.id} onClick={() => onSelect(s)} />
+        ))}
+      </div>
+
+      <div className="px-3 py-2 border-t border-white/[0.06] flex items-center justify-between">
+        <span className="text-[9px] text-white/20">{sessions.length} grabaciones</span>
+        <button onClick={onReload} className="text-[9px] text-white/30 hover:text-white/60 transition-colors">⟳ recargar</button>
+      </div>
+    </div>
+  )
+}
+
+// ── BandTimechart (SVG) ───────────────────────────────────────────────────────
+function BandTimechart({ band, metrics }) {
+  const color = BAND_COLORS[band]
+  const vals  = metrics.map(m => m[band] ?? 0)
+  const max   = Math.max(...vals, 0.001)
+  const W = 600, H = 48
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1 || 1)) * W},${H - (v / max) * H * 0.9}`)
+  const poly = pts.join(' ')
+  const area = `${pts.join(' ')} ${W},${H} 0,${H}`
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[10px]" style={{ color }}>{BAND_LABEL[band]} {band}</span>
+        <span className="text-[9px] font-mono text-white/20">máx {max.toFixed(4)}</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-10" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`g-${band}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon points={area} fill={`url(#g-${band})`} />
+        <polyline points={poly} fill="none" stroke={color} strokeWidth="1.5" />
+      </svg>
+    </div>
+  )
+}
+
+// ── StateTimeline ─────────────────────────────────────────────────────────────
+function StateTimeline({ metrics }) {
+  const total = metrics.length
+  if (!total) return null
+
+  const runs = []
+  let cur = null
+  metrics.forEach((m, i) => {
+    const s = m.state || 'transitioning'
+    if (s !== cur?.state) { cur = { state: s, start: i, count: 1 }; runs.push(cur) }
+    else cur.count++
+  })
+
+  return (
+    <div>
+      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Estado en el tiempo</p>
+      <div className="flex h-4 rounded overflow-hidden gap-px">
+        {runs.map((r, i) => {
+          const c = STATE_C[r.state] || STATE_C.transitioning
+          const w = ((r.count / total) * 100).toFixed(2)
+          return (
+            <div key={i} style={{ width: `${w}%`, backgroundColor: c.dot, opacity: 0.7 }}
+              title={`${r.state} (${r.count} muestras)`} />
+          )
+        })}
+      </div>
+      <div className="flex items-center gap-3 mt-1 flex-wrap">
+        {[...new Set(runs.map(r => r.state))].map(s => (
+          <span key={s} className="flex items-center gap-1 text-[9px] text-white/40">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: (STATE_C[s] || STATE_C.transitioning).dot }} />
+            {s}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── TabBandas ─────────────────────────────────────────────────────────────────
+function TabBandas({ rec, metrics }) {
+  if (!metrics || metrics.length === 0) return (
+    <p className="text-[11px] text-white/30 p-6">Sin datos de métricas en InfluxDB para esta grabación.</p>
+  )
+
+  const avgBand = band => metrics.reduce((s, m) => s + (m[band] ?? 0), 0) / metrics.length
+
+  return (
+    <div className="p-5 space-y-6">
+      <div className="flex gap-3 flex-wrap">
+        {BANDS.map(b => (
+          <div key={b} className="bg-white/[0.04] rounded-lg px-3 py-2 flex flex-col items-center">
+            <span className="text-[10px]" style={{ color: BAND_COLORS[b] }}>{BAND_LABEL[b]}</span>
+            <span className="text-sm font-mono text-white/80 mt-0.5">{(avgBand(b) * 100).toFixed(1)}%</span>
+          </div>
+        ))}
+        <div className="bg-white/[0.04] rounded-lg px-3 py-2 flex flex-col items-center">
+          <span className="text-[10px] text-purple-300">coh</span>
+          <span className="text-sm font-mono text-white/80 mt-0.5">
+            {(metrics.reduce((s, m) => s + (m.coherence ?? 0), 0) / metrics.length).toFixed(3)}
+          </span>
+        </div>
+      </div>
+
+      <StateTimeline metrics={metrics} />
+
+      <div className="space-y-4">
+        {BANDS.map(b => <BandTimechart key={b} band={b} metrics={metrics} />)}
+      </div>
+    </div>
+  )
+}
+
+// ── TabInfo ───────────────────────────────────────────────────────────────────
+function TabInfo({ rec, metrics }) {
+  const rows = [
+    ['ID', rec.id],
+    ['Nombre', rec.name || '–'],
+    ['Inicio', rec.started_at ? new Date(rec.started_at).toLocaleString('es') : '–'],
+    ['Fin', rec.ended_at ? new Date(rec.ended_at).toLocaleString('es') : '–'],
+    ['Duración', rec.duration_seconds ? `${rec.duration_seconds.toFixed(1)}s` : '–'],
+    ['Muestras', rec.sample_count ?? '–'],
+    ['Métricas', rec.metrics_count ?? '–'],
+    ['Señal media', rec.avg_signal_quality != null ? rec.avg_signal_quality.toFixed(3) : '–'],
+    ['Calibrado', rec.calibration_passed ? '✓ sí' : '✗ no'],
+    ['Coherencia media', rec.avg_coherence != null ? rec.avg_coherence.toFixed(3) : '–'],
+    ['Coherencia pico', rec.peak_coherence != null ? rec.peak_coherence.toFixed(3) : '–'],
+    ['α media', rec.avg_alpha != null ? rec.avg_alpha.toFixed(4) : '–'],
+    ['θ media', rec.avg_theta != null ? rec.avg_theta.toFixed(4) : '–'],
+    ['δ media', rec.avg_delta != null ? rec.avg_delta.toFixed(4) : '–'],
+    ['β media', rec.avg_beta != null ? rec.avg_beta.toFixed(4) : '–'],
+    ['γ media', rec.avg_gamma != null ? rec.avg_gamma.toFixed(4) : '–'],
+    ['Tags', rec.tags ? JSON.stringify(rec.tags) : '–'],
+    ['Tipo', rec.recording_type || '–'],
+  ]
+  return (
+    <div className="p-5">
+      <p className="text-[9px] text-white/30 uppercase tracking-widest mb-3">Metadatos (PostgreSQL)</p>
+      <table className="w-full text-xs mb-6">
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k} className="border-b border-white/[0.04]">
+              <td className="py-1.5 pr-4 text-white/30 w-40">{k}</td>
+              <td className="py-1.5 font-mono text-white/70">{String(v)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {metrics && metrics.length > 0 && (
+        <>
+          <p className="text-[9px] text-white/30 uppercase tracking-widest mb-3">
+            Agregados InfluxDB ({metrics.length} puntos)
+          </p>
+          <table className="w-full text-xs">
+            <tbody>
+              {['alpha', 'theta', 'delta', 'beta', 'gamma', 'coherence', 'signal_quality_avg'].map(k => {
+                const vals = metrics.map(m => m[k] ?? 0)
+                const avg = vals.reduce((s, v) => s + v, 0) / (vals.length || 1)
+                const mx = Math.max(...vals)
+                return (
+                  <tr key={k} className="border-b border-white/[0.04]">
+                    <td className="py-1.5 pr-4 text-white/30 w-40">{k}</td>
+                    <td className="py-1.5 font-mono text-white/60">avg {avg.toFixed(4)}</td>
+                    <td className="py-1.5 font-mono text-white/30">max {mx.toFixed(4)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── TabComparar (comparación con referencia EDF, conexión WS live) ────────────
 function BandCompareRow({ label, color, live, raw, ref }) {
   const rawMissing = raw == null
   return (
@@ -76,501 +355,217 @@ function BandCompareRow({ label, color, live, raw, ref }) {
   )
 }
 
-// ── Panel de snapshot ─────────────────────────────────────────────────────────
-function SnapshotPanel({ snap, onDismiss }) {
-  const tSec = Math.round(snap.sessionTimestamp ?? 0)
-  const refRow = referenceData.rows.reduce((best, r) =>
-    Math.abs(r.t - tSec) < Math.abs(best.t - tSec) ? r : best
-  )
-  // 'recorded' = métricas de InfluxDB (la grabación ya tenía EMA aplicado)
-  // En ese caso bandsDisplayRaw == bandsDisplay (sin columna extra útil)
-  // Para dataset/session recalculado: bandsDisplayRaw = pre-EMA real
-  const isRecorded = snap.source === 'recorded'
+function TabComparar() {
+  const { bandsDisplay, bandsDisplayRaw, bandsRaw, state, stateRaw, plv, coherence,
+          sessionProgress, sessionTimestamp, connectToField, socket, source } = useBrainStore()
+  const wsConnected = socket?.readyState === WebSocket.OPEN
 
-  // Para recorded: usamos bandsDisplay directamente (mejor disponibilidad)
-  // Para raw compute: usamos bandsDisplayRaw (pre-EMA)
-  const compareVals = isRecorded ? snap.bandsDisplay : snap.bandsDisplayRaw
-  const hasCompare  = compareVals != null
-
-  const totalDelta = hasCompare
-    ? BANDS.reduce((sum, b) => sum + Math.abs((compareVals[b] ?? 0) - refRow.bands_display[b]), 0) / BANDS.length
-    : null
-
-  const liveCoherence = snap.coherence  // MSC grabado (si source=recorded)
-  const livePLV       = snap.plv        // PLV (grabado o calculado)
-
-  return (
-    <div className="bg-white/[0.03] border border-white/20 rounded-xl p-4 mb-6 relative">
-      <button onClick={onDismiss} className="absolute top-3 right-3 text-white/30 hover:text-white/60 text-xs">✕</button>
-
-      <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
-        <div>
-          <p className="text-[10px] text-white/40 font-mono mb-0.5">
-            SNAPSHOT — t={tSec}s · {(snap.sessionProgress * 100).toFixed(2)}% · ref t={refRow.t}s
-            {isRecorded && <span className="ml-2 text-white/20">· source=recorded (InfluxDB)</span>}
-          </p>
-          {totalDelta != null
-            ? <span className={`text-[10px] font-mono ${totalDelta < 0.02 ? 'text-green-400' : totalDelta < 0.05 ? 'text-yellow-400' : 'text-red-400'}`}>
-                Error medio = {(totalDelta * 100).toFixed(1)}% vs referencia
-                {isRecorded && <span className="text-white/20 ml-1">(grabado vs EDF fresco)</span>}
-              </span>
-            : null}
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          {isRecorded
-            ? <><span className="text-[9px] text-white/30">grabado:</span><StateBadge state={snap.state} /></>
-            : <>
-                <span className="text-[9px] text-white/30">raw:</span><StateBadge state={snap.stateRaw ?? snap.state} />
-                {snap.stateRaw !== snap.state && (
-                  <><span className="text-[9px] text-white/30">EMA:</span><StateBadge state={snap.state} /></>
-                )}
-              </>}
-          <span className="text-[9px] text-white/30">ref:</span><StateBadge state={refRow.state} />
-        </div>
-      </div>
-
-      {isRecorded && (
-        <p className="text-[9px] text-white/20 mb-3 leading-relaxed">
-          Sesión grabada — los valores reproducen InfluxDB (ya incluían EMA de la grabación original).
-          La columna “Raw pre-EMA” no aplica. Se compara directamente grabado ↔ referencia EDF.
-        </p>
-      )}
-
-      <table className="w-full text-xs mb-3">
-        <thead>
-          <tr className="border-b border-white/10">
-            <th className="text-left py-1 pr-2 w-4" />
-            <th className="text-left py-1 px-1 text-[9px] text-white/40 uppercase">
-              {isRecorded ? 'Grabado (InfluxDB)' : 'Live (EMA)'}
-              <br/><span className="text-white/20 normal-case font-normal">bands_display</span>
-            </th>
-            {!isRecorded && (
-              <th className="text-left py-1 px-1 text-[9px] text-white/40 uppercase">
-                Raw (pre-EMA)<br/><span className="text-white/20 normal-case font-normal">bands_display_raw · Δ vs EMA</span>
-              </th>
-            )}
-            <th className="text-left py-1 px-1 text-[9px] text-white/40 uppercase">
-              Referencia t={refRow.t}s
-              <br/><span className="text-white/20 normal-case font-normal">
-                {isRecorded ? 'Δ grabado vs EDF' : 'Δ raw vs ref'}
-              </span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {BANDS.map(b => (
-            isRecorded
-              // Modo recorded: 2 columnas — grabado | referencia
-              ? <tr key={b} className="border-b border-white/[0.04]">
-                  <td className="py-0.5 pr-2 text-[10px]" style={{ color: BAR_COLORS[b] }}>{BAND_LABEL[b]}</td>
-                  <td className="py-0.5 px-1"><Bar value={snap.bandsDisplay?.[b] ?? 0} color={BAR_COLORS[b]} /></td>
-                  <td className="py-0.5 px-1">
-                    <div className="flex items-center">
-                      <Bar value={refRow.bands_display[b]} color={BAR_COLORS[b]} />
-                      <Delta a={snap.bandsDisplay?.[b]} b={refRow.bands_display[b]} />
-                    </div>
-                  </td>
-                </tr>
-              // Modo raw compute: 3 columnas — EMA | raw pre-EMA | referencia
-              : <BandCompareRow
-                  key={b} label={BAND_LABEL[b]} color={BAR_COLORS[b]}
-                  live={snap.bandsDisplay?.[b]}
-                  raw={snap.bandsDisplayRaw?.[b]}
-                  ref={refRow.bands_display[b]}
-                />
-          ))}
-        </tbody>
-      </table>
-
-      <div className="grid grid-cols-3 gap-2 text-[10px] pt-3 border-t border-white/[0.06]">
-        <div>
-          <span className="text-white/30">PLV live: </span>
-          <span className="font-mono text-white/70">{livePLV != null ? livePLV.toFixed(3) : '–'}</span>
-          {isRecorded && liveCoherence != null && liveCoherence !== livePLV && (
-            <span className="text-white/20 ml-1">(MSC: {liveCoherence.toFixed(3)})</span>
-          )}
-        </div>
-        <div>
-          <span className="text-white/30">PLV ref: </span>
-          <span className="font-mono text-white/70">{refRow.coherence.toFixed(3)}</span>
-          {livePLV != null && <Delta a={livePLV} b={refRow.coherence} />}
-        </div>
-        <div><span className="text-white/30">f dom ref: </span><span className="font-mono text-white/70">{refRow.dominant_freq}Hz</span></div>
-      </div>
-
-      <div className="mt-3 pt-3 border-t border-white/[0.06] text-[10px] space-y-0.5">
-        <p className="text-white/40 font-medium mb-1">Diagnóstico automático:</p>
-        {hasCompare && BANDS.map(b => {
-          const cmpVal = compareVals[b]
-          const refVal = refRow.bands_display[b]
-          if (cmpVal == null) return null
-          const diff = cmpVal - refVal
-          const abs  = Math.abs(diff)
-          if (abs < 0.03) return null
-          return (
-            <p key={b}>
-              <span style={{ color: BAR_COLORS[b] }}>{b}</span>
-              {isRecorded ? ' grabado ' : ' raw '}
-              <span className="text-white/50">{(cmpVal*100).toFixed(1)}%</span>
-              {' vs ref '}<span className="text-white/50">{(refVal*100).toFixed(1)}%</span>
-              {' → '}<span className={diff > 0 ? 'text-amber-400' : 'text-blue-400'}>
-                {diff > 0 ? `+${(diff*100).toFixed(1)}% SOBRE` : `${(diff*100).toFixed(1)}% BAJO`}
-              </span>
-              {abs > 0.08 && <span className="text-red-400 ml-1"> ⚠ diferencia grande</span>}
-            </p>
-          )
-        })}
-        {!isRecorded && snap.stateRaw !== snap.state && (
-          <p className="text-yellow-400">EMA cambia el estado: {snap.stateRaw} → {snap.state}</p>
-        )}
-        {snap.state !== refRow.state && (
-          <p className="text-orange-400">Estado live ({snap.state}) ≠ ref ({refRow.state})</p>
-        )}
-        {isRecorded && livePLV != null && liveCoherence != null && (
-          <p className="text-white/30">Coherencia grabada: MSC={liveCoherence.toFixed(3)} · PLV={livePLV.toFixed(3)} — métricas distintas, valores distintos son normales</p>
-        )}
-        {totalDelta != null && totalDelta < 0.02 && (
-          <p className="text-green-400">✓ Pipeline correcto — error menor al 2% en todas las bandas</p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Tabla de referencia con capturas intercaladas ─────────────────────────────
-function RefTable({ snapshots, filter }) {
-  const rows = filter === 'all' ? referenceData.rows : referenceData.rows.filter(r => r.state === filter)
-  const snapMap = {}
-  snapshots.forEach(s => { snapMap[Math.round(s.sessionTimestamp ?? 0)] = s })
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[10px]">
-        <thead>
-          <tr className="border-b border-white/10 text-white/30">
-            <th className="text-left py-2 px-2 w-10">t(s)</th>
-            {BANDS.map(b => (
-              <th key={b} className="text-left py-2 px-1" style={{ color: BAR_COLORS[b] + '99' }}>
-                {BAND_LABEL[b]} raw
-              </th>
-            ))}
-            <th className="py-2 px-1 text-white/10">│</th>
-            {BANDS.map(b => (
-              <th key={b} className="text-left py-2 px-1" style={{ color: BAR_COLORS[b] + '66' }}>
-                {BAND_LABEL[b]} disp
-              </th>
-            ))}
-            <th className="py-2 px-1 text-white/10">│</th>
-            <th className="text-left py-2 px-1">PLV</th>
-            <th className="text-left py-2 px-1">f dom</th>
-            <th className="text-left py-2 px-1">estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(row => {
-            const snap = snapMap[row.t]
-            const sc   = STATE_C[row.state] || STATE_C.transitioning
-            return (
-              <React.Fragment key={row.t}>
-                {/* Fila referencia */}
-                <tr className={`border-b border-white/[0.04] hover:bg-white/[0.02] ${snap ? 'border-b-0' : ''}`}>
-                  <td className="py-1 px-2 font-mono text-white/40">{row.t}</td>
-                  {BANDS.map(b => <td key={b} className="py-1 px-1"><Bar value={row.bands[b]} color={BAR_COLORS[b]} /></td>)}
-                  <td className="text-white/10 px-1">│</td>
-                  {BANDS.map(b => <td key={b} className="py-1 px-1"><Bar value={row.bands_display[b]} color={BAR_COLORS[b]} maxVal={0.65} /></td>)}
-                  <td className="text-white/10 px-1">│</td>
-                  <td className="py-1 px-1 font-mono" style={{
-                    color: row.coherence > 0.5 ? '#a78bfa' : row.coherence > 0.35 ? '#34d399' : '#6b7280'
-                  }}>{row.coherence.toFixed(3)}</td>
-                  <td className="py-1 px-1 font-mono text-white/40">{row.dominant_freq}Hz</td>
-                  <td className="py-1 px-1"><StateBadge state={row.state} /></td>
-                </tr>
-
-                {/* Sub-fila live (snapshot en este segundo) */}
-                {snap && (
-                  <tr className={`border-b border-white/10 ${sc.bg}`}>
-                    <td className="py-1 px-2 text-[9px] text-white/30 italic">live</td>
-                    {/* raw bands: captura pre-EMA vs referencia raw */}
-                    {BANDS.map(b => (
-                      <td key={b} className="py-1 px-1">
-                        {snap.bandsRaw
-                          ? <div className="flex items-center"><Bar value={snap.bandsRaw[b] ?? 0} color={BAR_COLORS[b]} /><Delta a={snap.bandsRaw[b]} b={row.bands[b]} /></div>
-                          : <span className="text-[9px] text-white/15">–</span>}
-                      </td>
-                    ))}
-                    <td className="text-white/10 px-1">│</td>
-                    {/* display bands: captura pre-EMA vs referencia display */}
-                    {BANDS.map(b => (
-                      <td key={b} className="py-1 px-1">
-                        {snap.bandsDisplayRaw
-                          ? <div className="flex items-center"><Bar value={snap.bandsDisplayRaw[b] ?? 0} color={BAR_COLORS[b]} maxVal={0.65} /><Delta a={snap.bandsDisplayRaw[b]} b={row.bands_display[b]} /></div>
-                          : <span className="text-[9px] text-white/15">–</span>}
-                      </td>
-                    ))}
-                    <td className="text-white/10 px-1">│</td>
-                    <td className="py-1 px-1 font-mono text-white/60">{(snap.plv ?? snap.coherence ?? 0).toFixed(3)}</td>
-                    <td className="py-1 px-1" />
-                    <td className="py-1 px-1"><StateBadge state={snap.stateRaw ?? snap.state} /></td>
-                  </tr>
-                )}
-              </React.Fragment>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// ── Timelines ─────────────────────────────────────────────────────────────────
-function BandTimeline({ band, color, snapshots }) {
-  const rows   = referenceData.rows
-  const values = rows.map(r => r.bands[band])
-  const max    = Math.max(...values, 0.01)
-  const W = 800, H = 36
-  const line = values.map((v, i) =>
-    `${(i / (values.length - 1)) * W},${H - (v / max) * H * 0.9}`
-  ).join(' ')
-  const dots = snapshots
-    .filter(s => s.bandsRaw?.[band] != null && s.sessionTimestamp != null)
-    .map(s => ({
-      x: (s.sessionTimestamp / 60) * W,
-      y: H - (s.bandsRaw[band] / max) * H * 0.9
-    }))
-  return (
-    <div>
-      <div className="text-[10px] text-white/30 mb-0.5 capitalize">{band}</div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-7" preserveAspectRatio="none">
-        <polyline points={line} fill="none" stroke={color} strokeWidth="1.5" opacity="0.5" />
-        {dots.map((d, i) => (
-          <circle key={i} cx={d.x} cy={d.y} r="5" fill={color} stroke="#000" strokeWidth="1.5" />
-        ))}
-      </svg>
-    </div>
-  )
-}
-
-// ── Live strip ────────────────────────────────────────────────────────────────
-function LiveStrip() {
-  const { bandsDisplay, bandsDisplayRaw, state, stateRaw, plv, coherence, sessionTimestamp, sessionProgress } = useBrainStore()
-  if (!sessionProgress) return null
-  const tSec = Math.round(sessionTimestamp ?? 0)
-  const ref  = referenceData.rows.find(r => r.t === tSec)
-  return (
-    <div className="mb-4 bg-white/[0.03] border border-white/10 rounded-xl p-3 flex items-start gap-6 flex-wrap">
-      <div>
-        <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">t sesión</p>
-        <p className="font-mono text-xs text-white/70">{tSec}s · {(sessionProgress * 100).toFixed(2)}%</p>
-      </div>
-      <div>
-        <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Estado</p>
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[9px] text-white/20">raw:</span><StateBadge state={stateRaw ?? state} />
-          {stateRaw && stateRaw !== state && (
-            <><span className="text-[9px] text-white/20">EMA:</span><StateBadge state={state} /></>
-          )}
-          {ref && <><span className="text-[9px] text-white/20">ref:</span><StateBadge state={ref.state} /></>}
-        </div>
-      </div>
-      <div>
-        <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">α display</p>
-        <p className="font-mono text-xs">
-          <span className="text-purple-400">{((bandsDisplay?.alpha ?? 0) * 100).toFixed(1)}%</span>
-          {bandsDisplayRaw && <span className="text-white/40"> raw {((bandsDisplayRaw.alpha ?? 0) * 100).toFixed(1)}%</span>}
-          {ref && <span className="text-white/25"> ref {(ref.bands_display.alpha * 100).toFixed(1)}%</span>}
-        </p>
-      </div>
-      <div>
-        <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">PLV</p>
-        <span className="font-mono text-xs text-white/70">{(plv ?? coherence ?? 0).toFixed(3)}</span>
-        {ref && <span className="text-white/25 text-[10px] ml-1">ref {ref.coherence.toFixed(3)}</span>}
-      </div>
-    </div>
-  )
-}
-
-// ── Botón captura ─────────────────────────────────────────────────────────────
-function CaptureButton({ onCapture }) {
-  const { sessionProgress, sessionTimestamp, bands, bandsDisplay,
-          bandsRaw, bandsDisplayRaw, state, stateRaw, plv, coherence, source } = useBrainStore()
-  const canCapture = sessionProgress != null
-  return (
-    <button
-      onClick={() => canCapture && onCapture({
-        capturedAt: Date.now(), sessionProgress, sessionTimestamp,
-        bands, bandsDisplay, bandsRaw, bandsDisplayRaw,
-        state, stateRaw, plv, coherence, source,
-      })}
-      disabled={!canCapture}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
-        ${canCapture
-          ? 'bg-purple-600 hover:bg-purple-500 text-white'
-          : 'bg-white/5 text-white/20 cursor-not-allowed'}`}
-    >
-      📸 {canCapture ? `Capturar t≈${Math.round(sessionTimestamp ?? 0)}s` : 'Sin sesión activa'}
-    </button>
-  )
-}
-
-// ── Página principal ──────────────────────────────────────────────────────────
-export default function AnalisisDatasets() {
-  const [snapshots, setSnapshots] = useState([])
-  const [activeSnap, setActiveSnap] = useState(null)
-  const [filter, setFilter] = useState('all')
-  const [showTL, setShowTL] = useState(true)
-  const [showMeta, setShowMeta] = useState(false)
-  const sessionProgress = useBrainStore(s => s.sessionProgress)
-  const connectToField  = useBrainStore(s => s.connectToField)
-  const socket          = useBrainStore(s => s.socket)
-  const wsConnected     = socket?.readyState === WebSocket.OPEN
-
-  // Auto-connect WS when this page mounts (works in any tab, no need to visit /lab/brain first)
   useEffect(() => { connectToField() }, [connectToField])
 
-  const addSnapshot = useCallback((snap) => {
+  const [snapshots, setSnapshots] = useState([])
+  const [activeSnap, setActiveSnap] = useState(null)
+
+  const addSnapshot = useCallback(() => {
+    if (sessionProgress == null) return
+    const snap = {
+      capturedAt: Date.now(), sessionProgress, sessionTimestamp,
+      bandsDisplay, bandsDisplayRaw, bandsRaw, state, stateRaw, plv, coherence, source,
+    }
     setSnapshots(prev => [snap, ...prev.slice(0, 19)])
     setActiveSnap(snap)
-  }, [])
+  }, [sessionProgress, sessionTimestamp, bandsDisplay, bandsDisplayRaw, bandsRaw, state, stateRaw, plv, coherence, source])
 
-  const states = [...new Set(referenceData.rows.map(r => r.state))]
+  const tSec = Math.round(sessionTimestamp ?? 0)
+  const ref  = referenceData.rows.reduce((best, r) =>
+    Math.abs(r.t - tSec) < Math.abs(best.t - tSec) ? r : best, referenceData.rows[0])
 
   return (
-    <div className="min-h-screen bg-black text-white px-4 py-8 max-w-screen-2xl mx-auto">
-
-      <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <p className="text-[10px] text-white/20 font-mono uppercase tracking-wider mb-1">
-            DEBUG · INTERNAL · /analisis-datasets
-          </p>
-          <h1 className="text-xl font-bold">Validación EEG — sub-001 meditación</h1>
-          <p className="text-white/30 text-xs mt-0.5">
-            Primer minuto · pipeline idéntico al backend · sin smoothing EMA
-          </p>
+    <div className="p-5 space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 text-[10px]">
+          <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+          <span className={wsConnected ? 'text-green-400' : 'text-red-400'}>
+            {wsConnected ? (sessionProgress != null ? `t≈${tSec}s activo` : 'WS conectado') : 'sin WS'}
+          </span>
         </div>
-        <div className="flex items-center gap-3">
-          {/* WS status dot */}
-          <div className="flex items-center gap-1.5 text-[10px]">
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
-            <span className={wsConnected ? 'text-green-400' : 'text-red-400'}>
-              {wsConnected ? (sessionProgress != null ? 'sesión activa' : 'WS conectado…') : 'sin conexión'}
-            </span>
-          </div>
-          <CaptureButton onCapture={addSnapshot} />
-          {snapshots.length > 0 && (
-            <button
-              onClick={() => { setSnapshots([]); setActiveSnap(null) }}
-              className="text-xs text-white/20 hover:text-white/40 transition-colors"
-            >
-              Borrar {snapshots.length} capturas
-            </button>
-          )}
-        </div>
+        <button
+          onClick={addSnapshot} disabled={sessionProgress == null}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors
+            ${sessionProgress != null ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-white/5 text-white/20 cursor-not-allowed'}`}
+        >
+          📸 Capturar t≈{tSec}s
+        </button>
+        {snapshots.length > 0 && (
+          <button onClick={() => { setSnapshots([]); setActiveSnap(null) }}
+            className="text-xs text-white/20 hover:text-white/40 transition-colors">
+            Borrar {snapshots.length}
+          </button>
+        )}
       </div>
-
-      <LiveStrip />
-
-      {activeSnap && <SnapshotPanel snap={activeSnap} onDismiss={() => setActiveSnap(null)} />}
-
-      {snapshots.length > 1 && (
-        <div className="mb-4 flex gap-2 flex-wrap">
-          {snapshots.map((s, i) => (
-            <button key={s.capturedAt} onClick={() => setActiveSnap(s)}
-              className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-colors
-                ${activeSnap?.capturedAt === s.capturedAt
-                  ? 'border-purple-500 text-purple-300 bg-purple-900/20'
-                  : 'border-white/10 text-white/30 hover:border-white/30'}`}>
-              #{i + 1} t≈{Math.round(s.sessionTimestamp ?? 0)}s
-            </button>
-          ))}
-        </div>
-      )}
 
       {!wsConnected && (
-        <div className="mb-6 px-4 py-3 bg-red-900/20 border border-red-500/20 rounded-xl text-xs text-red-200/60">
-          <strong>Sin conexión al backend.</strong> Asegúrate de que el backend está corriendo en <code>localhost:8000</code>.
-          La página se reconecta automáticamente cada 2s.
-        </div>
-      )}
-      {wsConnected && !sessionProgress && (
-        <div className="mb-6 px-4 py-3 bg-amber-900/20 border border-amber-500/20 rounded-xl text-xs text-amber-200/60">
-          <strong>WS conectado pero sin sesión.</strong> Ve a <code>/lab/brain</code> → activa modo sesión → pulsa play.
-          Cuando quieras capturar un segundo, pon pausa ahí y usa el botón de captura.
+        <div className="px-3 py-2 bg-red-900/20 border border-red-500/20 rounded text-xs text-red-300/60">
+          Backend apagado. Inicia el servidor en <code>localhost:8000</code>.
         </div>
       )}
 
-      <div className="mb-4 bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
-        <button onClick={() => setShowMeta(!showMeta)}
-          className="w-full flex items-center justify-between px-3 py-2 text-[10px] text-white/30 hover:text-white/50 transition-colors">
-          <span className="uppercase tracking-wider">Leyenda y pipeline</span>
-          <span>{showMeta ? '▲' : '▼'}</span>
-        </button>
-        {showMeta && (
-          <div className="px-3 pb-3 grid grid-cols-2 gap-4 text-[10px]">
-            <div>
-              <p className="text-white/30 mb-1 uppercase text-[9px]">Cómo leer la tabla</p>
-              <p className="text-white/40 leading-relaxed">
-                <strong className="text-white/60">raw</strong>: Welch PSD normalizado.{' '}
-                <strong className="text-white/60">disp</strong>: raw × f_centre/bandwidth (lo que ves en las barras).<br/>
-                La fila <span className="italic text-purple-300">live</span> muestra tu captura pre-EMA.
-                Los Δ en rojo/amarillo son diferencias vs referencia.
-              </p>
-            </div>
-            <div>
-              <p className="text-white/30 mb-1 uppercase text-[9px]">Pipeline referencia</p>
-              {Object.entries(referenceData.meta.processing).map(([k, v]) => (
-                <div key={k} className="flex gap-2 mb-0.5">
-                  <span className="text-white/20 w-28 flex-shrink-0">{k}</span>
-                  <span className="text-white/50 font-mono">{String(v)}</span>
-                </div>
+      {activeSnap && (
+        <div className="bg-white/[0.03] border border-white/20 rounded-xl p-4 relative">
+          <button onClick={() => setActiveSnap(null)} className="absolute top-3 right-3 text-white/30 hover:text-white/60 text-xs">✕</button>
+          <p className="text-[10px] text-white/40 font-mono mb-2">
+            SNAPSHOT t={Math.round(activeSnap.sessionTimestamp ?? 0)}s · {(activeSnap.sessionProgress * 100).toFixed(2)}%
+          </p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="text-left py-1 pr-2 w-4" />
+                <th className="text-left py-1 px-1 text-[9px] text-white/40 uppercase">Live</th>
+                <th className="text-left py-1 px-1 text-[9px] text-white/40 uppercase">Raw pre-EMA</th>
+                <th className="text-left py-1 px-1 text-[9px] text-white/40 uppercase">Ref t={ref.t}s</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BANDS.map(b => (
+                <BandCompareRow
+                  key={b} label={BAND_LABEL[b]} color={BAND_COLORS[b]}
+                  live={activeSnap.bandsDisplay?.[b]}
+                  raw={activeSnap.bandsDisplayRaw?.[b]}
+                  ref={ref.bands_display[b]}
+                />
               ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mb-4">
-        <button onClick={() => setShowTL(!showTL)}
-          className="text-[10px] text-white/30 hover:text-white/50 transition-colors uppercase tracking-wider flex items-center gap-2">
-          Timelines — puntos = capturas
-          <span>{showTL ? '▲' : '▼'}</span>
-        </button>
-        {showTL && (
-          <div className="mt-2 bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 grid gap-2">
-            {BANDS.map(b => <BandTimeline key={b} band={b} color={BAR_COLORS[b]} snapshots={snapshots} />)}
-            <div className="text-[9px] text-white/15">
-              ← t=0s · · · · · · · t=59s → {snapshots.length > 0 && ' | ● = capturas'}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mb-3 flex flex-wrap gap-2">
-        {[['all', referenceData.rows.length], ...states.map(s => [s, referenceData.rows.filter(r => r.state === s).length])].map(([s, ct]) => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`px-2.5 py-0.5 rounded text-[10px] transition-colors
-              ${filter === s
-                ? s === 'all' ? 'bg-white/15 text-white' : `${(STATE_C[s] || STATE_C.transitioning).bg} ${(STATE_C[s] || STATE_C.transitioning).text}`
-                : 'bg-white/[0.04] text-white/30 hover:text-white/50'}`}>
-            {s} ({ct}s)
-          </button>
-        ))}
-      </div>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
-        <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
-          <span className="text-[9px] text-white/30 uppercase tracking-wider">
-            REFERENCIA · raw (izq) │ display 1/f (der)
-            {snapshots.length > 0 && (
-              <span className="text-purple-400 ml-2">fila italic = captura pre-EMA · Δ vs ref</span>
-            )}
-          </span>
-          <span className="text-[9px] text-white/20 font-mono">Δ verde ≤2% · amarillo ≤6% · rojo &gt;6%</span>
+        <div className="px-3 py-2 border-b border-white/[0.06]">
+          <span className="text-[9px] text-white/30 uppercase tracking-wider">Referencia EDF — sub-001 meditación</span>
         </div>
-        <RefTable snapshots={snapshots} filter={filter} />
+        <div className="overflow-x-auto">
+          <table className="w-full text-[10px]">
+            <thead>
+              <tr className="border-b border-white/10 text-white/30">
+                <th className="text-left py-2 px-2 w-10">t(s)</th>
+                {BANDS.map(b => (
+                  <th key={b} className="text-left py-2 px-2" style={{ color: BAND_COLORS[b] + '99' }}>
+                    {BAND_LABEL[b]}
+                  </th>
+                ))}
+                <th className="text-left py-2 px-2">PLV</th>
+                <th className="text-left py-2 px-2">estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {referenceData.rows.map(row => (
+                <tr key={row.t} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                  <td className="py-1 px-2 font-mono text-white/40">{row.t}</td>
+                  {BANDS.map(b => <td key={b} className="py-1 px-2"><Bar value={row.bands_display[b]} color={BAND_COLORS[b]} /></td>)}
+                  <td className="py-1 px-2 font-mono text-white/40">{row.coherence.toFixed(3)}</td>
+                  <td className="py-1 px-2"><StateBadge state={row.state} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── RecordingHeader ───────────────────────────────────────────────────────────
+function RecordingHeader({ rec }) {
+  const date = rec.started_at ? new Date(rec.started_at).toLocaleString('es', {
+    year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  }) : '–'
+  return (
+    <div className="px-5 py-4 border-b border-white/[0.06]">
+      <h2 className="text-base font-semibold text-white">{rec.name || `Grabación #${rec.id}`}</h2>
+      <p className="text-[11px] text-white/40 mt-0.5">{date}</p>
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        {rec.duration_seconds != null && (
+          <span className="text-[10px] bg-white/[0.05] px-2 py-0.5 rounded text-white/60">
+            {Math.round(rec.duration_seconds)}s
+          </span>
+        )}
+        {rec.sample_count != null && (
+          <span className="text-[10px] bg-white/[0.05] px-2 py-0.5 rounded text-white/60">
+            {rec.sample_count} muestras
+          </span>
+        )}
+        {rec.calibration_passed && (
+          <span className="text-[10px] bg-green-900/40 text-green-300 px-2 py-0.5 rounded">calibrado ✓</span>
+        )}
+        {rec.avg_signal_quality != null && (
+          <span className="text-[10px] bg-white/[0.05] px-2 py-0.5 rounded"
+            style={{ color: rec.avg_signal_quality >= 0.9 ? '#34d399' : rec.avg_signal_quality >= 0.6 ? '#fbbf24' : '#f87171' }}>
+            señal {(rec.avg_signal_quality * 100).toFixed(0)}%
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── RecordingView ─────────────────────────────────────────────────────────────
+const TABS = ['Bandas', 'Comparar ref.', 'Info']
+
+function RecordingView({ rec }) {
+  const [tab, setTab] = useState('Bandas')
+  const { data: metrics, loading, error } = useRecordingMetrics(rec.id)
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <RecordingHeader rec={rec} />
+
+      <div className="flex border-b border-white/[0.06] px-4 flex-shrink-0">
+        {TABS.map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-3 py-2.5 text-xs font-medium transition-colors border-b-2 mr-1
+              ${tab === t ? 'border-purple-500 text-white' : 'border-transparent text-white/30 hover:text-white/60'}`}>
+            {t}
+          </button>
+        ))}
+        {loading && <span className="ml-auto text-[9px] text-white/20 self-center">cargando métricas…</span>}
+        {error && <span className="ml-auto text-[9px] text-red-400 self-center">error: {error}</span>}
       </div>
 
-      <div className="mt-6 text-[10px] text-white/15">
-        Regenerar: <code className="font-mono text-white/25">python scripts/generate_validation_reference.py</code>
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'Bandas'        && <TabBandas rec={rec} metrics={metrics ?? []} />}
+        {tab === 'Comparar ref.' && <TabComparar />}
+        {tab === 'Info'          && <TabInfo rec={rec} metrics={metrics ?? []} />}
+      </div>
+    </div>
+  )
+}
+
+// ── EmptyState ────────────────────────────────────────────────────────────────
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-white/20 select-none">
+      <div className="text-4xl mb-3">⟁</div>
+      <p className="text-sm">Selecciona una grabación</p>
+      <p className="text-xs mt-1 text-white/10">Los datos se cargan bajo demanda</p>
+    </div>
+  )
+}
+// ── Página principal ──────────────────────────────────────────────────────────
+export default function AnalisisDatasets() {
+  const { sessions, loading, error, reload } = useSessions()
+  const [selected, setSelected] = useState(null)
+
+  return (
+    <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
+      <Sidebar
+        sessions={sessions}
+        loading={loading}
+        error={error}
+        selected={selected}
+        onSelect={setSelected}
+        onReload={reload}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {selected ? <RecordingView rec={selected} /> : <EmptyState />}
       </div>
     </div>
   )
