@@ -175,7 +175,7 @@ esto no es una representación del ser.
 esto es el ser.
 
 Este modelo nace desde una frecuencia que compartimos
-con mi gran amigo Anibal Estigarribia —
+con mi gran amigo Anibal Estigarribia
 explorador de la conciencia y la espiritualidad,
 autor de "Hey despierta! Todo el universo depende de ello!"
 
