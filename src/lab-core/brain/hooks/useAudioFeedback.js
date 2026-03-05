@@ -29,12 +29,10 @@ export function useAudioFeedback() {
   const pannerLeftRef = useRef(null)
   const pannerRightRef = useRef(null)
 
-  // Inicializar contexto de audio (solo una vez)
-  useEffect(() => {
-    // Crear AudioContext (compatible con Safari)
-    const AudioContext = window.AudioContext || window.webkitAudioContext
-    audioContextRef.current = new AudioContext()
+  // NO crear AudioContext en mount — iOS/Android requieren gesto del usuario
+  // Se crea dentro de startAudio() directamente
 
+  useEffect(() => {
     return () => {
       if (audioContextRef.current) {
         audioContextRef.current.close()
@@ -57,7 +55,7 @@ export function useAudioFeedback() {
 
   // Actualizar frecuencias según coherencia
   useEffect(() => {
-    if (!isPlaying || !leftOscillatorRef.current || !rightOscillatorRef.current) return
+    if (!isPlaying || !leftOscillatorRef.current || !rightOscillatorRef.current || !audioContextRef.current) return
 
     // Frecuencia base ajustada por banda Alpha (estado sintérgico)
     const alphaInfluence = bands?.alpha || 0
@@ -88,7 +86,11 @@ export function useAudioFeedback() {
   }, [coherence, bands, isPlaying])
 
   const startAudio = () => {
-    if (!audioContextRef.current) return
+    // Crear AudioContext dentro del gesto del usuario (requerido por iOS/Android)
+    if (!audioContextRef.current) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext
+      audioContextRef.current = new AudioContextClass()
+    }
 
     const ctx = audioContextRef.current
 

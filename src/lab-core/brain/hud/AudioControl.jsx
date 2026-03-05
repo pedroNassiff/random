@@ -57,7 +57,7 @@ export function AudioControl() {
           fontFamily: 'monospace',
           letterSpacing: '0.2em',
           textTransform: 'uppercase',
-          cursor: 'none',
+          cursor: 'pointer',
           transition: 'all 0.2s ease',
           display: 'flex',
           alignItems: 'center',

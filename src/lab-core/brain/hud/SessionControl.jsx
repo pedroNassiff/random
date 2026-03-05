@@ -557,11 +557,12 @@ export default function SessionControl({ isMobile = false }) {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '16px'
+        gap: '12px'
       }}>
-        {/* Session info */}
+        {/* Session info — se oculta en pantallas muy estrechas */}
         <div style={{ 
-          flex: '0 0 200px',
+          flex: '0 1 160px',
+          minWidth: 0,
           overflow: 'hidden'
         }}>
           <div style={{
@@ -654,9 +655,9 @@ export default function SessionControl({ isMobile = false }) {
 
         {/* Right controls */}
         <div style={{ 
-          flex: '0 0 200px',
+          flex: '0 1 auto',
           display: 'flex', 
-          gap: '12px', 
+          gap: '8px', 
           alignItems: 'center',
           justifyContent: 'flex-end'
         }}>
