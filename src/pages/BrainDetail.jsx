@@ -75,6 +75,7 @@ export default function BrainDetail() {
   const disconnectFromField = useBrainStore((s) => s.disconnectFromField)
 
   const [dataSource, setDataSource] = useState('dataset') // 'dataset' | 'muse'
+  const [isMobile, setIsMobile] = useState(false)
 
   // Ref for SyntergicBrain — updated each frame by BrainBridge
   const brainStateRef = useRef({
@@ -83,33 +84,47 @@ export default function BrainDetail() {
     bands:      { delta: 0.1, theta: 0.1, alpha: 0.1, beta: 0.1, gamma: 0.1 },
   })
 
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   // Connect to backend WebSocket on mount
   useEffect(() => {
     connectToField()
     return () => disconnectFromField()
   }, []) // eslint-disable-line
 
-  const tabStyle = (active, color = 'rgba(100,100,255,0.25)', border = 'rgba(100,100,255,0.5)') => ({
+  const tabStyle = (active, isMobile, color = 'rgba(100,100,255,0.25)', border = 'rgba(100,100,255,0.5)') => ({
     flex: 1, padding: '8px 10px',
     background: active ? color : 'transparent',
     border: `1px solid ${active ? border : 'transparent'}`,
     borderRadius: 6,
     color: active ? '#fff' : 'rgba(255,255,255,0.4)',
-    fontSize: '0.68rem', fontFamily: 'monospace', cursor: 'none',
+    fontSize: '0.68rem', fontFamily: 'monospace',
+    cursor: isMobile ? 'pointer' : 'none',
     transition: 'all 0.2s', letterSpacing: '0.04em',
   })
 
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#00050a', cursor: 'none', position: 'relative', overflow: 'hidden' }}>
-      <CustomCursor />
+    <div style={{ width: '100vw', height: '100vh', background: '#00050a', cursor: isMobile ? 'auto' : 'none', position: 'relative', overflow: 'hidden' }}>
+      {!isMobile && <CustomCursor />}
 
-      {/* ── Canvas (full screen background) ── */}
+      {/* ── Canvas (full screen on desktop, top section on mobile) ── */}
       <Canvas
         camera={{ position: [0, 0, 1.5], fov: 45 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         dpr={[1, 2]}
         frameloop="always"
-        style={{ position: 'absolute', inset: 0 }}
+        style={{
+          position: isMobile ? 'relative' : 'absolute',
+          inset: isMobile ? 'auto' : 0,
+          height: isMobile ? '35vh' : '100vh',
+          width: '100%',
+        }}
       >
         <color attach="background" args={['#00050a']} />
         <ambientLight intensity={0.5} />
@@ -119,7 +134,7 @@ export default function BrainDetail() {
         <BrainBridge brainStateRef={brainStateRef} />
 
         <Suspense fallback={null}>
-          <SyntergicBrain brainStateRef={brainStateRef} scale={0.2} autoRotate />
+          <SyntergicBrain brainStateRef={brainStateRef} scale={isMobile ? 0.16 : 0.2} autoRotate />
         </Suspense>
 
         <OrbitControls enableZoom enablePan={false} enableDamping dampingFactor={0.06} minDistance={0.8} maxDistance={5} />
@@ -129,60 +144,96 @@ export default function BrainDetail() {
       <button
         onClick={() => navigate('/lab')}
         style={{
-          position: 'fixed', top: 32, left: 32, zIndex: 200,
+          position: isMobile ? 'absolute' : 'fixed',
+          top: isMobile ? 16 : 32,
+          left: isMobile ? 16 : 32,
+          zIndex: 200,
           background: 'transparent', border: 'none', padding: 0,
-          color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem',
+          color: 'rgba(255,255,255,0.3)',
+          fontSize: isMobile ? '0.55rem' : '0.62rem',
           letterSpacing: '0.4em', textTransform: 'uppercase',
-          fontFamily: 'monospace', cursor: 'none', transition: 'color 0.2s',
+          fontFamily: 'monospace',
+          cursor: isMobile ? 'pointer' : 'none',
+          transition: 'color 0.2s',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+        onMouseEnter={(e) => !isMobile && (e.currentTarget.style.color = '#fff')}
+        onMouseLeave={(e) => !isMobile && (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
       >
         ← Back
       </button>
 
       {/* ── Header ── */}
       <div style={{
-        position: 'fixed', top: 32, left: '50%', transform: 'translateX(-50%)',
+        position: isMobile ? 'absolute' : 'fixed',
+        top: isMobile ? 16 : 32,
+        left: '50%', transform: 'translateX(-50%)',
         zIndex: 200, pointerEvents: 'none', textAlign: 'center', fontFamily: 'monospace',
       }}>
-        <p style={{ fontSize: '0.55rem', letterSpacing: '0.5em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', margin: 0 }}>
+        <p style={{
+          fontSize: isMobile ? '0.48rem' : '0.55rem',
+          letterSpacing: '0.5em', textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.2)', margin: 0
+        }}>
           .RANDOM() / LAB
         </p>
-        <p style={{ fontSize: '0.7rem', letterSpacing: '0.4em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0' }}>
+        <p style={{
+          fontSize: isMobile ? '0.6rem' : '0.7rem',
+          letterSpacing: '0.4em', textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.6)', margin: '4px 0 0'
+        }}>
           ADA
         </p>
       </div>
 
-      {/* ── Right sidebar — live EEG metrics ── */}
+      {/* ── Right sidebar (desktop) / Content area (mobile) — live EEG metrics ── */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, height: '100vh', width: 310,
-        background: 'linear-gradient(270deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 100%)',
-        backdropFilter: 'blur(12px)',
-        borderLeft: '1px solid rgba(100, 200, 255, 0.12)',
-        overflowY: 'auto', overflowX: 'hidden',
-        padding: '80px 16px 160px',
-        zIndex: 100, pointerEvents: 'auto',
-        display: 'flex', flexDirection: 'column', gap: 14,
+        position: isMobile ? 'relative' : 'fixed',
+        top: isMobile ? 0 : 0,
+        right: isMobile ? 0 : 0,
+        left: isMobile ? 0 : 'auto',
+        height: isMobile ? 'auto' : '100vh',
+        width: isMobile ? '100%' : 310,
+        minHeight: isMobile ? 'calc(65vh - 140px)' : 'auto', // Space for SessionControl
+        background: isMobile
+          ? 'linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,5,10,1) 100%)'
+          : 'linear-gradient(270deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 100%)',
+        backdropFilter: isMobile ? 'none' : 'blur(12px)',
+        borderLeft: isMobile ? 'none' : '1px solid rgba(100, 200, 255, 0.12)',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        padding: isMobile ? '24px 16px 160px' : '80px 16px 160px',
+        paddingBottom: isMobile ? '160px' : '160px', // Extra space for sticky controls
+        zIndex: isMobile ? 10 : 100,
+        pointerEvents: 'auto',
+        display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 14,
         scrollbarWidth: 'none',
       }}>
         {/* Sidebar header */}
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10, marginBottom: 2 }}>
-          <p style={{ margin: 0, fontSize: '0.6rem', letterSpacing: '0.25em', fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+          <p style={{
+            margin: 0,
+            fontSize: isMobile ? '0.58rem' : '0.6rem',
+            letterSpacing: '0.25em', fontFamily: 'monospace',
+            color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase'
+          }}>
             {dataSource === 'muse' ? 'EEG en vivo' : 'Dataset'} · Tiempo Real
           </p>
         </div>
 
         {/* Source selector */}
-        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 4, gap: 4 }}>
-          <button onClick={() => setDataSource('dataset')} style={tabStyle(dataSource === 'dataset')}>
+        <div style={{
+          display: 'flex',
+          background: 'rgba(0,0,0,0.3)',
+          borderRadius: 8, padding: 4, gap: 4
+        }}>
+          <button onClick={() => setDataSource('dataset')} style={tabStyle(dataSource === 'dataset', isMobile)}>
             Dataset
           </button>
           <button
             disabled
             title="Muse 2 — próximamente"
             style={{
-              ...tabStyle(false),
+              ...tabStyle(false, isMobile),
               opacity: 0.3,
               cursor: 'not-allowed',
               position: 'relative',
@@ -206,10 +257,14 @@ export default function BrainDetail() {
         <AudioControl />
       </div>
 
-      {/* ── Bottom panel: SessionControl or MuseControl ── */}
+      {/* ── Bottom panel: SessionControl or MuseControl (sticky on mobile) ── */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 310,
-        zIndex: 150, pointerEvents: 'auto',
+        position: 'fixed',
+        bottom: 0,
+        left: isMobile ? 0 : 0,
+        right: isMobile ? 0 : 310,
+        zIndex: 150,
+        pointerEvents: 'auto',
       }}>
         {dataSource === 'dataset' ? <SessionControl /> : <MuseControl />}
       </div>

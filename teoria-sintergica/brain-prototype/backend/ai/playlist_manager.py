@@ -183,32 +183,50 @@ class PlaylistManager:
         
         print(f"📼 Loading session {index + 1}/{len(self.sessions)}: {session['name']}")
         
-        # Crear nuevo player
-        player = SessionPlayer(window_duration=2.0)
-        
-        # Cargar según tipo
-        if session['type'] == 'meditation':
-            # Archivo EDF directo
-            player.load_session(session['path'])
-        elif session['type'] == 'physionet':
-            # Sesiones especiales de PhysioNet
-            if session['path'] == 'physionet_run2':
-                player.load_default_session()
-            elif session['path'] == 'physionet_runs_6-10-14':
-                player.load_physionet_extended()
-        elif session['type'] == 'recorded':
-            # Sesiones grabadas desde PostgreSQL + InfluxDB (nuevo)
-            db_id = session.get('db_id')
-            if db_id:
-                player.load_recorded_session_v2(db_id)
-        elif session['type'] == 'recorded_sqlite':
-            # Sesiones grabadas desde SQLite (legacy)
-            db_id = session.get('db_id')
-            if db_id:
-                player.load_recorded_session(db_id)
-        
-        self.current_player = player
-        return player
+        try:
+            # Crear nuevo player
+            player = SessionPlayer(window_duration=2.0)
+            
+            # Cargar según tipo
+            if session['type'] == 'meditation':
+                # Archivo EDF directo
+                player.load_session(session['path'])
+            elif session['type'] == 'physionet':
+                # Sesiones especiales de PhysioNet
+                if session['path'] == 'physionet_run2':
+                    player.load_default_session()
+                elif session['path'] == 'physionet_runs_6-10-14':
+                    player.load_physionet_extended()
+            elif session['type'] == 'recorded':
+                # Sesiones grabadas desde PostgreSQL + InfluxDB (nuevo)
+                db_id = session.get('db_id')
+                if db_id:
+                    player.load_recorded_session_v2(db_id)
+            elif session['type'] == 'recorded_sqlite':
+                # Sesiones grabadas desde SQLite (legacy)
+                db_id = session.get('db_id')
+                if db_id:
+                    player.load_recorded_session(db_id)
+            
+            self.current_player = player
+            return player
+            
+        except (ValueError, FileNotFoundError, Exception) as e:
+            print(f"⚠️  Failed to load session {index + 1}: {e}")
+            print(f"   Skipping to next session...")
+            
+            # Intentar con siguiente sesión recursivamente
+            next_index = index + 1
+            if next_index < len(self.sessions):
+                return self.load_session(next_index)
+            else:
+                # Si no hay más sesiones, loop o retornar None
+                if self.loop_playlist:
+                    print("🔄 Attempting to restart from beginning after errors...")
+                    return self.load_session(0)
+                else:
+                    print("⚠️  No valid sessions available in playlist")
+                    return None
     
     def next_session(self) -> Optional[SessionPlayer]:
         """
