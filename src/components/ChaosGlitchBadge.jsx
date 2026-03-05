@@ -11,11 +11,15 @@ export default function ChaosGlitchBadge({ text, onGlitchEnd }) {
       setIsGlitching(true);
       setGlitchEffect(Math.floor(Math.random() * 3)); // 0, 1 o 2
 
-      // Desactivar después de 1 segundo
+      // Cambiar el texto a mitad del glitch (cuando la distorsión es máxima)
+      // así el swap ocurre "dentro" del efecto y no se nota el corte
+      setTimeout(() => {
+        if (onGlitchEnd) onGlitchEnd();
+      }, 450);
+
+      // Desactivar glitch al final
       setTimeout(() => {
         setIsGlitching(false);
-        // Notificar que terminó el glitch
-        if (onGlitchEnd) onGlitchEnd();
       }, 1000);
 
       // Programar el siguiente glitch en 1-5 segundos
@@ -44,7 +48,7 @@ export default function ChaosGlitchBadge({ text, onGlitchEnd }) {
       <div 
         ref={containerRef}
         className={`
-          inline-flex items-center justify-center border rounded-full w-[320px] h-[36px] overflow-hidden
+          inline-flex items-center justify-center border rounded-full h-[32px] w-fit overflow-hidden
           relative
           ${isGlitching ? 'glitch-active' : ''}
           ${clipPathGlitch ? 'clip-glitch' : ''}
@@ -69,14 +73,14 @@ export default function ChaosGlitchBadge({ text, onGlitchEnd }) {
         {/* Capa de texto duplicada para efecto glitch */}
         {clipPathGlitch && (
           <div 
-            className="absolute inset-0 flex items-center justify-center clip-glitch-layer px-4"
+            className="absolute inset-0 flex items-center justify-center clip-glitch-layer px-5"
             style={{
               color: 'white',
               textShadow: '-3px -3px 0px #1df2f0, 3px 3px 0px #E94BE8',
               fontFamily: 'var(--font-geist-pixel-square)'
             }}
           >
-            <span className="text-[13px] tracking-[0.5px]">{text}</span>
+            <span className="text-[11px] tracking-tight whitespace-nowrap">{text}</span>
           </div>
         )}
         
@@ -92,7 +96,7 @@ export default function ChaosGlitchBadge({ text, onGlitchEnd }) {
             fontFamily: 'var(--font-geist-pixel-square)'
           }}
         >
-          <span className="text-[13px] text-white tracking-[0.5px]">{text}</span>
+          <span className="text-[11px] text-white tracking-tight whitespace-nowrap">{text}</span>
         </div>
       </div>
 

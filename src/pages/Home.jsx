@@ -61,6 +61,7 @@ export default function Home() {
   const badgeTexts = [
     "donde fluyen caos y orden",
     "donde fluyen ciencia y arte",
+    "donde fluyen ciencia y espiritualidad",
   ];
   const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0);
   

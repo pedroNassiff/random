@@ -116,8 +116,8 @@ function CodeArea({ value, onChange, onCursorChange, onForceCompile, fontSize = 
         ref={numsRef}
         aria-hidden
         style={{
-          flexShrink: 0, width: 48,
-          paddingTop: 14, paddingBottom: 20, paddingRight: 12,
+          flexShrink: 0, width: isMobile() ? 36 : 48,
+          paddingTop: 14, paddingBottom: 20, paddingRight: isMobile() ? 6 : 12,
           textAlign: 'right',
           color: 'rgba(255,255,255,0.12)',
           fontSize, lineHeight: lh + 'px',
@@ -232,9 +232,9 @@ function MarkdownView({ content }) {
   return (
     <div style={{
       flex: 1, overflowY: 'auto',
-      padding: '32px 36px 48px',
+      padding: isMobile() ? '16px 14px 32px' : '32px 36px 48px',
       fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace',
-      fontSize: 12,
+      fontSize: isMobile() ? 11 : 12,
     }}>
       {lines.map((line, i) => {
         if (line.startsWith('# ')) {
@@ -320,14 +320,26 @@ function MarkdownView({ content }) {
 // ─────────────────────────────────────────────
 // EditorPanel — resizable live code editor
 // ─────────────────────────────────────────────
+const isMobile = () => typeof window !== 'undefined' && window.innerWidth < 768
+const initialWidth = () => isMobile() ? Math.min(window.innerWidth, 340) : 460
+
 export function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending, onClose, onForceCompile }) {
   const [activeTab,  setActiveTab]  = useState(0)
-  const [panelWidth, setPanelWidth] = useState(460)
+  const [panelWidth, setPanelWidth] = useState(initialWidth)
   const [cursor,     setCursor]     = useState({ ln: 1, col: 1 })
   const [tabOverflow, setTabOverflow] = useState(false)
   const dragRef    = useRef(null)
   const tabStripRef = useRef(null)
   const tabDragRef  = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false })
+
+  // Clamp panel width on viewport resize (especially on mobile orientation change)
+  useEffect(() => {
+    const handleResize = () => {
+      setPanelWidth(w => Math.min(w, window.innerWidth))
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Check if tab strip overflows (show fade indicator)
   useEffect(() => {
@@ -386,15 +398,18 @@ export function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending
   // ── Resize drag (capture phase to bypass stopPropagation) ──
   const startResize = (e) => {
     e.preventDefault()
-    const startX = e.clientX
+    const startX = e.clientX ?? e.touches?.[0]?.clientX
     const startW = panelWidth
     const onMove = (ev) => {
-      const delta = startX - ev.clientX
-      setPanelWidth(Math.min(900, Math.max(300, startW + delta)))
+      const x = ev.clientX ?? ev.touches?.[0]?.clientX
+      const delta = startX - x
+      setPanelWidth(Math.min(window.innerWidth, Math.max(isMobile() ? 260 : 300, startW + delta)))
     }
     const onUp = () => {
       window.removeEventListener('mousemove', onMove, true)
       window.removeEventListener('mouseup',   onUp,   true)
+      window.removeEventListener('touchmove', onMove, true)
+      window.removeEventListener('touchend',  onUp,   true)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
@@ -402,6 +417,8 @@ export function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending
     document.body.style.userSelect = 'none'
     window.addEventListener('mousemove', onMove, true)
     window.addEventListener('mouseup',   onUp,   true)
+    window.addEventListener('touchmove', onMove, { capture: true, passive: false })
+    window.addEventListener('touchend',  onUp,   true)
   }
 
   const stopAll = (e) => e.stopPropagation()
@@ -425,14 +442,16 @@ export function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending
       onTouchStart={stopAll}  onWheel={stopAll}
       style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
-        width: panelWidth,
+        width: Math.min(panelWidth, window.innerWidth),
+        maxWidth: '100vw',
         zIndex: 200,
         display: 'flex', flexDirection: 'column',
         background: '#080b10',
         borderLeft: '1px solid rgba(255,255,255,0.07)',
-        fontSize: 12,
+        fontSize: isMobile() ? 11 : 12,
         animation: 'slideInRight 0.2s ease',
         cursor: 'default',
+        overflowX: 'hidden',
       }}
     >
       <style>{EDITOR_STYLES}</style>
@@ -442,9 +461,11 @@ export function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending
         ref={dragRef}
         className="lab-resize"
         onMouseDown={startResize}
+        onTouchStart={startResize}
         title="Drag to resize"
         style={{
-          position: 'absolute', left: -3, top: 0, bottom: 0, width: 6,
+          position: 'absolute', left: -3, top: 0, bottom: 0,
+          width: isMobile() ? 12 : 6,
           cursor: 'ew-resize', zIndex: 10,
           background: 'transparent',
         }}
@@ -555,6 +576,7 @@ export function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending
             onChange={(v) => onChange(file.name, v)}
             onCursorChange={setCursor}
             onForceCompile={onForceCompile}
+            fontSize={isMobile() ? 11 : 12}
           />
       }
 
@@ -587,9 +609,9 @@ export function EditorPanel({ files, liveCode, onChange, errorMsg, shaderPending
             <span style={{ color: '#ff5f57' }}>⚠ error</span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>Ln {cursor.ln}, Col {cursor.col}</span>
-          <span style={{ color: 'rgba(255,255,255,0.15)' }}>⌘↵ compile</span>
+          {!isMobile() && <span style={{ color: 'rgba(255,255,255,0.15)' }}>⌘↵ compile</span>}
         </div>
       </div>
     </div>
