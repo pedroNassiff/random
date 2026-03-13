@@ -1,6 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef, useReducer } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useReducer, useMemo } from 'react'
 import { useBrainStore } from '../lab-core/brain/store.js'
 import referenceData from './analisis-datasets/reference_data.json'
+import CopilotPanelLabs from '../components/CopilotPanelLabs'
+import { useCopilotStore } from '../stores/copilotStore'
 
 const API = 'http://localhost:8000'
 
@@ -333,6 +335,305 @@ function TabInfo({ rec, metrics }) {
   )
 }
 
+// ── TabAnalisis ───────────────────────────────────────────────────────────────
+function analyzeSession(metrics) {
+  if (!metrics || metrics.length < 5) return null
+  const n = metrics.length
+  const get = (m, k) => m[k] ?? 0
+  const alphaS = metrics.map(m => get(m, 'alpha'))
+  const thetaS = metrics.map(m => get(m, 'theta'))
+  const betaS  = metrics.map(m => get(m, 'beta'))
+  const cohS   = metrics.map(m => get(m, 'coherence'))
+  const avg = arr => arr.reduce((s, v) => s + v, 0) / arr.length
+  const avgAlpha = avg(alphaS), maxAlpha = Math.max(...alphaS)
+  const avgTheta = avg(thetaS)
+  const avgCoh = avg(cohS), avgBeta = avg(betaS)
+  const ws = Math.max(5, Math.floor(n / 12))
+  const phases = []
+  for (let i = 0; i < n; i += ws) {
+    const a = avg(alphaS.slice(i, i + ws))
+    const t = avg(thetaS.slice(i, i + ws))
+    const c = avg(cohS.slice(i, i + ws))
+    let label = a >= 0.13 ? 'deep' : a >= 0.08 ? 'meditation' : a >= 0.04 ? 'building' : 'onset'
+    phases.push({ idx: i, frac: i / n, alpha: a, theta: t, coh: c, label })
+  }
+  const events = []
+  const sw = Math.max(3, Math.floor(n / 20))
+  for (let i = sw; i < n - sw; i++) {
+    const before = avg(alphaS.slice(i - sw, i))
+    const after  = avg(alphaS.slice(i, i + sw))
+    if (before > 0.08 && after < before * 0.5) {
+      events.push({ idx: i, frac: i / n, before, after, drop: (before - after) / before })
+      i += sw
+    }
+  }
+  const score = Math.round(
+    Math.min(30, (avgAlpha / 0.12) * 30) +
+    Math.min(20, (avgTheta / 0.25) * 20) +
+    Math.min(20, (avgCoh   / 0.65) * 20) +
+    Math.min(15, Math.max(0, (1 - avgBeta / 0.05)) * 15) +
+    Math.min(15, (alphaS.filter(a => a >= 0.13).length / n) * 100)
+  )
+  return {
+    avgAlpha, maxAlpha, avgTheta, avgCoh, avgBeta, score, phases, events, n,
+    timeDeep:     alphaS.filter(a => a >= 0.13).length / n,
+    timeMed:      alphaS.filter(a => a >= 0.08 && a < 0.13).length / n,
+    timeBuilding: alphaS.filter(a => a >= 0.04 && a < 0.08).length / n,
+    timeOnset:    alphaS.filter(a => a < 0.04).length / n,
+  }
+}
+
+function LitBar({ value, refMin, refMax, color, label }) {
+  const scale = refMax * 1.4
+  const pct = Math.min(100, (value / scale) * 100)
+  const minPct = (refMin / scale) * 100
+  const maxPct = (refMax / scale) * 100
+  const inRange = value >= refMin && value <= refMax
+  return (
+    <div className="mb-2.5">
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[10px] text-white/50">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] text-white/25">ref {refMin.toFixed(2)}–{refMax.toFixed(2)}</span>
+          <span className={`text-[10px] font-mono font-bold ${inRange ? 'text-green-400' : 'text-yellow-400'}`}>
+            {value.toFixed(3)} {inRange ? '✓' : '↗'}
+          </span>
+        </div>
+      </div>
+      <div className="relative h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+        <div className="absolute top-0 h-full rounded-full opacity-20"
+          style={{ left: `${minPct}%`, width: `${maxPct - minPct}%`, backgroundColor: color }} />
+        <div className="absolute top-0 left-0 h-full rounded-full"
+          style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.8 }} />
+      </div>
+    </div>
+  )
+}
+
+function SessionScore({ score }) {
+  const color = score >= 75 ? '#34d399' : score >= 55 ? '#a78bfa' : score >= 35 ? '#fbbf24' : '#f87171'
+  const label = score >= 75 ? 'Excelente' : score >= 55 ? 'Buena' : score >= 35 ? 'En desarrollo' : 'Iniciando'
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative w-16 h-16 flex-shrink-0">
+        <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="white" strokeOpacity="0.05" strokeWidth="6"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke={color} strokeWidth="6"
+            strokeDasharray={`${(score / 100) * 163.4} 163.4`} strokeLinecap="round"/>
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-lg font-bold text-white leading-none">{score}</span>
+          <span className="text-[7px] text-white/30 leading-none mt-0.5">/ 100</span>
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold" style={{ color }}>{label}</p>
+        <p className="text-[10px] text-white/30 mt-0.5">α · θ · coherencia · β</p>
+      </div>
+    </div>
+  )
+}
+
+function PhaseBar({ analysis, durationSeconds }) {
+  const COLORS = { deep: '#a78bfa', meditation: '#60a5fa', building: '#34d399', onset: '#4b5563' }
+  const LABELS = { deep: 'profundo', meditation: 'meditación', building: 'construyendo', onset: 'inicio' }
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[9px] text-white/30 uppercase tracking-wider">Fases detectadas</p>
+        {durationSeconds && <span className="text-[9px] text-white/20">{Math.round(durationSeconds)}s</span>}
+      </div>
+      <div className="flex h-5 rounded overflow-hidden gap-px">
+        {analysis.phases.map((p, i) => {
+          const nextFrac = analysis.phases[i + 1]?.frac ?? 1
+          const width = ((nextFrac - p.frac) * 100).toFixed(2)
+          return (
+            <div key={i} style={{ width: `${width}%`, backgroundColor: COLORS[p.label] ?? '#4b5563', opacity: 0.75 }}
+              title={`${LABELS[p.label]} α=${p.alpha.toFixed(3)} θ=${p.theta.toFixed(3)} coh=${p.coh.toFixed(2)}`}
+              className="cursor-help hover:opacity-100 transition-opacity"/>
+          )
+        })}
+      </div>
+      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+        {Object.entries(COLORS).map(([k, c]) =>
+          analysis.phases.some(p => p.label === k) && (
+            <span key={k} className="flex items-center gap-1 text-[9px] text-white/40">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c }}/>{LABELS[k]}
+            </span>
+          )
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TimeDistribution({ analysis }) {
+  const items = [
+    { label: 'Profundo (α≥13%)',     pct: analysis.timeDeep,     color: '#a78bfa' },
+    { label: 'Meditación (α 8–13%)', pct: analysis.timeMed,      color: '#60a5fa' },
+    { label: 'Construyendo (α 4–8%)',pct: analysis.timeBuilding,  color: '#34d399' },
+    { label: 'Inicio / baja (α<4%)', pct: analysis.timeOnset,    color: '#4b5563' },
+  ]
+  return (
+    <div>
+      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-2">Distribución de tiempo</p>
+      <div className="space-y-1.5">
+        {items.map(({ label, pct, color }) => (
+          <div key={label} className="flex items-center gap-2">
+            <div className="w-28 h-1.5 bg-white/[0.04] rounded-full overflow-hidden flex-shrink-0">
+              <div className="h-full rounded-full" style={{ width: `${pct * 100}%`, backgroundColor: color }}/>
+            </div>
+            <span className="text-[9px] font-mono" style={{ color }}>{(pct * 100).toFixed(0)}%</span>
+            <span className="text-[9px] text-white/30">{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EventsList({ events, durationSeconds }) {
+  if (!events.length) return (
+    <div className="text-[10px] text-green-400/70 bg-green-900/10 border border-green-500/10 rounded px-3 py-2">
+      ✓ Sin disrupciones detectadas
+    </div>
+  )
+  return (
+    <div>
+      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-2">Eventos detectados</p>
+      <div className="space-y-1.5">
+        {events.map((ev, i) => {
+          const tSec = durationSeconds ? Math.round(ev.frac * durationSeconds) : '?'
+          return (
+            <div key={i} className="flex items-center gap-3 bg-red-900/10 border border-red-500/10 rounded px-3 py-2">
+              <span className="text-[9px] font-mono text-red-400 w-10">t≈{tSec}s</span>
+              <span className="text-[9px] text-red-300">⚡ Mind-wandering</span>
+              <span className="text-[9px] text-white/30 ml-auto">
+                α {ev.before.toFixed(3)}→{ev.after.toFixed(3)} (−{(ev.drop*100).toFixed(0)}%)
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function AnnotatedAlphaChart({ metrics, events, durationSeconds }) {
+  if (!metrics || metrics.length < 3) return null
+  const W = 700, H = 80
+  const alpha = metrics.map(m => m.alpha ?? 0)
+  const theta = metrics.map(m => m.theta ?? 0)
+  const scale = Math.max(...alpha, ...theta, 0.001)
+  const toX = i => (i / (alpha.length - 1)) * W
+  const toY = v => H - (v / scale) * H * 0.92 - 2
+  const alphaPts = alpha.map((v, i) => `${toX(i)},${toY(v)}`).join(' ')
+  const thetaPts = theta.map((v, i) => `${toX(i)},${toY(v)}`).join(' ')
+  const refLow = toY(0.08), refHigh = toY(0.13)
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[9px] text-white/30 uppercase tracking-wider">Trayectoria Alpha + Theta</p>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1 text-[9px] text-purple-400">
+            <span className="w-3 h-0.5 bg-purple-400 inline-block"/> α
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-teal-400">
+            <span className="w-3 h-0.5 bg-teal-400 inline-block"/> θ
+          </span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-16" preserveAspectRatio="none">
+        <rect x="0" y={refHigh} width={W} height={Math.max(0, refLow - refHigh)} fill="#a78bfa" opacity="0.07"/>
+        <line x1="0" y1={refLow}  x2={W} y2={refLow}  stroke="#a78bfa" strokeWidth="0.5" strokeOpacity="0.3" strokeDasharray="4,4"/>
+        <line x1="0" y1={refHigh} x2={W} y2={refHigh} stroke="#a78bfa" strokeWidth="0.5" strokeOpacity="0.3" strokeDasharray="4,4"/>
+        <defs>
+          <linearGradient id="ag2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.3"/>
+            <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        <polygon points={`${alphaPts} ${W},${H} 0,${H}`} fill="url(#ag2)"/>
+        <polyline points={thetaPts} fill="none" stroke="#5eead4" strokeWidth="1" opacity="0.6"/>
+        <polyline points={alphaPts} fill="none" stroke="#a78bfa" strokeWidth="1.5"/>
+        {events.map((ev, i) => {
+          const x = toX(Math.floor(ev.frac * alpha.length))
+          return <line key={i} x1={x} y1={0} x2={x} y2={H} stroke="#f87171" strokeWidth="1" opacity="0.6" strokeDasharray="3,3"/>
+        })}
+      </svg>
+      <div className="flex justify-between text-[8px] text-white/15 mt-0.5">
+        <span>0s</span>
+        <span className="text-purple-400/40">── zona meditativa (8–13%) ──</span>
+        <span>{durationSeconds ? `${Math.round(durationSeconds)}s` : ''}</span>
+      </div>
+    </div>
+  )
+}
+
+function TabAnalisis({ rec, metrics }) {
+  if (!metrics || metrics.length === 0) return (
+    <p className="text-[11px] text-white/30 p-6">Sin datos de métricas para analizar.</p>
+  )
+  const analysis = analyzeSession(metrics)
+  if (!analysis) return <p className="text-[11px] text-white/30 p-6">Datos insuficientes (mín. 5 puntos).</p>
+  const dur = rec.duration_seconds
+  return (
+    <div className="p-5 space-y-5">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+          <p className="text-[9px] text-white/30 uppercase tracking-wider mb-3">Score de sesión</p>
+          <SessionScore score={analysis.score} />
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1">
+            {[['α max', analysis.maxAlpha.toFixed(3)], ['θ avg', analysis.avgTheta.toFixed(3)],
+              ['coh avg', analysis.avgCoh.toFixed(3)], ['β avg', analysis.avgBeta.toFixed(3)]].map(([k, v]) => (
+              <div key={k} className="flex justify-between">
+                <span className="text-[9px] text-white/30">{k}</span>
+                <span className="text-[9px] font-mono text-white/60">{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+          <p className="text-[9px] text-white/30 uppercase tracking-wider mb-3">vs Literatura mindfulness</p>
+          <LitBar value={analysis.avgAlpha} refMin={0.08} refMax={0.25} color="#a78bfa" label="α alpha"/>
+          <LitBar value={analysis.avgTheta} refMin={0.15} refMax={0.35} color="#5eead4" label="θ theta"/>
+          <LitBar value={analysis.avgBeta}  refMin={0.00} refMax={0.05} color="#fbbf24" label="β beta (bajo=bueno)"/>
+          <LitBar value={analysis.avgCoh}   refMin={0.50} refMax={0.80} color="#60a5fa" label="coherencia"/>
+        </div>
+      </div>
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+        <AnnotatedAlphaChart metrics={metrics} events={analysis.events} durationSeconds={dur}/>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-4">
+          <PhaseBar analysis={analysis} durationSeconds={dur}/>
+          <TimeDistribution analysis={analysis}/>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-4">
+          <EventsList events={analysis.events} durationSeconds={dur}/>
+          <div>
+            <p className="text-[9px] text-white/30 uppercase tracking-wider mb-2">Datasets referencia</p>
+            {[
+              { name: 'OpenNeuro ds004324', desc: 'Muse S meditación · 4ch · N=20', url: 'https://openneuro.org/datasets/ds004324', tag: '★ ideal' },
+              { name: 'PhysioNet EEGBCI',   desc: 'Eyes-open/closed baseline', url: 'https://physionet.org/content/eegmmidb/1.0.0/', tag: 'referencia' },
+              { name: 'Kaggle Brainwave',   desc: 'Meditación 1min · 4ch · CSV', url: 'https://www.kaggle.com/datasets/birdy654/eeg-brainwave-dataset-feeling-emotions', tag: '1 min' },
+            ].map(d => (
+              <a key={d.name} href={d.url} target="_blank" rel="noreferrer"
+                className="flex items-center gap-2 py-1.5 border-b border-white/[0.04] hover:bg-white/[0.02] rounded px-1 transition-colors group">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-white/70 group-hover:text-white transition-colors">{d.name}</p>
+                  <p className="text-[9px] text-white/30">{d.desc}</p>
+                </div>
+                <span className="text-[8px] bg-purple-900/40 text-purple-300 px-1.5 py-0.5 rounded flex-shrink-0">{d.tag}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── TabComparar (comparación con referencia EDF, conexión WS live) ────────────
 function BandCompareRow({ label, color, live, raw, ref }) {
   const rawMissing = raw == null
@@ -508,7 +809,7 @@ function RecordingHeader({ rec }) {
 }
 
 // ── RecordingView ─────────────────────────────────────────────────────────────
-const TABS = ['Bandas', 'Comparar ref.', 'Info']
+const TABS = ['Análisis', 'Bandas', 'Comparar ref.', 'Info']
 
 function RecordingView({ rec }) {
   const [tab, setTab] = useState('Bandas')
@@ -531,6 +832,7 @@ function RecordingView({ rec }) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {tab === 'Análisis'      && <TabAnalisis rec={rec} metrics={metrics ?? []} />}
         {tab === 'Bandas'        && <TabBandas rec={rec} metrics={metrics ?? []} />}
         {tab === 'Comparar ref.' && <TabComparar />}
         {tab === 'Info'          && <TabInfo rec={rec} metrics={metrics ?? []} />}
@@ -553,6 +855,23 @@ function EmptyState() {
 export default function AnalisisDatasets() {
   const { sessions, loading, error, reload } = useSessions()
   const [selected, setSelected] = useState(null)
+  const { isOpen, toggle } = useCopilotStore()
+
+  // Contexto de sesión para el copiloto: sesión activa + análisis pre-computado
+  // Se memoiza para no recalcular en cada render
+  const { data: selectedMetrics } = useRecordingMetrics(selected?.id ?? null)
+  const sessionContext = useMemo(() => {
+    if (!selected) return null
+    return {
+      id:               selected.id,
+      name:             selected.name,
+      duration_seconds: selected.duration_seconds,
+      started_at:       selected.started_at,
+      analysis:         selectedMetrics && selectedMetrics.length >= 5
+        ? analyzeSession(selectedMetrics)
+        : null,
+    }
+  }, [selected, selectedMetrics])
 
   return (
     <div className="h-screen w-screen bg-black text-white flex overflow-hidden">
@@ -564,9 +883,35 @@ export default function AnalisisDatasets() {
         onSelect={setSelected}
         onReload={reload}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {selected ? <RecordingView rec={selected} /> : <EmptyState />}
+
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden min-w-0">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {selected ? <RecordingView rec={selected} /> : <EmptyState />}
+        </div>
+
+        {/* Copilot panel — sliding right column */}
+        {isOpen && (
+          <div className="w-72 flex-shrink-0 flex flex-col overflow-hidden">
+            <CopilotPanelLabs sessionContext={sessionContext} />
+          </div>
+        )}
       </div>
+
+      {/* Toggle button */}
+      <button
+        onClick={toggle}
+        title={isOpen ? 'Cerrar ADA' : 'Abrir ADA — copiloto EEG'}
+        className={`fixed bottom-5 right-5 z-50 w-10 h-10 rounded-full flex items-center justify-center
+          text-sm transition-all shadow-lg border
+          ${
+            isOpen
+              ? 'bg-purple-600 border-purple-500 text-white'
+              : 'bg-black/80 border-white/10 text-purple-300 hover:border-purple-500/40 hover:bg-purple-900/20'
+          }`}
+      >
+        ⬡
+      </button>
     </div>
   )
 }

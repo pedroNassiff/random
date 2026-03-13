@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useBrainStore, API_BASE } from '../store';
+import { useBrainStore, API_BASE }  from '../store';
+import { useAdaRealtimeStore }      from '../../../stores/adaRealtimeStore';
 
 /**
  * Hook que anima la barra de progreso directamente en el DOM (sin setState),
@@ -66,6 +67,7 @@ function formatSeconds(seconds) {
 
 export default function SessionControl({ isMobile = false }) {
   const setSessionPaused = useBrainStore((state) => state.setSessionPaused);
+  const adaIsOpen        = useAdaRealtimeStore((s) => s.isOpen);
   const [sessionActive, setSessionActive] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sessionStatus, setSessionStatus] = useState(null);
@@ -463,9 +465,10 @@ export default function SessionControl({ isMobile = false }) {
     <div style={{
       position: 'fixed',
       bottom: '0',
-      left: '0',
+      left: adaIsOpen && !isMobile ? '278px' : '0',
       right: isMobile ? '0' : '320px',
       zIndex: 100,
+      transition: 'left 0.25s ease',
       background: isMobile 
         ? 'rgba(0, 0, 0, 1)' 
         : 'linear-gradient(180deg, rgba(18, 18, 18, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%)',

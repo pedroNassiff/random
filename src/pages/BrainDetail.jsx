@@ -16,6 +16,7 @@ import { OrbitControls, Environment } from '@react-three/drei'
 
 import { useBrainStore }     from '../lab-core/brain/store'
 import { SyntergicBrain }    from '../lab-core/brain/SyntergicBrain'
+import AdaRealtimePanel      from '../components/AdaRealtimePanel'
 import { FrequencySpectrum } from '../lab-core/brain/hud/FrequencySpectrum'
 import { CoherenceMeter }    from '../lab-core/brain/hud/CoherenceMeter'
 import { StateIndicator }    from '../lab-core/brain/hud/StateIndicator'
@@ -76,6 +77,12 @@ export default function BrainDetail() {
 
   const [dataSource, setDataSource] = useState('dataset') // 'dataset' | 'muse'
   const [isMobile, setIsMobile] = useState(false)
+
+  // Real-time EEG data for ADA panel
+  const bands           = useBrainStore((s) => s.bands)
+  const coherence       = useBrainStore((s) => s.coherence)
+  const sessionProgress = useBrainStore((s) => s.sessionProgress)
+  const eegState        = useBrainStore((s) => s.state)
 
   // Ref for SyntergicBrain — updated each frame by BrainBridge
   const brainStateRef = useRef({
@@ -252,6 +259,17 @@ export default function BrainDetail() {
 
       {/* ── Bottom panel: SessionControl (dataset only, fixed bottom) ── */}
       {dataSource === 'dataset' && <SessionControl isMobile={isMobile} />}
+
+      {/* ── ADA Realtime Panel (desktop only) ── */}
+      {!isMobile && (
+        <AdaRealtimePanel
+          bands={bands}
+          coherence={coherence}
+          sessionProgress={sessionProgress}
+          state={eegState}
+          dataSource={dataSource}
+        />
+      )}
 
       {/* ── Bottom tags (canvas area) ── */}
       {/* <div style={{

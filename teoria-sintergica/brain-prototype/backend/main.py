@@ -32,6 +32,9 @@ from analytics.service import AnalyticsService
 from automation import router as automation_router
 from automation.service import AutomationService
 
+# AI Copilot
+from ai.copilot_labs_service import CopilotLabsService
+
 app = FastAPI(title="Syntergic Brain API v0.4")
 
 
@@ -70,6 +73,18 @@ def _save_calib_log(label: str) -> str:
 class MarkerRequest(BaseModel):
     label: str
     event_type: Optional[str] = "marker"
+
+# ── Copilot Pydantic models ───────────────────────────────────────────────────
+class CopilotChatRequest(BaseModel):
+    message: str
+    session_context: Optional[Any] = None  # pre-computed analysis from frontend
+    user_tier: str = "free"
+
+class CopilotChatResponse(BaseModel):
+    text: str
+    model_used: str
+    complexity: str
+    widgets: List[Any] = []
 
 # Inicializar el Cerebro Digital (Carga modelo y datos)
 print("=" * 60)
@@ -143,6 +158,9 @@ async def startup():
     app.state.automation_service = AutomationService(app.state.db_pool)
     print("Automation service initialized")
 
+    app.state.copilot_service = CopilotLabsService()
+    print("✅ Copilot Labs service initialized")
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -151,11 +169,50 @@ async def shutdown():
         await app.state.analytics_pool.close()
         print("✓ Analytics database pool closed")
 
+    if hasattr(app.state, "copilot_service"):
+        await app.state.copilot_service.aclose()
+
 # Include analytics router
 app.include_router(analytics_router)
 
 # Include automation router
 app.include_router(automation_router)
+
+# ============================================
+# Copilot Labs Endpoint
+# ============================================
+
+@app.post("/api/copilot/labs/chat", response_model=CopilotChatResponse)
+async def copilot_labs_chat(request: CopilotChatRequest):
+    """
+    Procesa un mensaje del copiloto AI para Labs/ADA.
+
+    El frontend envía el contexto de la sesión ya analizado
+    (análisis pre-computado), evitando necesidad de acceso a DB
+    desde este endpoint.
+
+    Body:
+        message:         Pregunta del usuario.
+        session_context: Dict con 'analysis', 'name', 'duration_seconds', etc.
+        user_tier:       'free' | 'premium'.
+    """
+    service: CopilotLabsService = app.state.copilot_service
+    try:
+        result = await service.process_message(
+            message=request.message,
+            session_context=request.session_context,
+            user_tier=request.user_tier,
+        )
+        return CopilotChatResponse(**result)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("Copilot error: %s", exc)
+        return CopilotChatResponse(
+            text="❌ Error interno del copiloto. Revisa los logs del backend.",
+            model_used="none",
+            complexity="unknown",
+            widgets=[],
+        )
 
 # ============================================
 # Brain Endpoints
