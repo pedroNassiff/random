@@ -34,6 +34,8 @@ from automation.service import AutomationService
 
 # AI Copilot
 from ai.copilot_labs_service import CopilotLabsService
+from recording.validation_protocol import ValidationProtocol
+from recording.validation import run_all_tests, SessionQualityScore
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -102,6 +104,10 @@ session_recorder: Optional[SessionRecorderV2] = None
 # Legacy SQLite database (for old sessions)
 print("✓ Initializing session database...")
 session_db = get_database()
+
+# Validation protocol (scientific recording)
+print("✓ Initializing validation protocol...")
+validation_protocol = ValidationProtocol(recorder=None)  # recorder set when Muse connects
 print("=" * 60)
 
 # Allow CORS for frontend
@@ -1215,6 +1221,102 @@ async def delete_session(session_id: int):
         "status": "error",
         "message": f"Session {session_id} not found"
     }
+
+
+# ============================================
+# Validation Protocol Endpoints
+# ============================================
+
+class ProtocolStartRequest(BaseModel):
+    name: Optional[str] = ""
+    metadata: Optional[dict] = None
+
+@app.post("/protocol/start")
+async def protocol_start(request: ProtocolStartRequest):
+    """
+    Inicia el protocolo de validación científica.
+    Requiere Muse 2 conectado y streameando.
+    """
+    # Vincular recorder si hay Muse activo
+    if muse_connector.is_streaming and session_recorder is None:
+        try:
+            validation_protocol.recorder = get_recorder_v2(muse_connector)
+        except Exception:
+            pass  # funciona sin recorder también
+    
+    result = validation_protocol.start(
+        name=request.name or "",
+        metadata=request.metadata,
+    )
+    return result
+
+@app.post("/protocol/stop")
+async def protocol_stop():
+    """Detiene el protocolo y guarda el log."""
+    return validation_protocol.stop()
+
+@app.post("/protocol/pause")
+async def protocol_pause():
+    validation_protocol.pause()
+    return {"status": "success"}
+
+@app.post("/protocol/resume")
+async def protocol_resume():
+    validation_protocol.resume()
+    return {"status": "success"}
+
+@app.post("/protocol/advance")
+async def protocol_advance():
+    """Avanza manualmente a la siguiente fase."""
+    return validation_protocol.advance_phase()
+
+@app.post("/protocol/back")
+async def protocol_back():
+    """Retrocede a la fase anterior."""
+    return validation_protocol.go_back_phase()
+
+@app.get("/protocol/state")
+async def protocol_state():
+    """Estado actual del protocolo (polled por frontend cada 500ms)."""
+    return validation_protocol.get_state()
+
+
+@app.post("/protocol/validate/{session_id}")
+async def protocol_validate(session_id: int):
+    """
+    Ejecuta tests de validación científica sobre una sesión grabada.
+    
+    Retorna: Berger effect, cognitive reactivity, coherence stability,
+    y SessionQualityScore compuesto.
+    """
+    try:
+        # Obtener métricas desde InfluxDB
+        influx = get_influx_client()
+        metrics = influx.get_metrics(session_id)
+        if not metrics:
+            metrics = session_db.get_metrics(session_id)
+        
+        if not metrics:
+            return {"status": "error", "message": "No metrics found for session"}
+        
+        # Obtener eventos/marcadores
+        events = session_db.get_events(session_id)
+        markers = [{"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)} for e in (events or [])]
+        
+        # Correr todos los tests
+        test_results = run_all_tests(metrics, markers)
+        
+        # Score compuesto
+        quality = SessionQualityScore.compute(metrics, markers)
+        
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "validation": test_results,
+            "quality_score": quality,
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.websocket("/ws/brain-state")

@@ -74,7 +74,7 @@ _heavy_store  = _BucketStore(rate=10 / 60, capacity=5)     # 1 req/6s avg, burst
 HEAVY_PATHS = {"/analytics/events", "/analytics/batch", "/automation"}
 
 # Paths exempt from rate limiting — internal hardware polling at high frequency
-EXEMPT_PATHS = ("/hardware/", "/recording/", "/set-mode/")
+EXEMPT_PATHS = ("/hardware/", "/recording/", "/set-mode/", "/protocol/", "/ws/")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Known bad User-Agent patterns (scanner tools, exploit kits)
@@ -149,7 +149,11 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             )
 
         # ── 3. Tiered rate limiting ───────────────────────────────────────────
-        # Exempt hardware/recording paths — high-frequency local polling
+        # CORS preflight (OPTIONS) — browser-generated, never rate-limit
+        if method == "OPTIONS":
+            return await call_next(request)
+
+        # Exempt hardware/recording/protocol paths — high-frequency local polling
         if any(path.startswith(p) for p in EXEMPT_PATHS):
             return await call_next(request)
 

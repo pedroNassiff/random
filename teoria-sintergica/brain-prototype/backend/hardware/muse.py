@@ -80,6 +80,10 @@ class MuseConnector(EEGDevice):
         self._stop_event = Event()
         self._buffer_lock = Lock()
         
+        # Stale data detection: track when last sample arrived
+        self._last_sample_time: float = 0.0
+        self._stale_threshold: float = 3.0  # seconds without new data → stale
+        
         # Proceso de muselsl
         self._muselsl_process: Optional[subprocess.Popen] = None
         
@@ -431,22 +435,38 @@ class MuseConnector(EEGDevice):
                             if i < len(sample):
                                 self._buffer[ch].append(sample[i])
                         self._timestamps.append(timestamp)
+                        self._last_sample_time = time.time()
                         
             except Exception as e:
                 if not self._stop_event.is_set():
                     print(f"⚠️ Error en stream loop: {e}")
                 break
     
+    @property
+    def is_data_stale(self) -> bool:
+        """True if no new EEG samples have arrived for > stale_threshold seconds."""
+        if self._last_sample_time == 0:
+            return True
+        return (time.time() - self._last_sample_time) > self._stale_threshold
+
     def get_window(self, duration: float = 2.0) -> Optional[EEGWindow]:
         """
         Obtiene una ventana de datos EEG del buffer.
+        
+        Returns None if:
+          - Not enough samples in buffer
+          - Data is stale (no new samples for > 3s, e.g. BLE disconnect)
         
         Args:
             duration: Duración de la ventana en segundos
             
         Returns:
-            EEGWindow o None si no hay suficientes datos
+            EEGWindow o None si no hay suficientes datos o datos stale
         """
+        # Stale data guard: if BLE dropped, don't return old buffer data
+        if self.is_data_stale:
+            return None
+        
         n_samples_needed = int(self.SAMPLING_RATE * duration)
         
         with self._buffer_lock:
@@ -498,16 +518,20 @@ class MuseConnector(EEGDevice):
         Obtiene estado del buffer.
         
         Returns:
-            Dict con info del buffer
+            Dict con info del buffer, including stale detection
         """
         with self._buffer_lock:
             samples_in_buffer = len(self._timestamps)
+        
+        since_last = time.time() - self._last_sample_time if self._last_sample_time > 0 else -1
         
         return {
             'samples': samples_in_buffer,
             'capacity': self._buffer_size,
             'fill_percent': (samples_in_buffer / self._buffer_size) * 100,
-            'duration_available': samples_in_buffer / self.SAMPLING_RATE
+            'duration_available': samples_in_buffer / self.SAMPLING_RATE,
+            'is_stale': self.is_data_stale,
+            'seconds_since_last_sample': round(since_last, 1),
         }
 
 

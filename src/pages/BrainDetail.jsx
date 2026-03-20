@@ -23,6 +23,7 @@ import { StateIndicator }    from '../lab-core/brain/hud/StateIndicator'
 import { AudioControl }      from '../lab-core/brain/hud/AudioControl'
 import SessionControl        from '../lab-core/brain/hud/SessionControl'
 import MuseControl           from '../lab-core/brain/hud/MuseControl'
+import ProtocolOverlay       from '../lab-core/brain/hud/ProtocolOverlay'
 
 // Bridge: reads Zustand store every frame and updates brainStateRef for R3F
 function BrainBridge({ brainStateRef }) {
@@ -77,6 +78,7 @@ export default function BrainDetail() {
 
   const [dataSource, setDataSource] = useState('dataset') // 'dataset' | 'muse'
   const [isMobile, setIsMobile] = useState(false)
+  const [showProtocol, setShowProtocol] = useState(false)
 
   // Real-time EEG data for ADA panel
   const bands           = useBrainStore((s) => s.bands)
@@ -149,6 +151,20 @@ export default function BrainDetail() {
 
         <OrbitControls enableZoom enablePan={false} enableDamping dampingFactor={0.06} minDistance={0.8} maxDistance={5} />
       </Canvas>
+
+      {/* ── Protocol Overlay (sobre el Canvas, pointer-events: none) ── */}
+      {showProtocol && (
+        <div style={{
+          position: isMobile ? 'fixed' : 'absolute',
+          top: 0, left: 0,
+          width: isMobile ? '100%' : `calc(100% - 310px)`,
+          height: isMobile ? '42vh' : '100vh',
+          zIndex: 50,
+          pointerEvents: 'none',
+        }}>
+          <ProtocolOverlay onClose={() => setShowProtocol(false)} />
+        </div>
+      )}
 
       {/* ── Spacer so content starts below fixed canvas on mobile ── */}
       {isMobile && <div style={{ height: '42vh' }} />}
@@ -251,6 +267,26 @@ export default function BrainDetail() {
 
         {/* HUD panels */}
         {dataSource === 'muse' && <MuseControl />}
+        {dataSource === 'muse' && !showProtocol && (
+          <button
+            onClick={() => setShowProtocol(true)}
+            style={{
+              width: '100%', padding: '12px',
+              background: 'rgba(93,202,165,0.08)',
+              border: '1px dashed rgba(93,202,165,0.35)',
+              borderRadius: 8,
+              color: '#5DCAA5', fontSize: '0.72rem',
+              fontFamily: 'monospace', fontWeight: 'bold',
+              cursor: isMobile ? 'pointer' : 'none',
+              letterSpacing: '0.08em',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => e.target.style.background = 'rgba(93,202,165,0.15)'}
+            onMouseLeave={e => e.target.style.background = 'rgba(93,202,165,0.08)'}
+          >
+            🧪 Protocolo de validación
+          </button>
+        )}
         <StateIndicator />
         <FrequencySpectrum />
         <CoherenceMeter />
