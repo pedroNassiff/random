@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
@@ -214,6 +214,64 @@ async def copilot_labs_chat(request: CopilotChatRequest):
             widgets=[],
         )
 
+
+@app.post("/api/tts")
+async def text_to_speech(request: Request):
+    """
+    Convierte texto a voz con ElevenLabs (Rachel, ES).
+    Devuelve audio/mpeg stream listo para reproducir en el frontend.
+    
+    Body JSON: { "text": "...", "voice_id": "..." (opcional) }
+    """
+    import os, httpx
+    api_key = os.getenv("ELEVENLABS_API_KEY", "")
+    if not api_key:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content={"error": "ELEVENLABS_API_KEY no configurado"})
+
+    body = await request.json()
+    text = body.get("text", "").strip()
+    if not text:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=400, content={"error": "text requerido"})
+
+    # Rachel (voz femenina, cálida, contemplativa) — multilingual v2
+    voice_id = body.get("voice_id", "21m00Tcm4TlvDq8ikWAM")
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
+    payload = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.85,
+            "similarity_boost": 0.75,
+            "style": 0.15,
+            "use_speaker_boost": True,
+        },
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                url,
+                json=payload,
+                headers={"xi-api-key": api_key, "Accept": "audio/mpeg"},
+            )
+            resp.raise_for_status()
+
+        from fastapi.responses import Response
+        return Response(
+            content=resp.content,
+            media_type="audio/mpeg",
+            headers={"Cache-Control": "no-store"},
+        )
+    except httpx.HTTPStatusError as exc:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=502, content={"error": f"ElevenLabs HTTP {exc.response.status_code}"})
+    except Exception as exc:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
 # ============================================
 # Brain Endpoints
 # ============================================
@@ -417,16 +475,59 @@ async def refresh_playlist():
 async def discover_devices():
     """
     Busca dispositivos Muse 2 disponibles vía Bluetooth.
-    
-    Returns:
-        Lista de dispositivos encontrados con nombre, dirección y RSSI.
+    muselsl.list_muses() usa asyncio.run() internamente — si se llama desde
+    el event loop de FastAPI falla silenciosamente devolviendo lista vacía.
+    Solución: ejecutar discover() en un thread separado con asyncio.to_thread().
     """
-    devices = muse_connector.discover(timeout=10.0)
+    import logging
+    log = logging.getLogger("discover_devices")
+    log.info("[/hardware/devices] Iniciando BLE scan en thread separado...")
+    print("[/hardware/devices] Iniciando BLE scan (thread separado)...")
+
+    try:
+        # Correr en thread para que list_muses() pueda usar asyncio.run() sin conflicto
+        devices = await asyncio.to_thread(muse_connector.discover, 10.0)
+    except Exception as exc:
+        log.exception("[/hardware/devices] Error en discover: %s", exc)
+        print(f"[/hardware/devices] ERROR en discover: {exc}")
+        return {"status": "error", "devices": [], "count": 0, "error": str(exc)}
+
+    print(f"[/hardware/devices] Scan terminado. Dispositivos encontrados: {len(devices)}")
+    for d in devices:
+        info = d.to_dict()
+        print(f"  └─ {info.get('name')} | {info.get('address')} | RSSI: {info.get('rssi')}")
+
     return {
         "status": "success",
         "devices": [d.to_dict() for d in devices],
         "count": len(devices)
     }
+
+@app.get("/hardware/battery/{address}")
+async def get_device_battery(address: str):
+    """
+    Lee el nivel de batería del Muse vía BLE.
+
+    Conecta brevemente al dispositivo para leer la característica de telemetría.
+    Llamar ANTES de /hardware/connect (muselsl ocupa la conexión BLE después).
+
+    Returns:
+        battery_level: 0-100 o null si no se pudo leer.
+    """
+    # On macOS, BLE addresses are UUIDs with dashes (e.g. 6D5F179A-C0AF-...-293F).
+    # BleakClient needs the dashed format — do NOT convert to colons here.
+    # (Only the muselsl connect endpoint needs the colon-separated format.)
+    print(f"[/hardware/battery] Leyendo batería de {address}...")
+    try:
+        battery = await asyncio.to_thread(muse_connector.read_battery, address)
+        return {
+            "status": "success" if battery is not None else "timeout",
+            "battery_level": battery,
+            "address": address
+        }
+    except Exception as exc:
+        print(f"[/hardware/battery] Error: {exc}")
+        return {"status": "error", "battery_level": None, "address": address, "error": str(exc)}
 
 @app.post("/hardware/connect-stream")
 async def connect_to_existing_stream():
@@ -452,19 +553,23 @@ async def connect_to_existing_stream():
 async def connect_hardware(address: str):
     """
     Conecta a un Muse 2 específico.
-    
+
     Args:
-        address: MAC address del dispositivo (ej: "XX:XX:XX:XX:XX:XX")
+        address: UUID del dispositivo macOS (ej: "6D5F179A-C0AF-DCA5-3B60-7812EF8E293F")
+                 Se mantiene en formato UUID con guiones — es el formato que Bleak/CoreBluetooth
+                 usa en macOS. NO convertir a colons (eso rompe la conexión BLE).
     """
-    # Decodificar address (puede venir URL-encoded)
-    address = address.replace("-", ":")
-    
-    success = muse_connector.connect(address)
+    # Ejecutar en thread separado: connect() llama read_battery() que crea su propio
+    # event loop con asyncio.new_event_loop(). Si se llama desde el event loop de
+    # FastAPI (sin thread), el new_event_loop() entra en conflicto y la coroutine
+    # queda sin awaitar. Mismo patrón que discover().
+    success = await asyncio.to_thread(muse_connector.connect, address)
     if success:
+        device_dict = muse_connector.device_info.to_dict() if muse_connector.device_info else None
         return {
             "status": "success",
             "message": f"Connected to Muse 2: {address}",
-            "device": muse_connector.device_info.to_dict() if muse_connector.device_info else None
+            "device": device_dict
         }
     return {
         "status": "error",

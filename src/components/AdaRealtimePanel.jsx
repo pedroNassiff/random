@@ -12,6 +12,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useAdaRealtimeStore }  from '../stores/adaRealtimeStore'
 import { useBrainStore }         from '../lab-core/brain/store'
+import { useBinauralBeats }      from '../hooks/useBinauralBeats'
+import { getGuidance, classifyGuidanceState } from '../lib/adaGuidanceScripts'
 
 const API = import.meta.env.DEV
   ? 'http://localhost:8000'
@@ -166,36 +168,157 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
   const sessionPaused = useBrainStore((s) => s.sessionPaused)
 
   const [input, setInput] = useState('')
+  const [selectedModel, setSelectedModel] = useState('auto')
   const bottomRef      = useRef(null)
   const inputRef       = useRef(null)
   const lastSampleAt   = useRef(0)
   const isAutoRunning  = useRef(false)
+  const [voiceMuted, setVoiceMuted] = useState(false)
+  const voiceMutedRef = useRef(false)
+
+  // ── Binaural beats ────────────────────────────────────────────────────────
+  const binaural = useBinauralBeats()
+
+  // ── TTS: ElevenLabs (voz Rachel) con fallback a Web Speech API ───────────
+  const speakingRef = useRef(false)
+  const audioRef    = useRef(null)
+
+  const speak = useCallback(async (text) => {
+    if (voiceMutedRef.current) return
+    const clean = text
+      .replace(/[⬡●•]/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/━+[^━]*━+/g, '')
+      .trim()
+    if (!clean) return
+
+    // Cancelar cualquier locución anterior
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    window.speechSynthesis?.cancel()
+
+    try {
+      // Intentar ElevenLabs via backend
+      const res = await fetch(`${API}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: clean }),
+      })
+      if (!res.ok) throw new Error(`TTS HTTP ${res.status}`)
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => URL.revokeObjectURL(url)
+      audio.play()
+    } catch {
+      // Fallback: Web Speech API (voz del navegador)
+      if (!window.speechSynthesis) return
+      const utt = new SpeechSynthesisUtterance(clean)
+      utt.lang = 'es-ES'
+      utt.rate = 0.90
+      utt.pitch = 1.05
+      const voices = window.speechSynthesis.getVoices()
+      const preferred = voices.find(v => v.lang.startsWith('es') && /Monica|Paulina|Lucia|Google/i.test(v.name))
+        || voices.find(v => v.lang.startsWith('es'))
+      if (preferred) utt.voice = preferred
+      window.speechSynthesis.speak(utt)
+    }
+  }, [])
+
+  const toggleMute = () => {
+    const next = !voiceMutedRef.current
+    voiceMutedRef.current = next
+    setVoiceMuted(next)
+    if (next) {
+      window.speechSynthesis?.cancel()
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    }
+  }
+
+  // ── Muse live mode: timer local de sesión (sessionProgress solo existe en dataset) ──
+  const museLiveStartAt  = useRef(null)
+  const [museLiveElapsed, setMuseLiveElapsed] = useState(null)
+
+  useEffect(() => {
+    if (dataSource !== 'muse') {
+      museLiveStartAt.current = null
+      setMuseLiveElapsed(null)
+      return
+    }
+    // Arrancar timer al entrar en modo Muse — no depende de bands para evitar
+    // que el interval se destruya cada vez que llega un mensaje WS
+    if (!museLiveStartAt.current) museLiveStartAt.current = Date.now()
+    const id = setInterval(() => {
+      setMuseLiveElapsed(Math.floor((Date.now() - museLiveStartAt.current) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [dataSource]) // solo dataSource — nunca bands
+
+  // Para Muse en vivo: usar timer local; para dataset: usar sessionProgress del WS
+  const effectiveProgress = dataSource === 'muse' ? museLiveElapsed : sessionProgress
+
+  // ── Guía adaptativa por estado EEG (cada 60s en modo Muse) ───────────────
+  const lastGuidanceAt   = useRef(0)
+  const lastWandering    = useRef(false)
+  const guidanceOpeningDone = useRef(false)
+
+  useEffect(() => {
+    if (dataSource !== 'muse') return
+    if (effectiveProgress == null || effectiveProgress < 3) return
+
+    // Apertura: primera vez que hay datos
+    if (!guidanceOpeningDone.current) {
+      guidanceOpeningDone.current = true
+      setTimeout(() => speak(getGuidance('opening')), 2000)
+      lastGuidanceAt.current = Date.now()
+      return
+    }
+
+    const now = Date.now()
+    const secsSinceLast = (now - lastGuidanceAt.current) / 1000
+
+    // Wandering: intervenir más rápido (15s) — estado sintérgico: silencio total
+    const guidanceState = classifyGuidanceState(bands, coherence, lastWandering.current)
+    const isWandering   = guidanceState === 'wandering'
+    const isSyntergic   = (bands?.alpha ?? 0) >= 0.25 && coherence >= 0.75
+
+    if (isSyntergic) return  // silencio total en estado sintérgico
+
+    const minInterval = isWandering ? 15 : 60
+    if (secsSinceLast < minInterval) return
+
+    lastGuidanceAt.current = now
+    lastWandering.current  = isWandering
+    speak(getGuidance(guidanceState))
+  }, [effectiveProgress, bands, coherence, dataSource, speak])
 
   // Mantiene los props más recientes accesibles desde setInterval sin stale closures
   const liveRef = useRef({})
-  liveRef.current = { bands, coherence, sessionProgress, eegState, sessionPaused, dataSource }
+  liveRef.current = { bands, coherence, sessionProgress, eegState, sessionPaused, dataSource, museLiveElapsed }
 
   // ── Alimentar buffer (throttled a 1 muestra/s para no saturar) ─────────────
   useEffect(() => {
-    if (sessionProgress == null || !bands || sessionPaused) return
+    if (effectiveProgress == null || !bands) return
+    if (dataSource !== 'muse' && sessionPaused) return
     const now = Date.now()
     if (now - lastSampleAt.current < 1000) return
     lastSampleAt.current = now
     addSample({ ...bands, coherence })
-  }, [sessionProgress, bands, coherence, addSample])
+  }, [effectiveProgress, bands, coherence, addSample, dataSource, sessionPaused])
 
   // ── Auto-análisis cada 30s — setInterval + liveRef (sin stale closures) ────────
   useEffect(() => {
     if (!autoAnalyze) return
     const id = setInterval(async () => {
-      const { bands, coherence, sessionProgress, eegState, sessionPaused, dataSource } = liveRef.current
-      if (sessionProgress == null || sessionPaused || isAutoRunning.current) return
+      const { bands, coherence, sessionProgress, eegState, sessionPaused, dataSource, museLiveElapsed } = liveRef.current
+      const effectiveProg = dataSource === 'muse' ? museLiveElapsed : sessionProgress
+      if (effectiveProg == null || (dataSource !== 'muse' && sessionPaused) || isAutoRunning.current) return
       const summary = useAdaRealtimeStore.getState().getBufferSummary()
       if (!summary || summary.n_samples < 10) return
 
       isAutoRunning.current = true
       setAutoLoading(true)
-      const elapsed = Math.round(sessionProgress * 1000)
+      const elapsed = dataSource === 'muse' ? (museLiveElapsed ?? 0) : Math.round(sessionProgress * 1000)
       try {
         const res = await fetch(COPILOT_URL, {
           method:  'POST',
@@ -220,6 +343,7 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
           model_used: data.model_used,
           auto:       true,
         })
+        speak(data.text)
       } catch {
         // auto-análisis: fallo silencioso, no interrumpir al practicante
       } finally {
@@ -264,6 +388,7 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
         text:       data.text,
         model_used: data.model_used,
       })
+      speak(data.text)
     } catch (err) {
       addMessage({
         role:  'assistant',
@@ -281,15 +406,18 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
     if (!msg) return
     setInput('')
     const summary = getBufferSummary()
-    const elapsed = sessionProgress != null ? Math.round(sessionProgress * 1000) : 0
+    const elapsed = dataSource === 'muse'
+      ? (museLiveElapsed ?? 0)
+      : (sessionProgress != null ? Math.round(sessionProgress * 1000) : 0)
     // mode:'question' → backend usa _SYSTEM_PROMPT (160 palabras) y responde la pregunta
     // incluyendo el snapshot EEG como contexto, no como objetivo de la respuesta
     sendToAda(msg, {
-      mode:           'question',
-      source:         dataSource,
-      elapsed_s:      elapsed,
-      live_snapshot:  sessionProgress != null ? { bands, coherence, state: eegState } : undefined,
-      buffer_summary: summary ?? undefined,
+      mode:             'question',
+      source:           dataSource,
+      elapsed_s:        elapsed,
+      model_preference: selectedModel,
+      live_snapshot:    effectiveProgress != null ? { bands, coherence, state: eegState } : undefined,
+      buffer_summary:   summary ?? undefined,
     })
   }
 
@@ -371,6 +499,36 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
               >
                 {isAutoLoading ? '· · ·' : 'auto 30s'}
               </button>
+              {/* Mute voz */}
+              <button
+                onClick={toggleMute}
+                title={voiceMuted ? 'Activar voz de ADA' : 'Silenciar voz de ADA'}
+                style={{
+                  marginLeft: 4,
+                  fontSize: 10, padding: '2px 5px', borderRadius: 4, cursor: 'none',
+                  background: voiceMuted ? 'rgba(255,255,255,0.04)' : 'rgba(139,92,246,0.15)',
+                  border: `1px solid ${voiceMuted ? 'rgba(255,255,255,0.08)' : 'rgba(139,92,246,0.3)'}`,
+                  color: voiceMuted ? 'rgba(255,255,255,0.2)' : '#a78bfa',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {voiceMuted ? '🔇' : '🔊'}
+              </button>
+              {/* Binaural beats toggle */}
+              <button
+                onClick={() => binaural.active ? binaural.stop() : binaural.start('alpha')}
+                title={binaural.active ? `Binaural activo: ${binaural.preset} — click para parar` : 'Activar beats binaurales (requiere auriculares)'}
+                style={{
+                  marginLeft: 4,
+                  fontSize: 9, padding: '2px 5px', borderRadius: 4, cursor: 'none',
+                  background: binaural.active ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${binaural.active ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  color: binaural.active ? '#34d399' : 'rgba(255,255,255,0.2)',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {binaural.active ? `∿ ${binaural.preset}` : '∿'}
+              </button>
             </div>
           </div>
 
@@ -378,7 +536,7 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
           <LiveStatusBar
             bands={bands}
             coherence={coherence}
-            sessionProgress={sessionProgress}
+            sessionProgress={effectiveProgress}
           />
 
           {/* Messages */}
@@ -419,10 +577,49 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
               padding: '8px 10px 12px',
               borderTop: '1px solid rgba(255,255,255,0.06)',
               display: 'flex',
+              flexDirection: 'column',
               gap: 6,
               flexShrink: 0,
             }}
           >
+            {/* Model selector */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', marginRight: 2 }}>modelo</span>
+              {[
+                { id: 'auto',   label: '⚡ Auto',   title: 'Groq (llama) · gratis' },
+                { id: 'gemini', label: '✦ Gemini',  title: 'Gemini 2.0 Flash · gratis' },
+                { id: 'claude', label: '◆ Claude',  title: 'Claude 3.5 Haiku · pago' },
+              ].map(({ id, label, title }) => (
+                <button
+                  key={id}
+                  type="button"
+                  title={title}
+                  onClick={() => setSelectedModel(id)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: 20,
+                    fontSize: 9,
+                    fontFamily: 'monospace',
+                    border: selectedModel === id
+                      ? '1px solid rgba(139,92,246,0.7)'
+                      : '1px solid rgba(255,255,255,0.08)',
+                    background: selectedModel === id
+                      ? 'rgba(139,92,246,0.18)'
+                      : 'rgba(255,255,255,0.03)',
+                    color: selectedModel === id
+                      ? 'rgba(167,139,250,0.95)'
+                      : 'rgba(255,255,255,0.35)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* Input row */}
+            <div style={{ display: 'flex', gap: 6 }}>
             <input
               ref={inputRef}
               value={input}
@@ -459,6 +656,7 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
             >
               ↑
             </button>
+            </div>
           </form>
         </div>
       )}

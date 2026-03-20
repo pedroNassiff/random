@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions"
 GROQ_BASE       = "https://api.groq.com/openai/v1/chat/completions"
+ANTHROPIC_BASE  = "https://api.anthropic.com/v1/messages"
 OPENROUTER_REFERER = "https://random-lab.es"
 
 
@@ -339,6 +340,7 @@ class CopilotLabsService:
         self.router = LLMRouter()
         self._groq_key       = os.getenv("GROQ_API_KEY", "")
         self._openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+        self._claude_key     = os.getenv("CLAUDE_API_KEY", "")
         self._http = httpx.AsyncClient(timeout=30.0)
 
     async def aclose(self) -> None:
@@ -366,7 +368,16 @@ class CopilotLabsService:
         is_question = mode == "question"
         source      = ctx.get("source", "dataset")  # "dataset" (replay) | "muse" (live recording)
         complexity  = QueryComplexity.SIMPLE if is_realtime else self.router.classify(message)
-        model_cfg   = self.router.select(complexity)
+        model_pref  = ctx.get("model_preference", "auto")  # 'auto' | 'gemini' | 'claude'
+
+        # Forzar modelo si el frontend lo solicita
+        if model_pref == "claude":
+            model_cfg = {"model": "claude-3-haiku-20240307", "max_tokens": 1024, "display_name": "Claude 3 Haiku", "provider": "claude"}
+        elif model_pref == "gemini":
+            from .llm_router import OPENROUTER_MODELS
+            model_cfg = {**OPENROUTER_MODELS[complexity], "provider": "openrouter"}
+        else:
+            model_cfg = self.router.select(complexity)
 
         if is_realtime:
             system_prompt = _SYSTEM_PROMPT_LIVE if source == "muse" else _SYSTEM_PROMPT_REPLAY
@@ -378,7 +389,10 @@ class CopilotLabsService:
             {"role": "user",   "content": user_content},
         ]
 
-        text = await self._call_llm(messages, model_cfg)
+        if model_cfg.get("provider") == "claude":
+            text = await self._call_claude(messages)
+        else:
+            text = await self._call_llm_with_fallback(messages, model_cfg, complexity)
         widgets = self._maybe_build_widgets(session_context)
 
         return {
@@ -511,6 +525,54 @@ class CopilotLabsService:
         return "\n".join(lines)
 
     # ── LLM call via httpx ────────────────────────────────────────────────────
+    async def _call_claude(self, messages: List[Dict], max_tokens: int = 1024) -> str:
+        """Llama a Anthropic Claude 3.5 Haiku directamente."""
+        if not self._claude_key:
+            return "🔑 Añade `CLAUDE_API_KEY` al `.env` para usar Claude."
+
+        # Anthropic separa el system prompt del resto
+        system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+        user_msgs  = [m for m in messages if m["role"] != "system"]
+
+        headers = {
+            "x-api-key":         self._claude_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type":      "application/json",
+        }
+        payload = {
+            "model":      "claude-3-haiku-20240307",
+            "max_tokens": max_tokens,
+            "system":     system_msg,
+            "messages":   user_msgs,
+        }
+
+        try:
+            response = await self._http.post(ANTHROPIC_BASE, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()["content"][0]["text"]
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            logger.error("Claude HTTP %s: %s", status, exc.response.text[:200])
+            if status == 401:
+                return "🔑 CLAUDE_API_KEY inválida. Revisa el `.env`."
+            if status == 429:
+                return "⏳ Rate limit de Claude alcanzado. Prueba con Auto o Gemini."
+            return f"❌ Error de Claude (HTTP {status}). Inténtalo de nuevo."
+        except Exception as exc:
+            logger.exception("Claude error: %s", exc)
+            return "❌ Error inesperado con Claude. Revisa los logs."
+
+    async def _call_llm_with_fallback(
+        self, messages: List[Dict], model_cfg: Dict, complexity: "QueryComplexity"
+    ) -> str:
+        """Llama a _call_llm; si Groq devuelve 429, reintenta con OpenRouter."""
+        text = await self._call_llm(messages, model_cfg)
+        if text.startswith("⏳") and model_cfg.get("provider") == "groq" and self._openrouter_key:
+            logger.info("Groq rate-limited — reintentando con OpenRouter fallback")
+            fallback_cfg = self.router.select_fallback(complexity)
+            text = await self._call_llm(messages, fallback_cfg)
+        return text
+
     async def _call_llm(
         self, messages: List[Dict], model_cfg: Dict
     ) -> str:

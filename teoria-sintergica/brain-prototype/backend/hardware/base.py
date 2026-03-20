@@ -28,13 +28,15 @@ class DeviceInfo:
     address: str
     device_type: str  # 'muse2', 'openbci', etc.
     rssi: Optional[int] = None  # Signal strength (Bluetooth)
+    battery_level: Optional[int] = None  # 0-100%
     
     def to_dict(self) -> Dict:
         return {
             'name': self.name,
             'address': self.address,
             'device_type': self.device_type,
-            'rssi': self.rssi
+            'rssi': self.rssi,
+            'battery_level': self.battery_level
         }
 
 

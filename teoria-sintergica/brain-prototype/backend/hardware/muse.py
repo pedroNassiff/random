@@ -58,6 +58,9 @@ class MuseConnector(EEGDevice):
     LEFT_CHANNELS = [0, 1]   # TP9, AF7
     RIGHT_CHANNELS = [2, 3]  # AF8, TP10
     
+    # Muse GATT telemetry characteristic (battery + temp)
+    MUSE_TELEMETRY_UUID = '273e000b-4c4d-454d-96be-f03bac821358'
+    
     def __init__(self, buffer_duration: float = 10.0):
         """
         Args:
@@ -84,39 +87,67 @@ class MuseConnector(EEGDevice):
         self._inlet = None
         
     def discover(self, timeout: float = 10.0) -> List[DeviceInfo]:
-        """Descubre dispositivos Muse disponibles."""
+        """
+        Descubre dispositivos Muse disponibles via BleakScanner directamente.
+
+        Bypaseamos muselsl.list_muses() porque su backends.py usa
+        asyncio.get_event_loop() (deprecated en Python 3.10+) que lanza
+        RuntimeError en threads sin event loop (Python 3.13).
+
+        Se ejecuta siempre desde asyncio.to_thread() en main.py.
+        """
+        import asyncio
+        import traceback
+
         try:
-            from muselsl import list_muses
-            
-            print(f"🔍 Buscando dispositivos Muse ({timeout}s timeout)...")
-            muses = list_muses(timeout=timeout)
-            
-            devices = []
-            for muse in muses:
-                devices.append(DeviceInfo(
-                    name=muse.get('name', 'Muse'),
-                    address=muse['address'],
-                    device_type='muse2',
-                    rssi=muse.get('rssi')
-                ))
-            
-            if devices:
-                print(f"✅ Encontrados {len(devices)} dispositivo(s)")
-            else:
-                print("⚠️ No se encontraron dispositivos Muse")
-                print("   → Verifica que el Muse esté encendido")
-                print("   → Verifica que Bluetooth esté activado")
-            
-            return devices
-            
+            from bleak import BleakScanner
         except ImportError:
-            self._error_message = "muselsl no instalado. Ejecutar: pip install muselsl"
+            self._error_message = "bleak no instalado. Ejecutar: pip install bleak"
             self._status = DeviceStatus.ERROR
+            print("[discover] ERROR: bleak no instalado")
             return []
+
+        print(f"[discover] BleakScanner.discover(timeout={timeout}) — iniciando BLE scan...")
+
+        # Python 3.13: los threads no tienen event loop. Creamos uno.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            ble_devices = loop.run_until_complete(
+                BleakScanner.discover(timeout=timeout)
+            )
         except Exception as e:
-            self._error_message = f"Error en discovery: {str(e)}"
+            print(f"[discover] Exception en BleakScanner: {e}")
+            traceback.print_exc()
+            self._error_message = f"Error en BLE scan: {e}"
             self._status = DeviceStatus.ERROR
             return []
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+        print(f"[discover] BLE scan completo. Total dispositivos BT: {len(ble_devices)}")
+
+        devices = []
+        for d in ble_devices:
+            name = d.name or ''
+            print(f"[discover]   {name!r:30s} | {d.address}")
+            if 'muse' in name.lower():
+                rssi = getattr(d, 'rssi', None)
+                print(f"[discover]   ✅ MUSE: {name} | {d.address} | RSSI: {rssi}")
+                devices.append(DeviceInfo(
+                    name=name,
+                    address=d.address,
+                    device_type='muse2',
+                    rssi=rssi,
+                ))
+
+        if devices:
+            print(f"[discover] ✅ {len(devices)} Muse encontrado(s)")
+        else:
+            print("[discover] ⚠️  Ningún Muse encontrado entre los dispositivos BT visibles")
+
+        return devices
     
     def connect(self, address: str) -> bool:
         """
@@ -128,36 +159,47 @@ class MuseConnector(EEGDevice):
             self._status = DeviceStatus.CONNECTING
             print(f"🔌 Conectando a Muse: {address}")
             
-            # Iniciar muselsl stream en background
+            # Leer batería ANTES de iniciar muselsl — el Muse solo acepta una conexión BLE
+            # a la vez. Si leemos batería y muselsl se conectan en paralelo, uno falla.
+            print(f"[connect] Leyendo batería de {address}...")
+            battery = self.read_battery(address)
+            if battery is not None:
+                print(f"[connect] Batería: {battery}%")
+            else:
+                print(f"[connect] Batería: no disponible")
+
+            # Iniciar muselsl stream en background.
+            # En macOS el address es un UUID con guiones (6D5F179A-C0AF-...) — formato CoreBluetooth.
+            # NO convertir a colons: Bleak en macOS necesita el formato UUID.
             self._muselsl_process = subprocess.Popen(
-                [sys.executable, '-m', 'muselsl', 'stream', 
-                 '--address', address,
-                 '--ppg', '--acc'],  # Incluir sensores extra
+                [sys.executable, '-m', 'muselsl', 'stream',
+                 '--address', address],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
-            
+
             # Esperar a que se establezca conexión
             time.sleep(5)
-            
+
             # Verificar que el proceso sigue corriendo
             if self._muselsl_process.poll() is not None:
                 stderr = self._muselsl_process.stderr.read().decode()
                 self._error_message = f"muselsl falló: {stderr}"
                 self._status = DeviceStatus.ERROR
                 return False
-            
-            # Guardar info del dispositivo
+
+            # Guardar info del dispositivo (incluyendo batería)
             self._device_info = DeviceInfo(
                 name="Muse 2",
                 address=address,
-                device_type='muse2'
+                device_type='muse2',
+                battery_level=battery
             )
-            
+
             self._status = DeviceStatus.CONNECTED
             print(f"✅ Conectado a Muse 2: {address}")
             return True
-            
+
         except FileNotFoundError:
             self._error_message = "muselsl no encontrado en PATH"
             self._status = DeviceStatus.ERROR
@@ -227,7 +269,91 @@ class MuseConnector(EEGDevice):
         except Exception as e:
             self._error_message = f"Error: {str(e)}"
             return False
-    
+
+    def read_battery(self, address: str) -> Optional[int]:
+        """
+        Lee el nivel de batería del Muse vía BLE.
+
+        Conecta brevemente con BleakClient, suscribe a la característica de
+        telemetría y espera la primera notificación para extraer la batería.
+        Solo funciona ANTES de que muselsl ocupe la conexión BLE.
+
+        Returns:
+            Nivel de batería 0-100, o None si no se pudo leer.
+        """
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self._read_battery_async(address))
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+    async def _read_battery_async(self, address: str) -> Optional[int]:
+        """Lógica async de lectura de batería.
+
+        En lugar de esperar la característica de telemetría (que sólo envía
+        datos periódicamente), enviamos el comando 's' (ask_control) al
+        control characteristic. La respuesta incluye directamente el campo
+        \"bp\" (battery percentage) como número 0-100.
+
+        Comando: [0x02, 0x73, 0x0a] = len('s')+1, ord('s'), ord('\\n')
+        Respuesta: JSON-like string, e.g. {\"rc\":0,\"bp\":50,...}
+        """
+        import asyncio
+        import json
+        import re
+        from bleak import BleakClient
+
+        # Muse GATT control characteristic (stream toggle + command channel)
+        CONTROL_UUID = '273e0001-4c4d-454d-96be-f03bac821358'
+        # 'ask_control' command: _write_cmd_str('s') → [len+1, ord('s'), ord('\n')]
+        CMD_ASK_CONTROL = bytes([0x02, 0x73, 0x0a])
+
+        battery_pct = None
+        event = asyncio.Event()
+        buf = []
+
+        def on_control(sender, data):
+            """Accumulate control response chunks until we get 'rc' (end marker)."""
+            nonlocal battery_pct
+            try:
+                chunk = bytes(data).decode('utf-8', errors='ignore').strip()
+                buf.append(chunk)
+                combined = ''.join(buf)
+                # Response arrives in chunks; wait until we have the end marker
+                if 'rc' in combined:
+                    # Extract bp field: {"bp":50,...} or bp":50
+                    m = re.search(r'"bp"\s*:\s*(\d+)', combined)
+                    if m:
+                        battery_pct = int(m.group(1))
+                        print(f"[battery] {address}: {battery_pct}% (from control response)")
+                    else:
+                        print(f"[battery] Control response sin bp: {combined!r}")
+                    event.set()
+            except Exception as e:
+                print(f"[battery] Error parseando control response: {e}")
+                event.set()
+
+        try:
+            async with BleakClient(address, timeout=8.0) as client:
+                await client.start_notify(CONTROL_UUID, on_control)
+                # Request control info (returns bp, sn, hn, etc.)
+                await client.write_gatt_char(CONTROL_UUID, CMD_ASK_CONTROL, response=False)
+                try:
+                    await asyncio.wait_for(event.wait(), timeout=4.0)
+                except asyncio.TimeoutError:
+                    print(f"[battery] Timeout esperando control response de {address}")
+                try:
+                    await client.stop_notify(CONTROL_UUID)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[battery] Error BLE {address}: {e}")
+
+        return battery_pct
+
     def start_stream(self) -> bool:
         """Inicia la recepción de datos EEG via LSL."""
         if not self.is_connected:

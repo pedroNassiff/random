@@ -83,3 +83,7 @@ class LLMRouter:
         if os.getenv("GROQ_API_KEY"):
             return {**GROQ_MODELS[complexity], "provider": "groq"}
         return {**OPENROUTER_MODELS[complexity], "provider": "openrouter"}
+
+    def select_fallback(self, complexity: QueryComplexity) -> Dict:
+        """Devuelve OpenRouter config para usar tras 429/límite en Groq."""
+        return {**OPENROUTER_MODELS[complexity], "provider": "openrouter"}

@@ -35,7 +35,20 @@ export default function MuseControl({ onModeChange }) {
   const [error, setError] = useState(null);
   const [signalQuality, setSignalQuality] = useState(null);
   const [showInstructions, setShowInstructions] = useState(false);
-  
+
+  // Device picker
+  const [discoveredDevices, setDiscoveredDevices] = useState([]);
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [lastMuseAddress, setLastMuseAddress] = useState(() => localStorage.getItem('muse_last_address') || null);
+  const [scanCountdown, setScanCountdown] = useState(0);
+  const scanTimerRef = useRef(null);
+  const [deviceBatteries, setDeviceBatteries] = useState({}); // address → battery % (null = cargando)
+  const [connectedDevice, setConnectedDevice] = useState(null); // { name, address, battery } after connect
+
+  // Device buffer + status (polled from /hardware/status)
+  const [deviceBuffer, setDeviceBuffer] = useState(null); // { samples, fill_percent, duration_available }
+  const [deviceAddress, setDeviceAddress] = useState(null);
+
   // Live EEG bands from WebSocket store
   const bands = useBrainStore(s => s.bands);
   const bandsDisplay = useBrainStore(s => s.bandsDisplay);
@@ -92,6 +105,31 @@ export default function MuseControl({ onModeChange }) {
     }
   };
 
+  // ── Auto-recuperar estado al montar (página refrescada, backend sigue conectado) ──
+  useEffect(() => {
+    const recover = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/hardware/status`);
+        const data = await res.json();
+        if (data.is_connected || data.is_streaming) {
+          const info = data.device_info || {};
+          const name = info.name || lastMuseAddress || 'Muse 2';
+          const address = info.address || lastMuseAddress;
+          const battery = info.battery_level ?? null;
+          setConnectedDevice({ name, address, battery });
+          if (address) setDeviceAddress(address);
+          if (data.buffer) setDeviceBuffer(data.buffer);
+          if (data.signal_quality) setSignalQuality(data.signal_quality);
+          setStatus(data.is_streaming ? MUSE_STATUS.STREAMING : MUSE_STATUS.CONNECTED);
+          console.log('[MuseControl] Sesión Muse recuperada al montar:', name, address);
+        }
+      } catch (e) {
+        // Backend no disponible al montar — no hacer nada
+      }
+    };
+    recover();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Polling del estado
   useEffect(() => {
     if (status !== MUSE_STATUS.STREAMING && status !== MUSE_STATUS.CALIBRATING) return;
@@ -100,9 +138,9 @@ export default function MuseControl({ onModeChange }) {
       try {
         const res = await fetch(`${API_BASE}/hardware/status`);
         const data = await res.json();
-        if (data.signal_quality) {
-          setSignalQuality(data.signal_quality);
-        }
+        if (data.signal_quality) setSignalQuality(data.signal_quality);
+        if (data.buffer)        setDeviceBuffer(data.buffer);
+        if (data.device_info?.address) setDeviceAddress(data.device_info.address);
       } catch (err) {
         console.error('Error fetching status:', err);
       }
@@ -115,6 +153,7 @@ export default function MuseControl({ onModeChange }) {
     return () => {
       if (calibrationInterval.current) clearInterval(calibrationInterval.current);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (scanTimerRef.current) clearInterval(scanTimerRef.current);
     };
   }, []);
   
@@ -136,39 +175,136 @@ export default function MuseControl({ onModeChange }) {
   }, [isRecording]);
 
   const scanDevices = async () => {
-    console.log('[MuseControl] scanDevices → POST', `${API_BASE}/hardware/connect-stream`);
+    // Primero: comprobar si el backend ya tiene el Muse conectado
+    // (ocurre cuando se refresca la página pero el backend sigue corriendo)
+    try {
+      const statusRes = await fetch(`${API_BASE}/hardware/status`);
+      const statusData = await statusRes.json();
+      if (statusData.is_connected || statusData.is_streaming) {
+        const info = statusData.device_info || {};
+        const name = info.name || lastMuseAddress || 'Muse 2';
+        const address = info.address || lastMuseAddress;
+        const battery = info.battery_level ?? null;
+        setConnectedDevice({ name, address, battery });
+        if (address) setDeviceAddress(address);
+        if (statusData.buffer) setDeviceBuffer(statusData.buffer);
+        setStatus(statusData.is_streaming ? MUSE_STATUS.STREAMING : MUSE_STATUS.CONNECTED);
+        console.log('[MuseControl] Sesión ya activa en backend — saltando scan BLE:', name);
+        return; // no hace falta escanear
+      }
+    } catch (_) {
+      // Backend no responde — continuar con scan normal
+    }
+
+    const url = `${API_BASE}/hardware/devices`;
+    console.group('[MuseControl] scanDevices');
+    console.log('API_BASE:', API_BASE);
+    console.log('URL:', url);
+    console.log('lastMuseAddress (localStorage):', lastMuseAddress);
+
     setStatus(MUSE_STATUS.SCANNING);
     setError(null);
-    
+
+    // Countdown timer (backend scan takes ~10s)
+    let remaining = 11;
+    setScanCountdown(remaining);
+    scanTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setScanCountdown(remaining);
+      if (remaining <= 0) clearInterval(scanTimerRef.current);
+    }, 1000);
+
     try {
-      const streamRes = await fetch(`${API_BASE}/hardware/connect-stream`, { method: 'POST' });
-      const streamData = await streamRes.json();
-      console.log('[MuseControl] connect-stream response:', streamData);
-      
-      if (streamData.status === 'success') {
-        setStatus(MUSE_STATUS.CONNECTED);
-        return;
-      }
-    } catch (err) {
-      console.warn('[MuseControl] connect-stream failed (no existing stream):', err.message);
-    }
-    
-    try {
-      console.log('[MuseControl] GET', `${API_BASE}/hardware/devices`);
-      const res = await fetch(`${API_BASE}/hardware/devices`);
+      console.log('[MuseControl] → GET', url);
+      const res = await fetch(url);
+      console.log('[MuseControl] ← HTTP', res.status, res.statusText);
+
+      clearInterval(scanTimerRef.current);
+      setScanCountdown(0);
+
       const data = await res.json();
-      console.log('[MuseControl] devices response:', data);
-      
+      console.log('[MuseControl] response body:', JSON.stringify(data, null, 2));
+
       if (data.devices?.length > 0) {
+        console.log(`[MuseControl] ${data.devices.length} device(s) found:`);
+        data.devices.forEach((d, i) => console.log(`  [${i}]`, d.name, '|', d.address, '| RSSI:', d.rssi));
+
+        // Put last-used device first
+        const sorted = [...data.devices].sort((a, b) => {
+          if (a.address === lastMuseAddress) return -1;
+          if (b.address === lastMuseAddress) return 1;
+          return 0;
+        });
+        setDiscoveredDevices(sorted);
+        setShowDeviceModal(true);
         setStatus(MUSE_STATUS.DISCONNECTED);
+        // Batería: se lee en el backend durante connect(), no aquí,
+        // para evitar que BleakClient y muselsl peleen por la conexión BLE.
       } else {
-        setError('No se encontró stream. Ejecuta: ./scripts/start_muse.sh');
+        console.warn('[MuseControl] No devices found. Full response:', data);
+        setError('No se encontraron dispositivos Muse. ¿LED azul parpadeando?');
         setStatus(MUSE_STATUS.ERROR);
       }
     } catch (err) {
-      console.error('[MuseControl] devices fetch error:', err.message);
-      setError('Error al conectar. ¿Backend corriendo?');
+      clearInterval(scanTimerRef.current);
+      setScanCountdown(0);
+      console.error('[MuseControl] fetch error:', err.name, err.message);
+      setError(`Error al escanear: ${err.message}`);
       setStatus(MUSE_STATUS.ERROR);
+    } finally {
+      console.groupEnd();
+    }
+  };
+
+  const connectToDevice = async (address) => {
+    const url = `${API_BASE}/hardware/connect/${encodeURIComponent(address)}`;
+    console.group('[MuseControl] connectToDevice');
+    console.log('address:', address);
+    console.log('URL:', url);
+
+    // Capture device name before closing modal
+    const deviceMeta = discoveredDevices.find(d => d.address === address);
+    setConnectedDevice({
+      name: deviceMeta?.name || 'Muse',
+      address,
+      battery: null, // se actualiza desde la respuesta del connect
+    });
+
+    setShowDeviceModal(false);
+    setStatus(MUSE_STATUS.SCANNING);
+    setError(null);
+
+    localStorage.setItem('muse_last_address', address);
+    setLastMuseAddress(address);
+
+    try {
+      console.log('[MuseControl] → POST', url);
+      const res = await fetch(url, { method: 'POST' });
+      console.log('[MuseControl] ← HTTP', res.status, res.statusText);
+
+      const data = await res.json();
+      console.log('[MuseControl] connect response:', JSON.stringify(data, null, 2));
+
+      if (data.status === 'success') {
+        // Actualizar batería desde la respuesta del backend
+        const batteryFromBackend = data.device?.battery_level ?? null;
+        if (batteryFromBackend !== null) {
+          setConnectedDevice(prev => prev ? { ...prev, battery: batteryFromBackend } : prev);
+        }
+        console.log('[MuseControl] Connected! Battery:', batteryFromBackend, '% — Starting stream...');
+        setStatus(MUSE_STATUS.CONNECTED);
+        startStream();
+      } else {
+        console.error('[MuseControl] Connect failed:', data.message);
+        setError(data.message || 'No se pudo conectar al dispositivo');
+        setStatus(MUSE_STATUS.ERROR);
+      }
+    } catch (err) {
+      console.error('[MuseControl] connectToDevice fetch error:', err.name, err.message);
+      setError(`Error al conectar: ${err.message}`);
+      setStatus(MUSE_STATUS.ERROR);
+    } finally {
+      console.groupEnd();
     }
   };
 
@@ -785,6 +921,109 @@ export default function MuseControl({ onModeChange }) {
     }
   };
 
+  // ── Detecta señal plana (todos los valores iguales = waiting_data) ──────────
+  const isWaitingData = bands &&
+    Object.values(bands).every(v => Math.abs(v - 0.2) < 0.001);
+
+  const renderDeviceStatus = () => {
+    const noFlow = deviceBuffer?.samples === 0 || isWaitingData;
+    const fillPct = deviceBuffer?.fill_percent ?? 0;
+    const shortAddr = deviceAddress
+      ? deviceAddress.replace(/:/g, '').slice(-6).toUpperCase()
+      : '——';
+
+    return (
+      <div style={{
+        marginBottom: '10px',
+        padding: '10px 12px',
+        background: noFlow ? 'rgba(255,100,0,0.08)' : 'rgba(0,255,136,0.05)',
+        border: `1px solid ${noFlow ? 'rgba(255,100,0,0.3)' : 'rgba(0,255,136,0.15)'}`,
+        borderRadius: '8px',
+        fontSize: '0.65rem',
+        fontFamily: 'monospace',
+      }}>
+        {/* Fila superior: ID + estado */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{
+              width: '7px', height: '7px', borderRadius: '50%',
+              background: noFlow ? '#ff6400' : '#00ff88',
+              boxShadow: `0 0 8px ${noFlow ? '#ff640066' : '#00ff8866'}`,
+              animation: noFlow ? 'none' : 'pulse 2s infinite',
+            }} />
+            <span style={{ opacity: 0.8, color: '#cceeff' }}>{connectedDevice?.name || 'Muse'}</span>
+            {connectedDevice?.battery != null && (
+              <span style={{
+                fontSize: '0.6rem', fontWeight: 'bold',
+                color: connectedDevice.battery > 40 ? '#44ff88' : connectedDevice.battery > 15 ? '#ffaa00' : '#ff4444'
+              }}>
+                {connectedDevice.battery > 80 ? '🔋' : connectedDevice.battery > 40 ? '🪫' : '⚡'}
+                {' '}{connectedDevice.battery}%
+              </span>
+            )}
+            <span style={{ opacity: 0.3 }}>#{shortAddr}</span>
+          </div>
+          <span style={{ color: noFlow ? '#ff8844' : '#00ff88', fontWeight: 'bold' }}>
+            {noFlow ? 'SIN DATOS' : 'STREAMING'}
+          </span>
+        </div>
+
+        {/* Buffer fill */}
+        <div style={{ marginBottom: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <span style={{ opacity: 0.4 }}>Buffer EEG</span>
+            <span style={{ color: fillPct > 10 ? '#00ff88' : '#ff6400' }}>
+              {deviceBuffer ? `${deviceBuffer.samples} muestras (${fillPct.toFixed(0)}%)` : '—'}
+            </span>
+          </div>
+          <div style={{ height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{
+              width: `${fillPct}%`, height: '100%',
+              background: fillPct > 10 ? '#00ff88' : '#ff6400',
+              transition: 'width 0.5s',
+            }} />
+          </div>
+        </div>
+
+        {/* Warning si no hay datos */}
+        {noFlow && (
+          <div style={{
+            marginTop: '7px', padding: '7px 9px',
+            background: 'rgba(255,80,0,0.12)',
+            border: '1px solid rgba(255,80,0,0.25)',
+            borderRadius: '6px',
+            lineHeight: '1.6',
+          }}>
+            <div style={{ color: '#ff8844', fontWeight: 'bold', marginBottom: '4px' }}>
+              ⚠ EEG no recibido
+            </div>
+            <div style={{ opacity: 0.65 }}>Posibles causas:</div>
+            <div style={{ opacity: 0.55, paddingLeft: '8px' }}>
+              • Batería baja — recarga el Muse<br />
+              • Electrodos sin contacto — ajusta la diadema<br />
+              • Stream LSL roto — desconecta y reconecta
+            </div>
+            <button
+              onClick={async () => {
+                await disconnect();
+                setTimeout(() => scanDevices(), 300);
+              }}
+              style={{
+                marginTop: '8px', width: '100%', padding: '6px',
+                background: 'rgba(255,80,0,0.2)',
+                border: '1px solid rgba(255,80,0,0.4)',
+                borderRadius: '5px', color: '#ff8844',
+                fontSize: '0.62rem', cursor: 'pointer', fontFamily: 'monospace',
+              }}
+            >
+              ↺ Desconectar y reconectar
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderSignalQuality = () => {
     if (!signalQuality) return null;
     const channels = ['TP9', 'AF7', 'AF8', 'TP10'];
@@ -1095,25 +1334,134 @@ export default function MuseControl({ onModeChange }) {
         </div>
       )}
 
-      {/* Instrucciones */}
+      {/* Instrucciones — solo si no se sabe qué hacer */}
       {status === MUSE_STATUS.DISCONNECTED && (
         <div style={{ marginBottom: '10px' }}>
           <button onClick={() => setShowInstructions(!showInstructions)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', cursor: 'pointer', padding: 0 }}>
             {showInstructions ? '▼' : '▶'} Instrucciones
           </button>
-          
+
           {showInstructions && (
-            <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(0,100,200,0.1)', borderRadius: '6px', fontSize: '0.65rem', lineHeight: '1.5' }}>
-              <p style={{ margin: '0 0 5px 0' }}>1. Enciende el Muse (LED azul)</p>
-              <p style={{ margin: '0 0 5px 0' }}>2. En terminal:</p>
-              <code style={{ display: 'block', background: 'rgba(0,0,0,0.3)', padding: '5px', borderRadius: '4px', fontSize: '0.6rem', marginBottom: '5px' }}>
-                cd backend && ./scripts/start_muse.sh
-              </code>
-              <p style={{ margin: '0' }}>3. Cuando veas "Streaming...", click Conectar</p>
+            <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(0,100,200,0.1)', borderRadius: '6px', fontSize: '0.65rem', lineHeight: '1.6' }}>
+              <p style={{ margin: '0 0 4px 0' }}>1. Enciende el Muse 2 (LED parpadeando azul)</p>
+              <p style={{ margin: '0' }}>2. Haz click en <strong>Escanear</strong> — la UI busca y conecta directamente</p>
             </div>
           )}
         </div>
       )}
+
+      {/* Device picker modal */}
+      {showDeviceModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1001
+        }}>
+          <div style={{
+            background: 'rgba(0, 15, 30, 0.98)',
+            border: '1px solid rgba(0,170,255,0.3)',
+            borderRadius: '14px',
+            padding: '20px',
+            maxWidth: '360px',
+            width: '90%',
+            fontFamily: 'monospace'
+          }}>
+            {/* Modal header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00aaff' }}>Dispositivos encontrados</div>
+                <div style={{ fontSize: '0.6rem', opacity: 0.45, marginTop: '2px' }}>
+                  {discoveredDevices.length} Muse {discoveredDevices.length === 1 ? 'detectado' : 'detectados'}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDeviceModal(false)}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '1.1rem', cursor: 'pointer', lineHeight: 1 }}
+              >✕</button>
+            </div>
+
+            {/* Device list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {discoveredDevices.map((device) => {
+                const isLast = device.address === lastMuseAddress;
+                return (
+                  <button
+                    key={device.address}
+                    onClick={() => connectToDevice(device.address)}
+                    style={{
+                      width: '100%', padding: '12px 14px',
+                      background: isLast ? 'rgba(0,170,255,0.12)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isLast ? 'rgba(0,170,255,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '8px', color: '#fff', cursor: 'pointer',
+                      textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = isLast ? 'rgba(0,170,255,0.22)' : 'rgba(255,255,255,0.09)'}
+                    onMouseLeave={e => e.currentTarget.style.background = isLast ? 'rgba(0,170,255,0.12)' : 'rgba(255,255,255,0.04)'}
+                  >
+                    <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>🎧</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: isLast ? '#00aaff' : '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {device.name || 'Muse'}
+                        {isLast && (
+                          <span style={{ fontSize: '0.55rem', background: 'rgba(0,170,255,0.25)', borderRadius: '4px', padding: '1px 5px', fontWeight: 'normal' }}>último</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.58rem', opacity: 0.4, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {device.address}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+                      {/* RSSI (batería se lee en el backend durante connect, no aquí) */}
+                      {device.rssi !== undefined && (
+                        <div style={{ fontSize: '0.58rem', opacity: 0.35 }}>{device.rssi} dBm</div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Fallback: use existing LSL stream */}
+            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <button
+                onClick={async () => {
+                  setShowDeviceModal(false);
+                  setStatus(MUSE_STATUS.SCANNING);
+                  setError(null);
+                  try {
+                    const res = await fetch(`${API_BASE}/hardware/connect-stream`, { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                      setStatus(MUSE_STATUS.CONNECTED);
+                      startStream();
+                    } else {
+                      setError('No se encontró stream LSL activo');
+                      setStatus(MUSE_STATUS.ERROR);
+                    }
+                  } catch {
+                    setError('No se encontró stream LSL activo');
+                    setStatus(MUSE_STATUS.ERROR);
+                  }
+                }}
+                style={{
+                  width: '100%', padding: '8px',
+                  background: 'transparent',
+                  border: '1px dashed rgba(255,255,255,0.12)',
+                  borderRadius: '6px', color: 'rgba(255,255,255,0.3)',
+                  fontSize: '0.62rem', cursor: 'pointer', fontFamily: 'monospace'
+                }}
+              >
+                Usar stream LSL existente (start_muse.sh)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Device status — visible siempre que esté streaming o calibrando */}
+      {(status === MUSE_STATUS.STREAMING || status === MUSE_STATUS.CALIBRATING) && renderDeviceStatus()}
 
       {/* Calibración */}
       {(status === MUSE_STATUS.CALIBRATING || calibrationStep === CALIBRATION_STEPS.COMPLETE || calibrationStep === CALIBRATION_STEPS.FAILED) && renderCalibration()}
@@ -1329,11 +1677,13 @@ export default function MuseControl({ onModeChange }) {
       {/* Botones */}
       <div style={{ display: 'flex', gap: '8px', marginTop: '15px', flexWrap: 'wrap' }}>
         {status === MUSE_STATUS.DISCONNECTED && (
-          <ActionButton onClick={scanDevices} color="#00aaff">🔌 Conectar</ActionButton>
+          <ActionButton onClick={scanDevices} color="#00aaff">� Escanear Muse</ActionButton>
         )}
-        
+
         {status === MUSE_STATUS.SCANNING && (
-          <ActionButton disabled color="#666">⏳ Buscando...</ActionButton>
+          <ActionButton disabled color="#666">
+            {scanCountdown > 0 ? `🔍 Escaneando ${scanCountdown}s...` : '⏳ Conectando...'}
+          </ActionButton>
         )}
         
         {status === MUSE_STATUS.CONNECTED && (
