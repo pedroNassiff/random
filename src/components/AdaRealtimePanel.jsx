@@ -261,9 +261,11 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
   const lastGuidanceAt   = useRef(0)
   const lastWandering    = useRef(false)
   const guidanceOpeningDone = useRef(false)
+  const isSessionActive  = useBrainStore((s) => s.isSessionActive)
 
   useEffect(() => {
     if (dataSource !== 'muse') return
+    if (!isSessionActive) return  // No gastar TTS si no hay grabación/protocolo activo
     if (effectiveProgress == null || effectiveProgress < 3) return
 
     // Apertura: primera vez que hay datos
@@ -290,7 +292,7 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
     lastGuidanceAt.current = now
     lastWandering.current  = isWandering
     speak(getGuidance(guidanceState))
-  }, [effectiveProgress, bands, coherence, dataSource, speak])
+  }, [effectiveProgress, bands, coherence, dataSource, speak, isSessionActive])
 
   // Mantiene los props más recientes accesibles desde setInterval sin stale closures
   const liveRef = useRef({})
@@ -311,6 +313,9 @@ export default function AdaRealtimePanel({ bands, coherence, sessionProgress, st
     if (!autoAnalyze) return
     const id = setInterval(async () => {
       const { bands, coherence, sessionProgress, eegState, sessionPaused, dataSource, museLiveElapsed } = liveRef.current
+      // No gastar LLM + TTS si no hay sesión activa (grabación, protocolo o dataset)
+      const sessionActive = useBrainStore.getState().isSessionActive
+      if (dataSource === 'muse' && !sessionActive) return
       const effectiveProg = dataSource === 'muse' ? museLiveElapsed : sessionProgress
       if (effectiveProg == null || (dataSource !== 'muse' && sessionPaused) || isAutoRunning.current) return
       const summary = useAdaRealtimeStore.getState().getBufferSummary()

@@ -146,7 +146,7 @@ export default function BrainDetail() {
         <BrainBridge brainStateRef={brainStateRef} />
 
         <Suspense fallback={null}>
-          <SyntergicBrain brainStateRef={brainStateRef} scale={isMobile ? 0.28 : 0.2} autoRotate />
+          <SyntergicBrain brainStateRef={brainStateRef} scale={isMobile ? 0.28 : 0.2} position={[0, -0.05, 0]} autoRotate />
         </Suspense>
 
         <OrbitControls enableZoom enablePan={false} enableDamping dampingFactor={0.06} minDistance={0.8} maxDistance={5} />

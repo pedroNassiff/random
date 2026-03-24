@@ -11,7 +11,7 @@ import * as THREE from 'three'
  *
  * @prop {React.MutableRefObject} brainStateRef  — updated by WebSocket outside R3F
  */
-export function SyntergicBrain({ brainStateRef, scale = 0.2, autoRotate = true }) {
+export function SyntergicBrain({ brainStateRef, scale = 0.2, position, autoRotate = true }) {
   const { scene } = useGLTF('/models/brain/scene.gltf')
   const group   = useRef()
 
@@ -161,7 +161,7 @@ export function SyntergicBrain({ brainStateRef, scale = 0.2, autoRotate = true }
   })
 
   return (
-    <group ref={group} scale={scale} dispose={null}>
+    <group ref={group} scale={scale} position={position} dispose={null}>
       <primitive object={scene} />
     </group>
   )

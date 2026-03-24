@@ -352,11 +352,43 @@ class InfluxDBEEGClient:
                     'alpha': record.values.get('alpha', 0),
                     'beta': record.values.get('beta', 0),
                     'gamma': record.values.get('gamma', 0),
-                    'state': record.values.get('state', '')
+                    'state': record.values.get('state', ''),
+                    'signal_quality': record.values.get('signal_quality', 0),
+                    'dominant_frequency': record.values.get('dominant_frequency', 0),
                 })
         
         return metrics
     
+    def get_events(
+        self,
+        recording_id: int,
+    ) -> List[Dict]:
+        """Get events/markers for a recording."""
+        if not self._connected:
+            self.connect()
+
+        query = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+            |> range(start: -30d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_event")
+            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> sort(columns: ["_time"])
+        '''
+
+        tables = self.query_api.query(query, org=INFLUX_ORG)
+
+        events = []
+        for table in tables:
+            for record in table.records:
+                events.append({
+                    'timestamp': record.get_time().timestamp(),
+                    'label': record.values.get('label', ''),
+                    'event_type': record.values.get('event_type', ''),
+                })
+
+        return events
+
     def get_aggregated_metrics(self, recording_id: int) -> Dict:
         """
         Get aggregated metrics for a recording (for PostgreSQL update).

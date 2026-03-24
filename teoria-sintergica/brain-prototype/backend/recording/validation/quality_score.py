@@ -183,13 +183,16 @@ class SessionQualityScore:
 def _get_window_quality(w: Dict) -> float:
     """Extract quality score from a window dict."""
     aq = w.get('avg_quality')
-    if aq is not None and np.isfinite(aq):
-        return aq
+    if aq is not None and isinstance(aq, (int, float)) and np.isfinite(aq):
+        return float(aq)
     sq = w.get('signal_quality')
-    if isinstance(sq, dict):
-        vals = [v for v in sq.values() if isinstance(v, (int, float)) and np.isfinite(v)]
-        if vals:
-            return np.mean(vals)
+    if sq is not None:
+        if isinstance(sq, (int, float)) and np.isfinite(sq):
+            return float(sq)
+        if isinstance(sq, dict):
+            vals = [v for v in sq.values() if isinstance(v, (int, float)) and np.isfinite(v)]
+            if vals:
+                return float(np.mean(vals))
     return 0.5  # default if no quality info
 
 

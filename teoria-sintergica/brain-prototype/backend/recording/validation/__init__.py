@@ -13,6 +13,7 @@ from .tests import (
     validate_berger_effect,
     validate_cognitive_reactivity,
     validate_coherence_stability,
+    detect_artifacts,
     run_all_tests,
 )
 from .quality_score import SessionQualityScore
@@ -21,6 +22,7 @@ __all__ = [
     'validate_berger_effect',
     'validate_cognitive_reactivity',
     'validate_coherence_stability',
+    'detect_artifacts',
     'run_all_tests',
     'SessionQualityScore',
 ]

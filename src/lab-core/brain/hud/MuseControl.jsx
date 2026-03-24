@@ -414,19 +414,39 @@ export default function MuseControl({ onModeChange }) {
           return acc + (qualities.reduce((a, b) => a + b, 0) / qualities.length || 0);
         }, 0) / (samples.length || 1);
         
+        // Contar electrodos con buen contacto (quality >= 0.8) en la última muestra
+        const lastQuality = samples.at(-1)?.signal_quality || {};
+        const goodElectrodes = Object.values(lastQuality).filter(q => q >= 0.8).length;
+        
+        // Verificar rango fisiológico: gamma > 5000 µV² = ruido de línea (sin casco)
+        const lastBands = samples.at(-1)?.bands || {};
+        const gammaPhysiological = (lastBands.gamma || 0) < 5000;
+        const deltaPhysiological = (lastBands.delta || 0) < 10000;
+        const bandsOk = gammaPhysiological && deltaPhysiological;
+        
+        const passed = avgQuality >= 0.5 && goodElectrodes >= 2 && bandsOk;
+        
         logCal('signal_check_result', 'signal_check', {
           avgQuality: parseFloat(avgQuality.toFixed(4)),
           samplesCollected: samples.length,
-          passed: avgQuality >= 0.2,
-          threshold: 0.2,
-          perElectrode_last: samples.at(-1)?.signal_quality || null,
+          passed,
+          threshold: 0.5,
+          goodElectrodes,
+          bandsOk,
+          gamma_last: parseFloat((lastBands.gamma || 0).toFixed(1)),
+          delta_last: parseFloat((lastBands.delta || 0).toFixed(1)),
+          perElectrode_last: lastQuality,
         });
 
-        if (avgQuality < 0.2) {
+        if (!passed) {
+          let reason = 'Señal débil.';
+          if (avgQuality < 0.5) reason = `Calidad de señal muy baja (${(avgQuality * 100).toFixed(0)}%). Ajusta la diadema.`;
+          else if (goodElectrodes < 2) reason = `Solo ${goodElectrodes} electrodo(s) con buen contacto. Necesitas al menos 2. Humedece los sensores.`;
+          else if (!bandsOk) reason = 'Señal fuera de rango fisiológico — ¿el casco está puesto?';
           setCalibrationStep(CALIBRATION_STEPS.FAILED);
-          setCalibrationResults({ passed: false, reason: 'Señal muy débil. Ajusta la diadema.' });
+          setCalibrationResults({ passed: false, reason });
           setStatus(MUSE_STATUS.STREAMING);
-          logCal('calibration_failed', 'result', { reason: 'signal_too_weak', avgQuality });
+          logCal('calibration_failed', 'result', { reason, avgQuality, goodElectrodes, bandsOk });
         } else {
           setTimeout(() => runBlinkTest(), 500);
         }
@@ -704,37 +724,41 @@ export default function MuseControl({ onModeChange }) {
           threshold: 0.5,
         });
         
+        // Coherencia promedio de las muestras con ojos cerrados (señal real > 0.8)
+        const avgCoherence = closedToUse.reduce((acc, s) => acc + (s.coherence || 0), 0) / (closedToUse.length || 1);
+        
         setBaselineAlpha(avgAlphaOpen);
-        evaluateCalibration(avgAlphaOpen, avgAlphaClosed);
+        evaluateCalibration(avgAlphaOpen, avgAlphaClosed, avgCoherence);
       }
     }, 200);
   };
 
-  const evaluateCalibration = (alphaOpen, alphaClosed) => {
+  const evaluateCalibration = (alphaOpen, alphaClosed, avgCoherence = 0) => {
     // La calibración es exitosa si:
     // 1. Detectamos suficientes parpadeos (ya validado antes)
     // 2. Alpha con ojos cerrados es MAYOR que con ojos abiertos (fisiología normal)
-    // Esto valida que realmente cerró los ojos y la señal es real
+    // 3. Coherencia > 0.75 (señal cerebral real vs ruido — sin casco ~0.5-0.65)
     
-    const detectedBlinks = confirmedBlinksRef.current; // Usar ref para valor actualizado
+    const detectedBlinks = confirmedBlinksRef.current;
     const alphaRatio = alphaClosed / (alphaOpen || 1);
-    // 0.5 = tolerante: cualquier señal razonablemente real pasa
-    // (después del warmup trim los valores son mucho más realistas)
     const alphaOk = alphaRatio > 0.5;
     const alphaIncreased = alphaRatio > 1.0;
-    const passed = detectedBlinks >= 3 && alphaOk;
+    const coherenceOk = avgCoherence > 0.75;
+    const passed = detectedBlinks >= 3 && alphaOk && coherenceOk;
     
-    console.log(`📊 Calibration evaluation: blinks=${detectedBlinks}, alphaOpen=${alphaOpen.toFixed(2)}, alphaClosed=${alphaClosed.toFixed(2)}, ratio=${alphaRatio.toFixed(2)}`);
+    console.log(`📊 Calibration evaluation: blinks=${detectedBlinks}, alphaOpen=${alphaOpen.toFixed(2)}, alphaClosed=${alphaClosed.toFixed(2)}, ratio=${alphaRatio.toFixed(2)}, coherence=${avgCoherence.toFixed(3)}`);
     
     let reason;
     if (passed) {
       if (alphaIncreased) {
-        reason = `✓ Calibración exitosa: Alpha aumentó ${((alphaRatio - 1) * 100).toFixed(0)}% al cerrar ojos`;
+        reason = `✓ Calibración exitosa: Alpha aumentó ${((alphaRatio - 1) * 100).toFixed(0)}% al cerrar ojos (coherencia: ${avgCoherence.toFixed(2)})`;
       } else {
-        reason = `✓ Calibración exitosa: Señal EEG válida detectada`;
+        reason = `✓ Calibración exitosa: Señal EEG válida detectada (coherencia: ${avgCoherence.toFixed(2)})`;
       }
     } else if (detectedBlinks < 3) {
       reason = `✕ Pocos parpadeos detectados (${detectedBlinks}/${targetBlinks})`;
+    } else if (!coherenceOk) {
+      reason = `✕ Coherencia hemisférica baja (${avgCoherence.toFixed(2)}). ¿El casco está bien puesto? Humedece los sensores.`;
     } else if (!alphaOk) {
       reason = `✕ Alpha disminuyó mucho al cerrar ojos (ratio: ${alphaRatio.toFixed(2)}). Verifica que el sensor esté bien colocado.`;
     } else {
@@ -750,7 +774,10 @@ export default function MuseControl({ onModeChange }) {
       alpha_ratio: parseFloat(alphaRatio.toFixed(4)),
       alpha_ok: alphaOk,
       alpha_increased: alphaIncreased,
+      coherence_avg: parseFloat(avgCoherence.toFixed(4)),
+      coherence_ok: coherenceOk,
       threshold_ratio: 0.5,
+      threshold_coherence: 0.75,
       reason,
     };
 
@@ -814,6 +841,7 @@ export default function MuseControl({ onModeChange }) {
         setShowRecordingModal(false);
         setSessionName('');
         setSessionNotes('');
+        useBrainStore.getState().setSessionActive(true);
       } else {
         setError(data.message || 'Error al iniciar grabación');
       }
@@ -830,6 +858,7 @@ export default function MuseControl({ onModeChange }) {
       if (data.status === 'success') {
         setIsRecording(false);
         setRecordingSessionId(null);
+        useBrainStore.getState().setSessionActive(false);
         // Mostrar resumen breve
         console.log('Recording saved:', data.session);
       }

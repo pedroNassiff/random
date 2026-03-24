@@ -608,6 +608,19 @@ async def hardware_status():
     if muse_connector.is_streaming:
         status['buffer'] = muse_connector.get_buffer_status()
         status['signal_quality'] = muse_connector.get_signal_quality()
+        status['data_stale'] = muse_connector.is_data_stale
+        # Tiempo desde la última muestra real (para diagnosticar drops)
+        if muse_connector._last_sample_time > 0:
+            status['seconds_since_last_sample'] = round(
+                time.time() - muse_connector._last_sample_time, 2
+            )
+    
+    # Estado del proceso muselsl
+    if muse_connector._muselsl_process:
+        poll = muse_connector._muselsl_process.poll()
+        status['muselsl_alive'] = poll is None
+        if poll is not None:
+            status['muselsl_exit_code'] = poll
     
     return {
         "status": "success",
@@ -1290,8 +1303,9 @@ async def protocol_validate(session_id: int):
     y SessionQualityScore compuesto.
     """
     try:
-        # Obtener métricas desde InfluxDB
         influx = get_influx_client()
+        
+        # 1. Obtener métricas desde InfluxDB
         metrics = influx.get_metrics(session_id)
         if not metrics:
             metrics = session_db.get_metrics(session_id)
@@ -1299,14 +1313,35 @@ async def protocol_validate(session_id: int):
         if not metrics:
             return {"status": "error", "message": "No metrics found for session"}
         
-        # Obtener eventos/marcadores
-        events = session_db.get_events(session_id)
-        markers = [{"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)} for e in (events or [])]
+        # 2. Obtener marcadores — InfluxDB primero (donde el protocolo los graba),
+        #    luego fallback a SQLite legacy
+        markers = []
+        try:
+            influx_events = influx.get_events(session_id)
+            markers = [
+                {"label": e.get("label", ""), "timestamp": e.get("timestamp", 0)}
+                for e in (influx_events or [])
+            ]
+        except Exception as e_influx:
+            print(f"\u26a0\ufe0f [validate] InfluxDB events failed: {e_influx}, trying SQLite")
         
-        # Correr todos los tests
+        # Fallback: SQLite legacy events
+        if not markers:
+            events = session_db.get_events(session_id)
+            markers = [
+                {"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)}
+                for e in (events or [])
+            ]
+        
+        print(f"\U0001f9ea [validate] session_id={session_id}: {len(metrics)} metrics, {len(markers)} markers")
+        if markers:
+            marker_labels = [m['label'] for m in markers[:20]]
+            print(f"    markers: {marker_labels}")
+        
+        # 3. Correr todos los tests
         test_results = run_all_tests(metrics, markers)
         
-        # Score compuesto
+        # 4. Score compuesto
         quality = SessionQualityScore.compute(metrics, markers)
         
         return {
@@ -1314,8 +1349,12 @@ async def protocol_validate(session_id: int):
             "session_id": session_id,
             "validation": test_results,
             "quality_score": quality,
+            "markers_found": len(markers),
+            "metrics_found": len(metrics),
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
 

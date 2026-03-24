@@ -307,7 +307,7 @@ export default function ProtocolOverlay({ onClose }) {
           pointerEvents: 'auto',
         }}>
           <div style={{ fontSize: '0.6rem', letterSpacing: '0.4em', color: 'rgba(255,255,255,0.3)', marginBottom: 20, textTransform: 'uppercase' }}>
-            Protocolo de validación
+            Protocolo de validaciónn
           </div>
 
           <input
@@ -392,73 +392,76 @@ export default function ProtocolOverlay({ onClose }) {
 
   return (
     <div style={overlayStyle}>
-      {/* Phase dots (top) */}
+      {/* Top area: phase dots + label + instruction (above the brain) */}
       <div style={{
-        position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
-        display: 'flex', gap: 3,
+        position: 'absolute', top: 100, left: 300, right: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        pointerEvents: 'none',
       }}>
-        {Array.from({ length: protocolState.total_phases }).map((_, i) => (
-          <div key={i} style={{
-            width: i === protocolState.phase_index ? 16 : 5,
-            height: 5, borderRadius: 3,
-            background: `rgba(255,255,255,${i === protocolState.phase_index ? 0.35 : i < protocolState.phase_index ? 0.15 : 0.06})`,
-            transition: 'all 0.4s',
-          }} />
-        ))}
-      </div>
-
-      {/* Phase label */}
-      <div style={{
-        position: 'absolute', top: 40, left: '50%', transform: 'translateX(-50%)',
-        fontSize: 11, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', letterSpacing: '0.3em',
-      }}>
-        {phase.label}
-      </div>
-
-      {/* Main instruction area */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 80,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        opacity: textVisible ? 1 : 0,
-        transform: textVisible ? 'translateY(0)' : 'translateY(8px)',
-        transition: 'opacity 0.8s ease-out, transform 0.8s ease-out',
-      }}>
-        {/* Instruction text */}
-        <div style={{
-          fontSize: phase.has_drishti || phase.breathing_guide ? 18 : 22,
-          color: textColor, fontWeight: 300, letterSpacing: '0.08em',
-          textAlign: 'center', marginBottom: 8,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}>
-          {phase.instruction}
+        {/* Phase dots */}
+        <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+          {Array.from({ length: protocolState.total_phases }).map((_, i) => (
+            <div key={i} style={{
+              width: i === protocolState.phase_index ? 16 : 5,
+              height: 5, borderRadius: 3,
+              background: `rgba(255,255,255,${i === protocolState.phase_index ? 0.35 : i < protocolState.phase_index ? 0.15 : 0.06})`,
+              transition: 'all 0.4s',
+            }} />
+          ))}
         </div>
 
-        {phase.sub_instruction && (
+        {/* Phase label */}
+        <div style={{
+          fontSize: 11, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace',
+          letterSpacing: '0.3em', marginBottom: 12,
+        }}>
+          {phase.label}
+        </div>
+
+        {/* Instruction + sub_instruction */}
+        <div style={{
+          opacity: textVisible ? 1 : 0,
+          transform: textVisible ? 'translateY(0)' : 'translateY(8px)',
+          transition: 'opacity 0.8s ease-out, transform 0.8s ease-out',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+        }}>
           <div style={{
-            fontSize: 12, color: 'rgba(255,255,255,0.15)',
-            letterSpacing: '0.15em', textAlign: 'center',
-            maxWidth: 280, marginBottom: 24,
+            fontSize: phase.has_drishti || phase.breathing_guide ? 18 : 22,
+            color: textColor, fontWeight: 300, letterSpacing: '0.08em',
+            textAlign: 'center', marginBottom: 6,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           }}>
-            {phase.sub_instruction}
+            {phase.instruction}
           </div>
-        )}
 
-        {/* Visual element: Drishti or Breathing Guide */}
-        {phase.has_drishti && (
-          <Drishti
-            color={phase.drishti_color || '#5DCAA5'}
-            progress={protocolState.phase_progress || 0}
-          />
-        )}
+          {phase.sub_instruction && (
+            <div style={{
+              fontSize: 12, color: 'rgba(255,255,255,0.15)',
+              letterSpacing: '0.15em', textAlign: 'center',
+              maxWidth: 280, marginBottom: 12,
+            }}>
+              {phase.sub_instruction}
+            </div>
+          )}
 
-        {phase.breathing_guide && (
-          <BreathingGuide progress={protocolState.phase_progress || 0} />
-        )}
+          {/* Visual element: Drishti or Breathing Guide */}
+          {phase.has_drishti && (
+            <Drishti
+              color={phase.drishti_color || '#5DCAA5'}
+              progress={protocolState.phase_progress || 0}
+            />
+          )}
+
+          {phase.breathing_guide && (
+            <BreathingGuide progress={protocolState.phase_progress || 0} />
+          )}
+        </div>
       </div>
 
-      {/* Timer */}
+      {/* Timer (above controls, below brain) */}
       <div style={{
-        position: 'absolute', bottom: 72, left: '50%', transform: 'translateX(-50%)',
+        position: 'absolute', bottom: 72, left: 300, right: 0,
+        display: 'flex', justifyContent: 'center',
         fontFamily: 'monospace', fontSize: 24, color: 'rgba(255,255,255,0.12)',
         letterSpacing: 4,
       }}>
@@ -467,7 +470,7 @@ export default function ProtocolOverlay({ onClose }) {
 
       {/* Bottom controls */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: 68,
+        position: 'absolute', bottom: 0, left: 300, right: 0, height: 68,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
         borderTop: '1px solid rgba(255,255,255,0.04)',
         pointerEvents: 'auto',

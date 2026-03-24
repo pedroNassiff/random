@@ -20,6 +20,18 @@ import numpy as np
 from typing import Dict, List, Optional
 
 
+def _get_band(window: Dict, band_name: str) -> float:
+    """
+    Get a band power from a window dict, handling both formats:
+      - Nested: {'bands': {'alpha': 0.3, ...}}  (WebSocket/brainState format)
+      - Flat:   {'alpha': 0.3, ...}              (InfluxDB metrics format)
+    """
+    bands = window.get('bands')
+    if isinstance(bands, dict):
+        return bands.get(band_name, 0)
+    return window.get(band_name, 0)
+
+
 def _extract_phase_windows(
     windows: List[Dict],
     markers: List[Dict],
@@ -88,8 +100,8 @@ def validate_berger_effect(
     open_windows = open_windows[skip_open:]
     closed_windows = closed_windows[skip_closed:]
     
-    alpha_open_vals = [w.get('bands', {}).get('alpha', 0) for w in open_windows]
-    alpha_closed_vals = [w.get('bands', {}).get('alpha', 0) for w in closed_windows]
+    alpha_open_vals = [_get_band(w, 'alpha') for w in open_windows]
+    alpha_closed_vals = [_get_band(w, 'alpha') for w in closed_windows]
     
     alpha_open = np.mean(alpha_open_vals) if alpha_open_vals else 0
     alpha_closed = np.mean(alpha_closed_vals) if alpha_closed_vals else 0
@@ -132,30 +144,44 @@ def validate_cognitive_reactivity(
     """
     Cognitive Reactivity Test — beta/gamma must increase during mental task.
     
-    Compares beta and gamma power during 'cognitive_task' phase vs 
-    'baseline_closed' (resting state).
+    Compares beta and gamma power during 'cognitive_task' phase vs
+    the PRECEDING meditation phase (meditation_free), NOT baseline_closed.
+    
+    Rationale: baseline_closed is at minute 2; cognitive_task is at minute 19
+    after 15 min of meditation. Beta is naturally suppressed by then.
+    The correct comparison is: did the cognitive task WAKE UP beta relative
+    to the deep meditative state that preceded it?
     
     Expected: beta ratio > 1.2, gamma ratio > 1.1
     """
-    rest_windows = _extract_phase_windows(windows, markers, "baseline_closed")
     task_windows = _extract_phase_windows(windows, markers, "cognitive_task")
     
-    if not rest_windows or not task_windows:
+    # Use preceding meditation as reference (not early baseline)
+    pre_task_windows = _extract_phase_windows(windows, markers, "meditation_free")
+    if not pre_task_windows:
+        # Fallback to baseline_closed if no meditation_free phase
+        pre_task_windows = _extract_phase_windows(windows, markers, "baseline_closed")
+    
+    if not pre_task_windows or not task_windows:
         return {
             "test": "cognitive_reactivity",
             "passed": False,
             "quality": "failed",
             "metrics": {},
-            "error": "Missing baseline_closed or cognitive_task phases",
+            "error": "Missing meditation_free/baseline_closed or cognitive_task phases",
         }
     
-    beta_rest = np.mean([w.get('bands', {}).get('beta', 0) for w in rest_windows])
-    beta_task = np.mean([w.get('bands', {}).get('beta', 0) for w in task_windows])
-    gamma_rest = np.mean([w.get('bands', {}).get('gamma', 0) for w in rest_windows])
-    gamma_task = np.mean([w.get('bands', {}).get('gamma', 0) for w in task_windows])
+    # Use last 20% of pre-task phase (deepest meditation point)
+    n_tail = max(5, len(pre_task_windows) // 5)
+    pre_task_tail = pre_task_windows[-n_tail:]
     
-    beta_ratio = beta_task / (beta_rest + 1e-8)
-    gamma_ratio = gamma_task / (gamma_rest + 1e-8)
+    beta_pre = np.mean([_get_band(w, 'beta') for w in pre_task_tail])
+    beta_task = np.mean([_get_band(w, 'beta') for w in task_windows])
+    gamma_pre = np.mean([_get_band(w, 'gamma') for w in pre_task_tail])
+    gamma_task = np.mean([_get_band(w, 'gamma') for w in task_windows])
+    
+    beta_ratio = beta_task / (beta_pre + 1e-8)
+    gamma_ratio = gamma_task / (gamma_pre + 1e-8)
     
     passed = beta_ratio > 1.2
     
@@ -173,12 +199,13 @@ def validate_cognitive_reactivity(
         "passed": passed,
         "quality": quality,
         "metrics": {
-            "beta_rest": round(float(beta_rest), 4),
+            "beta_pre_meditation": round(float(beta_pre), 4),
             "beta_task": round(float(beta_task), 4),
             "beta_ratio": round(float(beta_ratio), 3),
-            "gamma_rest": round(float(gamma_rest), 4),
+            "gamma_pre_meditation": round(float(gamma_pre), 4),
             "gamma_task": round(float(gamma_task), 4),
             "gamma_ratio": round(float(gamma_ratio), 3),
+            "comparison": "cognitive_task vs last 20% of meditation_free",
         },
         "thresholds": {
             "beta_min_ratio": 1.2,
@@ -284,6 +311,59 @@ def _sanitize(obj):
     return obj
 
 
+def detect_artifacts(
+    windows: List[Dict],
+    markers: List[Dict],
+) -> Dict:
+    """
+    Detect common EEG artifacts that contaminate results.
+    
+    Checks:
+    - Muscle artifact: gamma > 0.10 in rest (normal is < 0.05)
+    - Flat signal: all bands identical (frozen data from BLE dropout)
+    - Electrode drift: progressive alpha increase without closing eyes
+    """
+    rest_windows = _extract_phase_windows(windows, markers, "baseline_closed")
+    if not rest_windows:
+        rest_windows = windows[:100]  # first 100 samples as fallback
+    
+    # Gamma in rest — muscle artifact indicator
+    gamma_vals = [_get_band(w, 'gamma') for w in rest_windows]
+    gamma_mean = float(np.mean(gamma_vals)) if gamma_vals else 0
+    has_muscle_artifact = gamma_mean > 0.10
+    
+    # Flat signal detection (frozen values from BLE dropout)
+    # Check if consecutive windows have identical values
+    flat_count = 0
+    for i in range(1, min(len(windows), 500)):
+        if (abs(_get_band(windows[i], 'alpha') - _get_band(windows[i-1], 'alpha')) < 1e-6 and
+            abs(_get_band(windows[i], 'delta') - _get_band(windows[i-1], 'delta')) < 1e-6):
+            flat_count += 1
+    flat_pct = (flat_count / max(len(windows)-1, 1)) * 100
+    has_stale_data = flat_pct > 20
+    
+    warnings = []
+    if has_muscle_artifact:
+        warnings.append(f"Muscle artifact detected: gamma={gamma_mean:.3f} in rest (threshold: 0.10). Check jaw tension and electrode contact at TP9/TP10.")
+    if has_stale_data:
+        warnings.append(f"Stale/frozen data detected: {flat_pct:.0f}% identical consecutive windows. BLE may have dropped.")
+    
+    return {
+        "has_artifacts": has_muscle_artifact or has_stale_data,
+        "muscle_artifact": {
+            "detected": has_muscle_artifact,
+            "gamma_rest_mean": round(gamma_mean, 4),
+            "threshold": 0.10,
+            "normal_range": "< 0.05",
+        },
+        "stale_data": {
+            "detected": has_stale_data,
+            "flat_percent": round(flat_pct, 1),
+        },
+        "warnings": warnings,
+    }
+
+
 def run_all_tests(
     windows: List[Dict],
     markers: List[Dict],
@@ -303,6 +383,7 @@ def run_all_tests(
     berger = validate_berger_effect(windows, markers)
     cognitive = validate_cognitive_reactivity(windows, markers)
     coherence = validate_coherence_stability(windows, markers)
+    artifacts = detect_artifacts(windows, markers)
     
     tests = [berger, cognitive, coherence]
     passed_count = sum(1 for t in tests if t['passed'])
@@ -323,10 +404,12 @@ def run_all_tests(
             "cognitive_reactivity": cognitive,
             "coherence_stability": coherence,
         },
+        "artifacts": artifacts,
         "summary": {
             "passed": passed_count,
             "total": len(tests),
             "overall": overall,
             "usable_for_training": passed_count >= 2,
+            "artifact_contaminated": artifacts.get('has_artifacts', False),
         },
     })

@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "name": ".random(22",
+    "notes": "",
+    "time_of_day": "morning",
+    "sleep_quality": 4,
+    "caffeine": false,
+    "prior_meditation_min": 0,
+    "subjective_pre": 8,
+    "subjective_post": 0
+  },
+  "protocol_start": 1774345084.127193,
+  "protocol_start_iso": "2026-03-24T10:38:04.127193",
+  "phases_completed": 0,
+  "total_phases": 8,
+  "total_events": 3,
+  "events": [
+    {
+      "time": 1774345084.147459,
+      "time_iso": "2026-03-24T10:38:04.147460",
+      "elapsed": 0.020349979400634766,
+      "event": "protocol_start",
+      "data": {
+        "name": ".random(22",
+        "total_phases": 8,
+        "total_duration": 1800
+      }
+    },
+    {
+      "time": 1774345084.16741,
+      "time_iso": "2026-03-24T10:38:04.167413",
+      "elapsed": 0.04023313522338867,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_open",
+        "label": "BASELINE",
+        "duration": 120,
+        "instruction": "Ojos abiertos"
+      }
+    },
+    {
+      "time": 1774345111.6621282,
+      "time_iso": "2026-03-24T10:38:31.662144",
+      "elapsed": 27.534964084625244,
+      "event": "protocol_stop",
+      "data": {
+        "completed_phases": 0,
+        "total_phases": 8,
+        "total_elapsed": 27.534929037094116
+      }
+    }
+  ]
+}
