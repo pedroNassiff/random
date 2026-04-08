@@ -25,7 +25,7 @@ El VAE actual (64ch PhysioNet, latent_dim=64) **no se usa** en modo Muse — cor
 
 ---
 
-## PILAR 1: Validación científica
+## PILAR 1: Validación científicano m
 
 ### 1.1 Protocolo de recolección de datos
 

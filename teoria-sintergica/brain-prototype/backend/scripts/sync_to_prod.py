@@ -6,7 +6,8 @@ Sube sesiones EEG grabadas en LOCAL a las BBDDs de PRODUCCIÓN.
 
 Arquitectura:
   local PostgreSQL  →  prod PostgreSQL  (metadatos de sesión)
-  local InfluxDB    →  prod InfluxDB    (métricas time-series)
+  local InfluxDB    →  prod InfluxDB    (métricas + samples + eventos)
+  local JSONs       →  prod server      (validation logs vía SCP)
 
 Requiere que tunnel-prod-db.sh esté corriendo en background:
   ./tunnel-prod-db.sh --bg
@@ -16,9 +17,10 @@ Uso:
   python scripts/sync_to_prod.py --id 11         # sesión específica
   python scripts/sync_to_prod.py --all           # todas las no sincronizadas
   python scripts/sync_to_prod.py --list          # lista sesiones locales
+  python scripts/sync_to_prod.py --id 25 --validate  # sync + trigger validation on prod
 """
 
-import os, sys, json, argparse
+import os, sys, json, argparse, subprocess, glob
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
@@ -247,8 +249,208 @@ def upload_influx_metrics(session_id: int):
     return len(metrics)
 
 
-def sync_session(session_id: int, force: bool = False):
-    """Sube una sesión completa (metadata + métricas) a producción."""
+def upload_influx_samples(session_id: int):
+    """
+    Lee los raw EEG samples (256Hz, 4 canales) de local InfluxDB
+    y los escribe en prod InfluxDB.
+    """
+    with local_influx_client() as lclient:
+        qapi = lclient.query_api()
+        query = f'''
+        from(bucket: "{LOCAL_INFLUX["bucket"]}")
+            |> range(start: -90d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_sample")
+            |> filter(fn: (r) => r["recording_id"] == "{session_id}")
+            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+        '''
+        tables = qapi.query(query, org=LOCAL_INFLUX["org"])
+        samples = []
+        for table in tables:
+            for record in table.records:
+                samples.append({
+                    "time": record.get_time(),
+                    "tp9":  record.values.get("tp9", 0),
+                    "af7":  record.values.get("af7", 0),
+                    "af8":  record.values.get("af8", 0),
+                    "tp10": record.values.get("tp10", 0),
+                    "aux":  record.values.get("aux", None),
+                })
+
+    if not samples:
+        print(f"   ⚠️  InfluxDB: sin samples locales para sesión #{session_id}")
+        return 0
+
+    with prod_influx_client() as pclient:
+        wapi = pclient.write_api(write_options=SYNCHRONOUS)
+        points = []
+        for s in samples:
+            p = (
+                Point("eeg_sample")
+                .tag("recording_id", str(session_id))
+                .field("tp9",  s["tp9"])
+                .field("af7",  s["af7"])
+                .field("af8",  s["af8"])
+                .field("tp10", s["tp10"])
+                .time(s["time"], WritePrecision.NS)
+            )
+            if s["aux"] is not None and s["aux"] != 0:
+                p = p.field("aux", s["aux"])
+            points.append(p)
+
+        batch_size = 1000
+        total = len(points)
+        for i in range(0, total, batch_size):
+            wapi.write(bucket=PROD_INFLUX["bucket"], org=PROD_INFLUX["org"], record=points[i:i+batch_size])
+            if total > 5000 and (i // batch_size) % 10 == 0:
+                pct = min(100, int((i / total) * 100))
+                print(f"   … samples {pct}% ({i}/{total})", end="\r")
+
+    print(f"   ✓ InfluxDB: {len(samples)} samples → prod         ")
+    return len(samples)
+
+
+def upload_influx_events(session_id: int):
+    """
+    Lee los eventos/marcadores de protocolo de local InfluxDB
+    y los escribe en prod InfluxDB.
+    """
+    with local_influx_client() as lclient:
+        qapi = lclient.query_api()
+        query = f'''
+        from(bucket: "{LOCAL_INFLUX["bucket"]}")
+            |> range(start: -90d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_event")
+            |> filter(fn: (r) => r["recording_id"] == "{session_id}")
+            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+        '''
+        tables = qapi.query(query, org=LOCAL_INFLUX["org"])
+        events = []
+        for table in tables:
+            for record in table.records:
+                events.append({
+                    "time":       record.get_time(),
+                    "event_type": record.values.get("event_type", ""),
+                    "label":      record.values.get("label", ""),
+                    "values":     {k: v for k, v in record.values.items()
+                                   if k not in ("_time", "_start", "_stop", "_measurement",
+                                                "recording_id", "event_type", "label",
+                                                "result", "table")},
+                })
+
+    if not events:
+        print(f"   ⚠️  InfluxDB: sin eventos locales para sesión #{session_id}")
+        return 0
+
+    with prod_influx_client() as pclient:
+        wapi = pclient.write_api(write_options=SYNCHRONOUS)
+        points = []
+        for e in events:
+            p = (
+                Point("eeg_event")
+                .tag("recording_id", str(session_id))
+                .tag("event_type", e["event_type"])
+                .field("label", e["label"])
+                .time(e["time"], WritePrecision.NS)
+            )
+            for fk, fv in e["values"].items():
+                if isinstance(fv, (int, float)):
+                    p = p.field(fk, fv)
+                elif isinstance(fv, str) and fv:
+                    p = p.field(fk, fv)
+            points.append(p)
+
+        wapi.write(bucket=PROD_INFLUX["bucket"], org=PROD_INFLUX["org"], record=points)
+
+    print(f"   ✓ InfluxDB: {len(events)} eventos → prod")
+    return len(events)
+
+
+# ── Validation & Protocol log upload (SCP) ────────────────────────────────────
+VALIDATION_LOGS_DIR = BACKEND_DIR / "validation_logs"
+PROD_SSH_HOST = os.getenv("PROD_SSH_HOST", "api.random-lab.es")
+PROD_SSH_USER = os.getenv("PROD_SSH_USER", "root")
+PROD_REMOTE_LOGS_DIR = os.getenv("PROD_VALIDATION_LOGS_DIR",
+    "/root/random/teoria-sintergica/brain-prototype/backend/validation_logs")
+
+
+def upload_validation_json(session_id: int):
+    """Sube el validate-{session_id}.json a prod vía SCP."""
+    local_file = VALIDATION_LOGS_DIR / f"validate-{session_id}.json"
+    if not local_file.exists():
+        print(f"   ⚠️  validate-{session_id}.json no existe localmente")
+        return False
+
+    remote = f"{PROD_SSH_USER}@{PROD_SSH_HOST}:{PROD_REMOTE_LOGS_DIR}/"
+    result = subprocess.run(
+        ["scp", "-q", str(local_file), remote],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(f"   ❌ SCP validate-{session_id}.json falló: {result.stderr.strip()}")
+        return False
+
+    print(f"   ✓ SCP: validate-{session_id}.json → prod")
+    return True
+
+
+def upload_protocol_logs():
+    """Sube todos los protocol logs COMPLETE a prod vía SCP (si no existen allá)."""
+    complete_logs = sorted(VALIDATION_LOGS_DIR.glob("validation_*_COMPLETE.json"))
+    if not complete_logs:
+        print("   ⚠️  Sin protocol logs COMPLETE locales")
+        return 0
+
+    uploaded = 0
+    for log_file in complete_logs:
+        remote = f"{PROD_SSH_USER}@{PROD_SSH_HOST}:{PROD_REMOTE_LOGS_DIR}/"
+        result = subprocess.run(
+            ["scp", "-q", str(log_file), remote],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            uploaded += 1
+        else:
+            print(f"   ❌ SCP {log_file.name} falló: {result.stderr.strip()}")
+
+    if uploaded:
+        print(f"   ✓ SCP: {uploaded} protocol log(s) → prod")
+    return uploaded
+
+
+def trigger_prod_validation(session_id: int):
+    """
+    Llama al endpoint /protocol/validate/{session_id} en prod (vía tunnel)
+    para generar/regenerar validate-{session_id}.json en el servidor.
+    """
+    import urllib.request, urllib.error
+    prod_api = os.getenv("PROD_API_URL", f"http://localhost:{os.getenv('PROD_API_PORT', '8000')}")
+    url = f"{prod_api}/protocol/validate/{session_id}"
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+            if data.get("status") == "success":
+                # Save locally too if we don't have it
+                local_file = VALIDATION_LOGS_DIR / f"validate-{session_id}.json"
+                if not local_file.exists():
+                    local_file.write_text(json.dumps(data, indent=2))
+                    print(f"   ✓ Validation: guardada localmente en validate-{session_id}.json")
+                # Save on prod via SCP
+                local_file.write_text(json.dumps(data, indent=2))
+                upload_validation_json(session_id)
+                print(f"   ✓ Validation: sesión #{session_id} validada en prod")
+                return True
+            else:
+                print(f"   ⚠️  Validation: {data.get('detail', 'error desconocido')}")
+                return False
+    except urllib.error.URLError as e:
+        print(f"   ⚠️  Validation endpoint no accesible: {e}")
+        print(f"      (si no tienes tunnel al API, sube manualmente: scp validate-{session_id}.json prod:...)")
+        return False
+
+
+def sync_session(session_id: int, force: bool = False, validate: bool = False):
+    """Sube una sesión completa (metadata + samples + métricas + eventos + logs) a producción."""
     print(f"\n📤 Subiendo sesión #{session_id} a producción…")
 
     session = get_local_session(session_id)
@@ -263,9 +465,30 @@ def sync_session(session_id: int, force: bool = False):
         return False
 
     try:
+        # 1. PostgreSQL metadata
         upload_session_metadata(session)
-        n = upload_influx_metrics(session_id)
-        print(f"   ✅ Sesión #{session_id} subida correctamente ({n} métricas)")
+
+        # 2. InfluxDB metrics (processed 2s windows)
+        n_metrics = upload_influx_metrics(session_id)
+
+        # 3. InfluxDB raw samples (256Hz EEG)
+        n_samples = upload_influx_samples(session_id)
+
+        # 4. InfluxDB events (protocol markers)
+        n_events = upload_influx_events(session_id)
+
+        # 5. Validation JSON (if exists locally)
+        upload_validation_json(session_id)
+
+        # 6. Protocol logs
+        upload_protocol_logs()
+
+        # 7. Optionally trigger validation on prod
+        if validate:
+            trigger_prod_validation(session_id)
+
+        print(f"\n   ✅ Sesión #{session_id} subida correctamente")
+        print(f"      {n_metrics} métricas · {n_samples} samples · {n_events} eventos")
         return True
     except Exception as e:
         print(f"   ❌ Error: {e}")
@@ -280,7 +503,9 @@ def main():
     group.add_argument("--id",    type=int,            help="ID de sesión específica")
     group.add_argument("--all",   action="store_true", help="Todas las sesiones locales")
     group.add_argument("--list",  action="store_true", help="Listar sesiones locales")
-    parser.add_argument("--force", action="store_true", help="Sobreescribir si ya existe en prod")
+    parser.add_argument("--force",    action="store_true", help="Sobreescribir si ya existe en prod")
+    parser.add_argument("--validate", action="store_true", help="Trigger validation en prod después de subir")
+    parser.add_argument("--no-samples", action="store_true", help="Skip raw EEG samples (solo métricas)")
     args = parser.parse_args()
 
     if args.list:
@@ -294,6 +519,13 @@ def main():
             print(f"{s['id']:>4}  {(s['name'] or '–'):<25}  {started:<20}  {dur:>6}  {qual:>5}")
         return
 
+    # Inyectar skip_samples en sync_session si se pasa --no-samples
+    _orig_upload_samples = upload_influx_samples.__code__  # noqa
+    if getattr(args, 'no_samples', False):
+        global upload_influx_samples
+        _real_fn = upload_influx_samples
+        upload_influx_samples = lambda sid: (print(f"   ⏭  Skipping samples (--no-samples)"), 0)[1]
+
     if args.last:
         sessions = list_local_sessions()
         if not sessions:
@@ -304,11 +536,11 @@ def main():
         session_id = args.id
     else:  # --all
         sessions = list_local_sessions()
-        ok = sum(sync_session(s['id'], force=args.force) for s in sessions)
+        ok = sum(sync_session(s['id'], force=args.force, validate=args.validate) for s in sessions)
         print(f"\n✅ {ok}/{len(sessions)} sesiones subidas")
         return
 
-    sync_session(session_id, force=args.force)
+    sync_session(session_id, force=args.force, validate=args.validate)
 
 
 if __name__ == "__main__":

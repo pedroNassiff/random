@@ -42,6 +42,9 @@ else
     exit 1
 fi
 
+# 
+docker exec brain-postgres psql -U brain_user -d brain_prototype -c "SELECT count(*) FROM eeg_recordings;"
+
 # Test 4: Backend health check
 echo ""
 echo "4️⃣ Testing backend health..."

@@ -32,6 +32,25 @@ def _get_band(window: Dict, band_name: str) -> float:
     return window.get(band_name, 0)
 
 
+def _get_band_raw(window: Dict, band_name: str) -> float:
+    """
+    Get absolute band power (µV²/Hz, NOT normalized).
+
+    Falls back to normalized value if raw is not available (e.g., legacy sessions).
+    Raw fields are stored as '{band}_raw' in InfluxDB metrics.
+    """
+    raw = window.get(f'{band_name}_raw')
+    if raw is not None and raw > 0:
+        return float(raw)
+    bands_raw = window.get('bands_raw')
+    if isinstance(bands_raw, dict):
+        v = bands_raw.get(band_name)
+        if v is not None and v > 0:
+            return float(v)
+    # Fallback: use normalized value (legacy sessions without raw fields)
+    return _get_band(window, band_name)
+
+
 def _extract_phase_windows(
     windows: List[Dict],
     markers: List[Dict],
@@ -100,8 +119,8 @@ def validate_berger_effect(
     open_windows = open_windows[skip_open:]
     closed_windows = closed_windows[skip_closed:]
     
-    alpha_open_vals = [_get_band(w, 'alpha') for w in open_windows]
-    alpha_closed_vals = [_get_band(w, 'alpha') for w in closed_windows]
+    alpha_open_vals = [_get_band_raw(w, 'alpha') for w in open_windows]
+    alpha_closed_vals = [_get_band_raw(w, 'alpha') for w in closed_windows]
     
     alpha_open = np.mean(alpha_open_vals) if alpha_open_vals else 0
     alpha_closed = np.mean(alpha_closed_vals) if alpha_closed_vals else 0
@@ -179,9 +198,16 @@ def validate_cognitive_reactivity(
     beta_task = np.mean([_get_band(w, 'beta') for w in task_windows])
     gamma_pre = np.mean([_get_band(w, 'gamma') for w in pre_task_tail])
     gamma_task = np.mean([_get_band(w, 'gamma') for w in task_windows])
-    
+    delta_task = np.mean([_get_band(w, 'delta') for w in task_windows])
+
     beta_ratio = beta_task / (beta_pre + 1e-8)
     gamma_ratio = gamma_task / (gamma_pre + 1e-8)
+
+    # Detectar si delta alto durante la tarea aplastó las proporciones de beta/gamma.
+    # Con bandas normalizadas, delta >0.60 durante la tarea cognitiva es estado
+    # post-meditación profunda, no un artefacto: beta físicamente no puede subir
+    # en proporción aunque sí en absoluto. Advertir para que el scorer lo considere.
+    delta_dominance_warning = delta_task > 0.60
     
     passed = beta_ratio > 1.2
     
@@ -205,12 +231,18 @@ def validate_cognitive_reactivity(
             "gamma_pre_meditation": round(float(gamma_pre), 4),
             "gamma_task": round(float(gamma_task), 4),
             "gamma_ratio": round(float(gamma_ratio), 3),
+            "delta_task_mean": round(float(delta_task), 3),
             "comparison": "cognitive_task vs last 20% of meditation_free",
         },
         "thresholds": {
             "beta_min_ratio": 1.2,
             "gamma_min_ratio": 1.1,
         },
+        "warnings": (
+            [f"Delta dominance during task ({delta_task:.2f} > 0.60): post-meditation state "
+             "suppressed proportional beta. Use raw bands for accurate comparison."]
+            if delta_dominance_warning else []
+        ),
     }
 
 

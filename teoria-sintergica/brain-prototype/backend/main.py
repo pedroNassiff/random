@@ -19,7 +19,7 @@ load_dotenv()
 
 from models import SyntergicState, FrequencyBands, Vector3
 from ai.inference import SyntergicBrain
-from hardware import MuseConnector, MuseToSyntergicAdapter
+from hardware import MuseConnector, MuseToSyntergicAdapter, EOGDetector
 # Legacy SQLite (for backward compatibility)
 from database import get_database, get_recorder, SessionRecorder
 # New PostgreSQL + InfluxDB
@@ -838,6 +838,12 @@ async def get_calibration_snapshot():
         if bad_posterior:
             print(f"⚠️  [Snapshot] Canales posteriores débiles {bad_posterior} — alpha puede ser impreciso (TP9={posterior_quality['TP9']:.2f}, TP10={posterior_quality['TP10']:.2f})")
         
+        # EOG blink detection: flag this window as contaminated by eye blinks.
+        # Uses frontal channels AF7/AF8 as natural EOG sensors.
+        # Consumers (calibration, recording, live viz) use this flag to decide
+        # whether to include this sample in alpha calculations.
+        eog = EOGDetector.detect_detailed(data, fs)
+        
         return {
             "status": "success",
             "bands": bands,                        # µV² — para cálculos (ratio alpha, calibración)
@@ -846,6 +852,8 @@ async def get_calibration_snapshot():
             "signal_quality": signal_quality,
             "posterior_quality": posterior_quality,
             "alpha_by_channel": alpha_by_posterior,  # Alpha TP9 vs TP10 individual
+            "blink_contaminated": eog['blink_detected'],  # True if blink artifact in this window
+            "eog": eog,                            # Detailed EOG diagnostics
             "timestamp": window.timestamp
         }
         
@@ -933,6 +941,14 @@ async def detect_blinks():
         signal_quality = muse_connector.get_signal_quality()
         avg_quality = sum(signal_quality.values()) / len(signal_quality) if signal_quality else 1.0
         bad_channels = [ch for ch, q in signal_quality.items() if q < 0.4] if signal_quality else []
+        
+        # NOTE: NO quality gate here. Blinks ARE artifacts — they temporarily
+        # destroy signal quality scores (blink = 400-800µV spike, quality checker
+        # flags anything > 200µV as poor). Gating on quality during blink
+        # detection is contradictory and prevents detecting blinks 2-5 after
+        # blink 1 crashes the quality score. The frontend handles the higher-level
+        # validation (was this a real blink pattern vs random noise).
+        
         if bad_channels and random.random() < 0.05:
             print(f"⚠️  [Blink] Mala señal en {bad_channels} (avg={avg_quality:.2f}) — threshold adaptado a {min_amplitude:.0f}µV (95th pct={percentile_95:.0f}µV)")
         
@@ -1119,6 +1135,145 @@ async def add_recording_marker(request: MarkerRequest):
         "status": "success",
         "message": f"Marker '{request.label}' added"
     }
+
+
+# =============================================================================
+# DOCUMENTATION DASHBOARD ENDPOINT
+# =============================================================================
+
+@app.get("/doc/dashboard")
+async def doc_dashboard():
+    """
+    Aggregated data for the ADA documentation dashboard.
+    Returns sessions list, validation results, and project stats.
+    """
+    try:
+        # 1. Sessions from PostgreSQL
+        pg = get_postgres_client_sync()
+        sessions = []
+        if pg:
+            recordings = pg.get_all_recordings(limit=200)
+            for r in recordings:
+                d = asdict(r)
+                for k in ('started_at', 'ended_at'):
+                    if d.get(k) and hasattr(d[k], 'isoformat'):
+                        d[k] = d[k].isoformat()
+                sessions.append(d)
+
+        # 2. Validation logs from disk
+        logs_dir = Path(__file__).parent / "validation_logs"
+        validations = []
+        if logs_dir.exists():
+            for f in sorted(logs_dir.glob("validate-*.json")):
+                try:
+                    data = json.loads(f.read_text())
+                    validations.append(data)
+                except Exception:
+                    pass
+
+        # 3. Protocol logs (only complete sessions)
+        protocol_logs = []
+        if logs_dir.exists():
+            for f in sorted(logs_dir.glob("validation_*.json")):
+                try:
+                    data = json.loads(f.read_text())
+                    if data.get("phases_completed", 0) != data.get("total_phases", 8):
+                        continue
+                    protocol_logs.append({
+                        "filename": f.name,
+                        "phases_completed": data.get("phases_completed", 0),
+                        "total_phases": data.get("total_phases", 8),
+                        "complete": True,
+                        "start_iso": data.get("protocol_start_iso", ""),
+                        "metadata": data.get("metadata", {}),
+                    })
+                except Exception:
+                    pass
+
+        return {
+            "status": "success",
+            "sessions": sessions,
+            "validations": validations,
+            "protocol_logs": protocol_logs,
+            "total_sessions": len(sessions),
+            "total_validations": len(validations),
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/doc/session/{session_id}")
+async def doc_session_detail(session_id: int):
+    """
+    Detailed data for a single session: recording info, validation, protocol log, metrics summary.
+    """
+    try:
+        result = {"status": "success", "session_id": session_id}
+
+        # 1. Recording from PostgreSQL
+        pg = get_postgres_client_sync()
+        if pg:
+            recording = pg.get_recording(session_id)
+            if recording:
+                d = asdict(recording)
+                for k in ('started_at', 'ended_at'):
+                    if d.get(k) and hasattr(d[k], 'isoformat'):
+                        d[k] = d[k].isoformat()
+                result["recording"] = d
+
+        # 2. Validation result
+        logs_dir = Path(__file__).parent / "validation_logs"
+        val_file = logs_dir / f"validate-{session_id}.json"
+        if val_file.exists():
+            result["validation"] = json.loads(val_file.read_text())
+
+        # 3. Find matching protocol log (complete only)
+        result["protocol_log"] = None
+        if logs_dir.exists():
+            for f in sorted(logs_dir.glob("validation_*_COMPLETE.json"), reverse=True):
+                try:
+                    data = json.loads(f.read_text())
+                    # Match by checking if session name or timing aligns
+                    result["protocol_log"] = {
+                        "filename": f.name,
+                        "phases_completed": data.get("phases_completed", 0),
+                        "total_phases": data.get("total_phases", 8),
+                        "start_iso": data.get("protocol_start_iso", ""),
+                        "metadata": data.get("metadata", {}),
+                        "events": data.get("events", []),
+                    }
+                    break  # Use most recent complete log
+                except Exception:
+                    pass
+
+        # 4. Metrics summary from InfluxDB
+        try:
+            influx = get_influx_client()
+            metrics = influx.get_metrics(session_id)
+            if metrics:
+                n = len(metrics)
+                bands_avg = {}
+                for band in ['delta', 'theta', 'alpha', 'beta', 'gamma']:
+                    vals = [m.get(band, 0) for m in metrics if m.get(band) is not None]
+                    bands_avg[band] = sum(vals) / len(vals) if vals else 0
+                coh_vals = [m.get('coherence', 0) for m in metrics if m.get('coherence') is not None]
+                result["metrics_summary"] = {
+                    "total_windows": n,
+                    "duration_seconds": n * 2,  # 2s windows
+                    "bands_avg": bands_avg,
+                    "coherence_avg": sum(coh_vals) / len(coh_vals) if coh_vals else 0,
+                    "coherence_max": max(coh_vals) if coh_vals else 0,
+                }
+        except Exception:
+            pass
+
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
 
 
 # =============================================================================

@@ -94,6 +94,27 @@ class SpectralAnalyzer:
         return band_powers
 
     @staticmethod
+    def compute_frequency_bands_raw(eeg_signal: np.ndarray, fs: int = 256) -> Dict[str, float]:
+        """
+        Potencia absoluta en cada banda (µV²/Hz) SIN normalizar.
+
+        A diferencia de compute_frequency_bands(), la suma NO es 1.0.
+        Usar para comparaciones relativas entre fases (e.g., Berger effect),
+        donde una banda puede subir en absoluto aunque su proporción baje
+        porque otras bandas también suben.
+        """
+        if len(eeg_signal) < 64:
+            return {band: 0.0 for band in SpectralAnalyzer.BANDS.keys()}
+
+        freqs, psd = SpectralAnalyzer.compute_psd(eeg_signal, fs)
+
+        return {
+            band_name: float(np.mean(psd[np.logical_and(freqs >= lo, freqs <= hi)]))
+            if np.any(np.logical_and(freqs >= lo, freqs <= hi)) else 0.0
+            for band_name, (lo, hi) in SpectralAnalyzer.BANDS.items()
+        }
+
+    @staticmethod
     def compute_frequency_bands_display(eeg_signal: np.ndarray, fs: int = 256) -> Dict[str, float]:
         """
         Versión corregida para VISUALIZACIÓN usando normalización por ancho de banda.

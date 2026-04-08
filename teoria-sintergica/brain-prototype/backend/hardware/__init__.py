@@ -23,6 +23,7 @@ from .base import (
     DeviceStatus,
     DeviceInfo,
     EEGWindow,
+    EOGDetector,
     SignalQualityChecker
 )
 
@@ -37,6 +38,7 @@ __all__ = [
     'DeviceStatus', 
     'DeviceInfo',
     'EEGWindow',
+    'EOGDetector',
     'SignalQualityChecker',
     # Muse
     'MuseConnector',

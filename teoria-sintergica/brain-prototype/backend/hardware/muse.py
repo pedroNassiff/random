@@ -84,6 +84,13 @@ class MuseConnector(EEGDevice):
         self._last_sample_time: float = 0.0
         self._stale_threshold: float = 3.0  # seconds without new data → stale
         
+        # EMA smoothing for signal quality — previene que spikes aislados de BLE
+        # (1-2 samples en 256) causen la oscilación 100→30 cada 3-5s en la UI.
+        # alpha=0.3: 1 drop de 0.3 → EMA = 0.79 (sigue por encima del gate de 0.5)
+        # Si la calidad es mala sostenida (>3-4 polls), EMA converge hacia 0.3 correctamente.
+        self._quality_ema: Dict[str, float] = {}
+        self._quality_ema_alpha: float = 0.3
+        
         # Proceso de muselsl
         self._muselsl_process: Optional[subprocess.Popen] = None
         
@@ -278,7 +285,16 @@ class MuseConnector(EEGDevice):
                         if streams:
                             self._inlet = StreamInlet(streams[0])
                             self._last_sample_time = time.time()
-                            print(f"✅ [muselsl] LSL stream reconectado: {streams[0].name()}")
+                            # Reiniciar el thread de datos si murió (agotó max_reconnect)
+                            if self._stream_thread is None or not self._stream_thread.is_alive():
+                                self._status = DeviceStatus.STREAMING
+                                self._stop_event.clear()
+                                from threading import Thread
+                                self._stream_thread = Thread(target=self._stream_loop, daemon=True)
+                                self._stream_thread.start()
+                                print(f"✅ [muselsl] Auto-restart completo (stream+thread reiniciados): {streams[0].name()}")
+                            else:
+                                print(f"✅ [muselsl] LSL stream reconectado: {streams[0].name()}")
                         else:
                             print("⚠️ [muselsl] Proceso reinició pero no aparece stream LSL")
                 except Exception as e:
@@ -509,8 +525,15 @@ class MuseConnector(EEGDevice):
                             reconnect_attempts += 1
                             if reconnect_attempts > max_reconnect:
                                 print("❌ Stream loop: máximo de reconexiones alcanzado.")
-                                self._status = DeviceStatus.ERROR
-                                self._error_message = "BLE desconectado — sin datos por >8s tras 5 intentos"
+                                # Si muselsl sigue vivo, mantener CONNECTED (no ERROR) para que
+                                # el frontend pueda recuperar la UI y reintentar el stream.
+                                # Si ya murió, el auto-restart de _log_muselsl_stderr se encarga.
+                                if self._muselsl_process and self._muselsl_process.poll() is None:
+                                    self._status = DeviceStatus.CONNECTED
+                                    print("⚠️ muselsl aún vivo → estado CONNECTED (UI puede recuperar)")
+                                else:
+                                    self._status = DeviceStatus.ERROR
+                                    self._error_message = "BLE desconectado — sin datos por >8s tras 5 intentos"
                                 break
                             
                             print(f"🔄 Reconectando LSL stream (intento {reconnect_attempts}/{max_reconnect})...")
@@ -534,11 +557,15 @@ class MuseConnector(EEGDevice):
                 reconnect_attempts += 1
                 if reconnect_attempts >= max_reconnect:
                     print("❌ Stream loop: máximo de reconexiones alcanzado. Deteniendo.")
-                    self._status = DeviceStatus.ERROR
-                    self._error_message = f"LSL stream perdido tras {max_reconnect} intentos: {e}"
+                    if self._muselsl_process and self._muselsl_process.poll() is None:
+                        self._status = DeviceStatus.CONNECTED
+                        print("⚠️ muselsl aún vivo → estado CONNECTED (UI puede recuperar)")
+                    else:
+                        self._status = DeviceStatus.ERROR
+                        self._error_message = f"LSL stream perdido tras {max_reconnect} intentos: {e}"
                     break
                 time.sleep(2)
-    
+
     @property
     def is_data_stale(self) -> bool:
         """True if no new EEG samples have arrived for > stale_threshold seconds."""
@@ -591,7 +618,12 @@ class MuseConnector(EEGDevice):
     
     def get_signal_quality(self) -> Dict[str, float]:
         """
-        Calcula calidad de señal para cada canal.
+        Calcula calidad de señal para cada canal con EMA smoothing.
+        
+        El smoothing previene que un spike BLE de 1-2 samples en la ventana de
+        1s haga que la calidad caiga 100→30 instantáneamente. Un drop real
+        (electrodo suelto) tarda ~3-4 polls en reflejarse en la EMA, lo cual
+        es suficientemente rápido para el UX (< 1 segundo).
         
         Returns:
             Dict {channel_name: quality_score}
@@ -604,9 +636,18 @@ class MuseConnector(EEGDevice):
         quality = {}
         for i, ch in enumerate(self.CHANNELS):
             signal = window.data[i]
-            quality[ch] = SignalQualityChecker.compute_quality_score(
+            raw_score = SignalQualityChecker.compute_quality_score(
                 signal, self.SAMPLING_RATE
             )
+            # Aplicar EMA: si no hay historial, inicializamos con el raw score actual
+            if ch not in self._quality_ema:
+                self._quality_ema[ch] = raw_score
+            else:
+                self._quality_ema[ch] = (
+                    self._quality_ema_alpha * raw_score
+                    + (1 - self._quality_ema_alpha) * self._quality_ema[ch]
+                )
+            quality[ch] = round(self._quality_ema[ch], 4)
         
         return quality
     

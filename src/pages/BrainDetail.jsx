@@ -263,6 +263,12 @@ export default function BrainDetail() {
           >
             Muse 2
           </button>
+          <button
+            onClick={() => navigate('/lab/brain/doc')}
+            style={tabStyle(false, isMobile, 'rgba(99,102,241,0.25)', 'rgba(99,102,241,0.5)')}
+          >
+            DOC
+          </button>
         </div>
 
         {/* HUD panels */}

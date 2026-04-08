@@ -63,6 +63,111 @@ class EEGWindow:
         }
 
 
+class EOGDetector:
+    """
+    Detects eye-blink (EOG) artifacts in EEG windows.
+
+    Blinks generate 100-800µV transients at the cornea that propagate via
+    volume conduction to ALL electrodes, including posterior TP9/TP10.
+    This contaminates alpha measurements (Berger effect, calibration,
+    live visualization, recorded data).
+
+    Detection strategy: use frontal channels AF7/AF8 as EOG sensors.
+    When their absolute amplitude exceeds a threshold, the window is
+    flagged as blink-contaminated.
+
+    Usage:
+        window = muse.get_window(2.0)
+        is_blink = EOGDetector.detect(window.data, window.fs)
+    """
+
+    # Amplitude threshold for frontal channels (µV).
+    # Normal EEG: 10-50µV.  Blink artifact: 100-800µV.
+    # 80µV is conservative — catches all real blinks while ignoring
+    # normal frontal activity and small saccades.
+    FRONTAL_BLINK_THRESHOLD = 80.0  # µV peak amplitude
+
+    # Fraction of samples above threshold to flag the window.
+    # A blink lasts ~200-400ms in a 2s window = 5-10% of samples.
+    # Even 1% of samples above threshold indicates contamination
+    # because the Welch PSD spreads the energy across the whole window.
+    CONTAMINATION_FRACTION = 0.005  # 0.5% of samples
+
+    @staticmethod
+    def detect(data: np.ndarray, fs: int = 256,
+               frontal_indices: tuple = (1, 2)) -> bool:
+        """
+        Detect blink artifacts in an EEG window.
+
+        Args:
+            data: (n_channels, n_samples) raw EEG
+            fs: sampling rate
+            frontal_indices: channel indices for AF7, AF8
+
+        Returns:
+            True if blink artifact detected in this window
+        """
+        if data.shape[0] < max(frontal_indices) + 1:
+            return False
+
+        # Average frontal channels
+        frontal = np.mean(
+            [data[i] for i in frontal_indices], axis=0
+        )
+
+        # Count samples above blink threshold
+        n_above = np.sum(
+            np.abs(frontal) > EOGDetector.FRONTAL_BLINK_THRESHOLD
+        )
+        fraction = n_above / len(frontal)
+
+        return bool(fraction > EOGDetector.CONTAMINATION_FRACTION)
+
+    @staticmethod
+    def detect_detailed(data: np.ndarray, fs: int = 256,
+                        frontal_indices: tuple = (1, 2)) -> dict:
+        """
+        Detailed blink detection with diagnostics.
+
+        Returns:
+            Dict with detection result and diagnostics:
+            {
+                'blink_detected': bool,
+                'frontal_peak_uv': float,
+                'fraction_above': float,
+                'n_blinks_estimated': int,
+            }
+        """
+        if data.shape[0] < max(frontal_indices) + 1:
+            return {
+                'blink_detected': False,
+                'frontal_peak_uv': 0.0,
+                'fraction_above': 0.0,
+                'n_blinks_estimated': 0,
+            }
+
+        frontal = np.mean(
+            [data[i] for i in frontal_indices], axis=0
+        )
+        frontal_abs = np.abs(frontal)
+
+        peak = float(np.max(frontal_abs))
+        n_above = int(np.sum(frontal_abs > EOGDetector.FRONTAL_BLINK_THRESHOLD))
+        fraction = n_above / len(frontal)
+
+        # Estimate number of blinks: each blink ~100-400ms
+        # at 256Hz that's 25-100 samples per blink
+        blink_samples = max(int(0.3 * fs), 1)  # ~300ms per blink
+        n_blinks = max(1, n_above // blink_samples) if n_above > 0 else 0
+
+        return {
+            'blink_detected': bool(fraction > EOGDetector.CONTAMINATION_FRACTION),
+            'frontal_peak_uv': peak,
+            'fraction_above': round(fraction, 4),
+            'n_blinks_estimated': n_blinks,
+        }
+
+
 class SignalQualityChecker:
     """
     Utilidades para verificar calidad de señal EEG.
@@ -93,15 +198,20 @@ class SignalQualityChecker:
         if len(signal) == 0:
             return 0.0
         
-        # Métricas básicas
-        amplitude = np.max(np.abs(signal))
+        abs_signal = np.abs(signal)
+        
+        # Usar percentil 99 en lugar de max para ignorar spikes aislados de BLE.
+        # np.max() se dispara con 1-2 samples malos en 256 (BLE retransmission artifact),
+        # causando la oscilación 100→30 cada 3-5s que se ve en la UI.
+        # p99 ignora los ~2 samples más ruidosos sin afectar artefactos sostenidos.
+        amplitude = np.percentile(abs_signal, 99)
         std = np.std(signal)
         
         # Penalizar si muy bajo (mal contacto)
         if amplitude < SignalQualityChecker.MIN_AMPLITUDE:
             return 0.2
         
-        # Penalizar si muy alto (artefacto)
+        # Penalizar si muy alto (artefacto sostenido — no spike aislado)
         if amplitude > SignalQualityChecker.MAX_AMPLITUDE:
             return 0.3
         

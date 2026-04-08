@@ -13,7 +13,9 @@
 #   ./scripts/upload_session.sh --id 11   → sesión específica
 #   ./scripts/upload_session.sh --all     → todas las sesiones locales
 #   ./scripts/upload_session.sh --list    → lista sesiones locales (sin subir)
-#   ./scripts/upload_session.sh --id 11 --force  → sobreescribir si ya existe
+#   ./scripts/upload_session.sh --id 11 --force       → sobreescribir si ya existe
+#   ./scripts/upload_session.sh --id 25 --validate    → sync + trigger validation
+#   ./scripts/upload_session.sh --id 11 --no-samples  → skip raw EEG (más rápido)
 #
 # Requiere: .env.prod-db con credenciales de producción
 #   cp .env.prod-db.example .env.prod-db  (la primera vez)

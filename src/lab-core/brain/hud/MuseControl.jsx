@@ -4,7 +4,7 @@
  * Calibración mejorada con detección de parpadeos:
  * 1. Calidad de señal (verificar contacto) - 3s
  * 2. Parpadeos (detectar 5 parpadeos) - validación precisa
- * 3. Relajación (ojos cerrados) - baseline de alpha - 5s
+ * 3. Relajación (ojos abiertos + ojos cerrados) - baseline de alpha - 40s (20s + 20s)
  * 
  * También incluye grabación de sesiones EEG para reproducción posterior.
  */
@@ -188,8 +188,15 @@ export default function MuseControl({ onModeChange }) {
         setConnectedDevice({ name, address, battery });
         if (address) setDeviceAddress(address);
         if (statusData.buffer) setDeviceBuffer(statusData.buffer);
-        setStatus(statusData.is_streaming ? MUSE_STATUS.STREAMING : MUSE_STATUS.CONNECTED);
         console.log('[MuseControl] Sesión ya activa en backend — saltando scan BLE:', name);
+        if (statusData.is_streaming) {
+          setStatus(MUSE_STATUS.STREAMING);
+        } else {
+          // Conectado pero sin stream activo — reiniciar stream automáticamente
+          console.log('[MuseControl] CONNECTED pero no streaming — reactivando stream...');
+          setStatus(MUSE_STATUS.CONNECTED);
+          startStream();
+        }
         return; // no hace falta escanear
       }
     } catch (_) {
@@ -385,6 +392,7 @@ export default function MuseControl({ onModeChange }) {
     let samples = [];
     let elapsed = 0;
     const duration = 3000;
+    const warmupMs = 1000; // Discard first 1s — EMA buffer settling transient after BLE→LSL handoff
     
     calibrationInterval.current = setInterval(async () => {
       elapsed += 200;
@@ -394,11 +402,11 @@ export default function MuseControl({ onModeChange }) {
         const res = await fetch(`${API_BASE}/hardware/calibration/snapshot`);
         const data = await res.json();
         if (data.status === 'success') {
-          samples.push(data);
+          if (elapsed > warmupMs) samples.push(data); // warmup samples logged but not used for SQ
           setCurrentMetrics(data);
-          // Log every snapshot with full signal quality + bands
           logCal('signal_check_sample', 'signal_check', {
             elapsed_ms: elapsed,
+            warmup: elapsed <= warmupMs,
             bands: data.bands,
             signal_quality: data.signal_quality,
             coherence: data.coherence,
@@ -468,6 +476,29 @@ export default function MuseControl({ onModeChange }) {
       duration_ms: duration,
       poll_interval_ms: 300,
     });
+
+    // Poll up to 3s for SQ to recover >0.7 (blink artifacts clear within ~500ms-2s)
+    // Non-blocking: if it never recovers, we log a warning and proceed anyway.
+    const sqRecoveryThenRelax = async () => {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise(r => setTimeout(r, 300));
+        try {
+          const res = await fetch(`${API_BASE}/hardware/calibration/snapshot`);
+          const snap = await res.json();
+          if (snap.status === 'success') {
+            const sqVals = Object.values(snap.signal_quality || {});
+            const avgSQ = sqVals.length ? sqVals.reduce((a, b) => a + b, 0) / sqVals.length : 0;
+            logCal('post_blink_sq_recovery', 'blink_test', {
+              attempt, waited_ms: (attempt + 1) * 300,
+              avgSQ: parseFloat(avgSQ.toFixed(3)),
+              recovered: avgSQ >= 0.7,
+            });
+            if (avgSQ >= 0.7) break;
+          }
+        } catch (_) {}
+      }
+      runRelaxationTest();
+    };
     
     calibrationInterval.current = setInterval(async () => {
       elapsed += 300;
@@ -498,6 +529,11 @@ export default function MuseControl({ onModeChange }) {
         });
 
         if (data.status === 'success' && data.blink_count > 0) {
+          // NOTE: No quality gate here. Blinks ARE artifacts that temporarily
+          // crash signal quality (400-800µV spike → SQ drops to 0.3).
+          // The backend already validates the blink pattern (amplitude,
+          // prominence, physiological timing). If the backend says it's
+          // a blink, we count it.
           // Detectamos parpadeo(s) en esta ventana
           // Solo contamos 1 por detección (las ventanas se solapan)
           confirmedBlinksRef.current += 1;
@@ -537,7 +573,7 @@ export default function MuseControl({ onModeChange }) {
           target: targetBlinks,
           elapsed_ms: elapsed,
         });
-        setTimeout(() => runRelaxationTest(), 800);
+        sqRecoveryThenRelax();
         return;
       }
       
@@ -553,7 +589,7 @@ export default function MuseControl({ onModeChange }) {
             target: targetBlinks,
             elapsed_ms: elapsed,
           });
-          setTimeout(() => runRelaxationTest(), 800);
+          sqRecoveryThenRelax();
         } else {
           playBeep(330, 0.3); // Sonido de fallo
           setCalibrationStep(CALIBRATION_STEPS.FAILED);
@@ -587,8 +623,8 @@ export default function MuseControl({ onModeChange }) {
     let eyesOpenSamples = [];
     let eyesClosedSamples = [];
     let elapsed = 0;
-    const eyesOpenDuration = 4500;  // 4.5s ojos abiertos (1.5s warmup + 3s útiles)
-    const eyesClosedDuration = 7400; // 7.4s ojos cerrados: 2.2s warmup (11 samples × 200ms) + 5.2s útiles
+    const eyesOpenDuration = 20000;  // 20s ojos abiertos: 2s warmup + 18s útiles
+    const eyesClosedDuration = 20000; // 20s ojos cerrados: 2s warmup + 18s útiles
     const totalDuration = eyesOpenDuration + eyesClosedDuration;
     let phase = 'open'; // 'open' -> 'closed'
     let phaseBeeped = false;
@@ -599,8 +635,7 @@ export default function MuseControl({ onModeChange }) {
     logCal('relaxation_start', 'eyes_open', {
       eyes_open_duration_ms: eyesOpenDuration,
       eyes_closed_duration_ms: eyesClosedDuration,
-      warmup_open_skip_ms: 1500,
-      warmup_open_stable_n: 7,
+      warmup_open_skip_ms: 2000,
       warmup_closed_skip_ms: 2200,
       poll_interval_ms: 200,
     });
@@ -633,21 +668,34 @@ export default function MuseControl({ onModeChange }) {
         const res = await fetch(`${API_BASE}/hardware/calibration/snapshot`);
         const data = await res.json();
         if (data.status === 'success') {
-          if (phase === 'open') {
-            eyesOpenSamples.push(data);
+          // EOG filter: skip blink-contaminated windows for alpha calculation.
+          // Blinks propagate via volume conduction to TP9/TP10 and inflate alpha.
+          // The backend detects blinks using frontal AF7/AF8 channels.
+          const isClean = !data.blink_contaminated;
+          
+          if (isClean) {
+            if (phase === 'open') {
+              eyesOpenSamples.push(data);
+            } else {
+              eyesClosedSamples.push(data);
+            }
           } else {
-            eyesClosedSamples.push(data);
+            console.log(`⚡ EOG rejected [${phase}]: alpha=${data.bands?.alpha?.toFixed(1)}µV² (peak=${data.eog?.frontal_peak_uv?.toFixed(0)}µV)`);
           }
+          
           setCurrentMetrics(data);
-          console.log(`📊 Alpha snapshot [${phase}]: alpha=${data.bands?.alpha?.toFixed(1)}, beta=${data.bands?.beta?.toFixed(1)}`);
+          console.log(`📊 Alpha snapshot [${phase}]${isClean ? '' : ' ⚡BLINK'}: alpha=${data.bands?.alpha?.toFixed(1)}, beta=${data.bands?.beta?.toFixed(1)}`);
 
-          // Log every sample with full bands + quality
-          logCal('relaxation_sample', phase === 'open' ? 'eyes_open' : 'eyes_closed', {
+          // Log every sample with full bands + quality + EOG status
+          logCal(isClean ? 'relaxation_sample' : 'relaxation_sample_eog_rejected',
+            phase === 'open' ? 'eyes_open' : 'eyes_closed', {
             elapsed_ms: elapsed,
             phase,
             bands: data.bands,
             coherence: data.coherence,
             signal_quality: data.signal_quality,
+            blink_contaminated: data.blink_contaminated,
+            eog: data.eog,
           });
         }
       } catch (err) {
@@ -658,30 +706,31 @@ export default function MuseControl({ onModeChange }) {
         clearInterval(calibrationInterval.current);
         
         // --- WARMUP OJOS ABIERTOS ---
-        // Descartar primeros 1500ms (artefactos del test de parpadeos al inicio)
-        const warmupOpen   = Math.ceil(1500 / 200); // 8 muestras
-        // Solo usar las primeras 7 muestras estables post-warmup (baseline real).
-        // Log3 mostró un 'posterior alpha drift': tras 3-4s de ojos abiertos quieto,
-        // el alpha posterior sube de 9µV² a 57-101µV² naturalmente.
-        // Si incluimos esas muestras tardías, alpha_open queda inflado (26.7 vs 9.2 µV² real)
-        // y el ratio aparece invertido (0.51x en vez de 1.44x).
-        const openStableN  = 7;
+        // Descartar primeros 2000ms: artefactos de transición desde el blink test.
+        const warmupOpen = Math.ceil(2000 / 200); // 10 muestras
 
         // --- WARMUP OJOS CERRADOS ---
         // La ventana Welch usa los últimos 2s del buffer.
-        // La fase eyes_closed empieza en elapsed_ms ~4600.
-        // Con warmup=8 (1600ms), el primer sample usado tiene ventana [4200-6200ms] → incluye 400ms
-        // de la fase anterior → artefactos de transición (90, 46µV² en log3).
-        // Para que la ventana esté ENTERAMENTE en eyes_closed: necesitamos t > transition + 2000ms.
-        // Con margen de 200ms: warmup = 11 samples = 2200ms → ventana [4800, 6800ms] ≡ todo closed. ✅
+        // Para que la ventana esté ENTERAMENTE en eyes_closed necesitamos
+        // descartar los primeros 2200ms tras la transición (margen para Welch).
         const warmupClosed = Math.ceil(2200 / 200); // 11 muestras
 
-        const openFiltered   = eyesOpenSamples.slice(warmupOpen, warmupOpen + openStableN);
-        const closedFiltered = eyesClosedSamples.slice(warmupClosed);
-        const openToUse   = openFiltered.length > 2   ? openFiltered   : eyesOpenSamples.slice(warmupOpen);
-        const closedToUse = closedFiltered.length > 2 ? closedFiltered : eyesClosedSamples;
+        // Con 20s por fase y los warmups, quedan ~18s útiles por fase (~90 muestras).
+        // Se usa TODA la ventana estable — sin límite artificial de N muestras.
+        const openToUse   = eyesOpenSamples.slice(warmupOpen);
+        const closedToUse = eyesClosedSamples.slice(warmupClosed);
         
-        // Media recortada: descartar top 20% más altos (spikes)
+        // Median: robust estimator for bimodal distributions.
+        // Even with EOG filtering, residual blink-adjacent windows may inflate
+        // the mean. Median captures the center of the clean distribution.
+        const median = (arr, key) => {
+          const vals = arr.map(s => s.bands?.[key] || 0).sort((a, b) => a - b);
+          if (vals.length === 0) return 0;
+          const mid = Math.floor(vals.length / 2);
+          return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+        };
+        
+        // Trimmed mean still used for non-alpha bands (less affected by EOG)
         const trimmedMean = (arr, key, trimTop = 0.2) => {
           const vals = arr.map(s => s.bands?.[key] || 0).sort((a, b) => a - b);
           const cutoff = Math.floor(vals.length * (1 - trimTop));
@@ -689,8 +738,9 @@ export default function MuseControl({ onModeChange }) {
           return trimmed.reduce((a, b) => a + b, 0) / (trimmed.length || 1);
         };
         
-        const avgAlphaOpen   = trimmedMean(openToUse, 'alpha');
-        const avgAlphaClosed = trimmedMean(closedToUse, 'alpha');
+        // Alpha uses MEDIAN (robust to residual EOG), other bands use trimmedMean
+        const avgAlphaOpen   = median(openToUse, 'alpha');
+        const avgAlphaClosed = median(closedToUse, 'alpha');
         
         console.log(`📊 Alpha after warmup trim: open=${avgAlphaOpen.toFixed(1)} (${openToUse.length} samples, skipped ${warmupOpen}), closed=${avgAlphaClosed.toFixed(1)} (${closedToUse.length} samples, skipped ${warmupClosed})`);
 
@@ -722,6 +772,12 @@ export default function MuseControl({ onModeChange }) {
           },
           alpha_ratio: parseFloat((avgAlphaClosed / (avgAlphaOpen || 1)).toFixed(4)),
           threshold: 0.5,
+          eog_filtering: {
+            open_total_snapshots: eyesOpenSamples.length + (eyesOpenDuration / 200 - eyesOpenSamples.length),
+            open_clean_samples: eyesOpenSamples.length,
+            closed_clean_samples: eyesClosedSamples.length,
+            estimator: 'median',  // Changed from trimmedMean — robust to residual EOG
+          },
         });
         
         // Coherencia promedio de las muestras con ojos cerrados (señal real > 0.8)
@@ -741,8 +797,11 @@ export default function MuseControl({ onModeChange }) {
     
     const detectedBlinks = confirmedBlinksRef.current;
     const alphaRatio = alphaClosed / (alphaOpen || 1);
-    const alphaOk = alphaRatio > 0.5;
-    const alphaIncreased = alphaRatio > 1.0;
+    // Alpha DEBE aumentar al cerrar ojos (Berger effect, 1929).
+    // ratio > 1.0 = alpha subió. Mínimo aceptable: 1.05 (5% aumento).
+    // Ratio < 1.0 con ojos cerrados = la señal no está captando actividad cortical real.
+    const alphaOk = alphaRatio >= 1.05;
+    const alphaIncreased = alphaRatio > 1.15;
     const coherenceOk = avgCoherence > 0.75;
     const passed = detectedBlinks >= 3 && alphaOk && coherenceOk;
     
@@ -753,14 +812,14 @@ export default function MuseControl({ onModeChange }) {
       if (alphaIncreased) {
         reason = `✓ Calibración exitosa: Alpha aumentó ${((alphaRatio - 1) * 100).toFixed(0)}% al cerrar ojos (coherencia: ${avgCoherence.toFixed(2)})`;
       } else {
-        reason = `✓ Calibración exitosa: Señal EEG válida detectada (coherencia: ${avgCoherence.toFixed(2)})`;
+        reason = `✓ Calibración exitosa: Efecto Berger detectado, ratio ${alphaRatio.toFixed(2)} (coherencia: ${avgCoherence.toFixed(2)})`;
       }
     } else if (detectedBlinks < 3) {
-      reason = `✕ Pocos parpadeos detectados (${detectedBlinks}/${targetBlinks})`;
+      reason = `✕ Pocos parpadeos detectados (${detectedBlinks}/${targetBlinks}). Asegúrate de pestañear fuerte cuando el test lo pida.`;
+    } else if (!alphaOk) {
+      reason = `✕ Alpha no aumentó al cerrar ojos (ratio: ${alphaRatio.toFixed(2)}, necesario ≥1.05). ¿Cerraste los ojos durante la fase 'ojos cerrados'? Verifica que los sensores frontales tengan buen contacto.`;
     } else if (!coherenceOk) {
       reason = `✕ Coherencia hemisférica baja (${avgCoherence.toFixed(2)}). ¿El casco está bien puesto? Humedece los sensores.`;
-    } else if (!alphaOk) {
-      reason = `✕ Alpha disminuyó mucho al cerrar ojos (ratio: ${alphaRatio.toFixed(2)}). Verifica que el sensor esté bien colocado.`;
     } else {
       reason = '✕ No se pudo completar la calibración';
     }
@@ -776,7 +835,7 @@ export default function MuseControl({ onModeChange }) {
       alpha_increased: alphaIncreased,
       coherence_avg: parseFloat(avgCoherence.toFixed(4)),
       coherence_ok: coherenceOk,
-      threshold_ratio: 0.5,
+      threshold_ratio: 1.05,
       threshold_coherence: 0.75,
       reason,
     };
@@ -929,19 +988,23 @@ export default function MuseControl({ onModeChange }) {
         };
       case CALIBRATION_STEPS.RELAXATION:
         if (relaxationPhase === 'open') {
+          // calibrationProgress 0→50 maps to 0→100% of open phase
+          const openProgress = Math.min(calibrationProgress * 2, 100);
           return { 
             emoji: '👀', 
             text: 'MANTÉN OJOS ABIERTOS', 
             subtext: 'Midiendo baseline... escucha el pip',
-            timeRemaining: getTimeRemaining(8000),
+            timeRemaining: Math.ceil((20000 * (100 - openProgress) / 100) / 1000),
             showTimer: true
           };
         } else {
+          // calibrationProgress 50→100 maps to 0→100% of closed phase
+          const closedProgress = Math.min((calibrationProgress - 50) * 2, 100);
           return { 
             emoji: '😌', 
             text: 'CIERRA LOS OJOS', 
             subtext: 'Relájate... pip para abrirlos',
-            timeRemaining: getTimeRemaining(8000),
+            timeRemaining: Math.ceil((20000 * (100 - closedProgress) / 100) / 1000),
             showTimer: true
           };
         }
@@ -1034,6 +1097,18 @@ export default function MuseControl({ onModeChange }) {
             </div>
             <button
               onClick={async () => {
+                // Check if backend is still connected — avoid disconnecting a live device
+                try {
+                  const res = await fetch(`${API_BASE}/hardware/status`);
+                  const data = await res.json();
+                  if (data.is_connected || data.is_streaming) {
+                    // Backend still has the device — just recover the UI state
+                    setError(null);
+                    scanDevices();
+                    return;
+                  }
+                } catch (_) {}
+                // Backend lost device — full disconnect + rescan
                 await disconnect();
                 setTimeout(() => scanDevices(), 300);
               }}
@@ -1730,7 +1805,7 @@ export default function MuseControl({ onModeChange }) {
         )}
         
         {status === MUSE_STATUS.ERROR && (
-          <ActionButton onClick={() => { setStatus(MUSE_STATUS.DISCONNECTED); setError(null); }} color="#666">↺ Reintentar</ActionButton>
+          <ActionButton onClick={() => { setError(null); scanDevices(); }} color="#00aaff">↺ Reconectar</ActionButton>
         )}
       </div>
     </div>

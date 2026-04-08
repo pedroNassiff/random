@@ -59,12 +59,15 @@ class SessionQualityScore:
             aq = w.get('avg_quality')
             if aq is not None:
                 quality_values.append(aq)
-            elif w.get('signal_quality'):
+            elif w.get('signal_quality') is not None:
                 sq = w['signal_quality']
                 if isinstance(sq, dict):
                     vals = [v for v in sq.values() if isinstance(v, (int, float)) and np.isfinite(v)]
                     if vals:
                         quality_values.append(np.mean(vals))
+                elif isinstance(sq, (int, float)) and np.isfinite(sq) and sq > 0:
+                    # Scalar float from InfluxDB get_metrics()
+                    quality_values.append(sq)
         
         signal_score = (np.mean(quality_values) * 100) if quality_values else 50.0
         signal_score = min(100, max(0, signal_score))
@@ -105,7 +108,7 @@ class SessionQualityScore:
         return _sanitize({
             "total_score": round(total, 1),
             "grade": grade,
-            "usable_for_training": total >= SessionQualityScore.MIN_TRAINING_SCORE,
+            "passes_quality_threshold": total >= SessionQualityScore.MIN_TRAINING_SCORE,
             "components": {
                 "signal_quality": {
                     "score": round(signal_score, 1),
