@@ -1146,6 +1146,7 @@ async def doc_dashboard():
     """
     Aggregated data for the ADA documentation dashboard.
     Returns sessions list, validation results, and project stats.
+    Auto-computes validation for sessions that don't have a file yet.
     """
     try:
         # 1. Sessions from PostgreSQL
@@ -1162,33 +1163,71 @@ async def doc_dashboard():
 
         # 2. Validation logs from disk
         logs_dir = Path(__file__).parent / "validation_logs"
+        logs_dir.mkdir(exist_ok=True)
         validations = []
-        if logs_dir.exists():
-            for f in sorted(logs_dir.glob("validate-*.json")):
-                try:
-                    data = json.loads(f.read_text())
-                    validations.append(data)
-                except Exception:
-                    pass
+        validated_ids = set()
+        for f in sorted(logs_dir.glob("validate-*.json")):
+            try:
+                data = json.loads(f.read_text())
+                validations.append(data)
+                validated_ids.add(data.get("session_id"))
+            except Exception:
+                pass
 
-        # 3. Protocol logs (only complete sessions)
-        protocol_logs = []
-        if logs_dir.exists():
-            for f in sorted(logs_dir.glob("validation_*.json")):
+        # 3. Auto-compute validation for sessions without files (up to 20 most recent)
+        influx_bulk = get_influx_client()
+        missing = [s for s in sessions if s.get("id") not in validated_ids][-20:]
+        for s in missing:
+            sid = s.get("id")
+            if not sid:
+                continue
+            try:
+                metrics_v = influx_bulk.get_metrics(sid) or session_db.get_metrics(sid)
+                if not metrics_v:
+                    continue
+                markers_v = []
                 try:
-                    data = json.loads(f.read_text())
-                    if data.get("phases_completed", 0) != data.get("total_phases", 8):
-                        continue
-                    protocol_logs.append({
-                        "filename": f.name,
-                        "phases_completed": data.get("phases_completed", 0),
-                        "total_phases": data.get("total_phases", 8),
-                        "complete": True,
-                        "start_iso": data.get("protocol_start_iso", ""),
-                        "metadata": data.get("metadata", {}),
-                    })
+                    events_v = influx_bulk.get_events(sid)
+                    markers_v = [{"label": e.get("label", ""), "timestamp": e.get("timestamp", 0)} for e in (events_v or [])]
                 except Exception:
                     pass
+                if not markers_v:
+                    raw_evts = session_db.get_events(sid)
+                    markers_v = [{"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)} for e in (raw_evts or [])]
+                val_result = {
+                    "status": "success",
+                    "session_id": sid,
+                    "validation": run_all_tests(metrics_v, markers_v),
+                    "quality_score": SessionQualityScore.compute(metrics_v, markers_v),
+                    "markers_found": len(markers_v),
+                    "metrics_found": len(metrics_v),
+                }
+                (logs_dir / f"validate-{sid}.json").write_text(json.dumps(val_result, default=str))
+                validations.append(val_result)
+                print(f"✅ [dashboard] Auto-validated session #{sid}")
+            except Exception as ve:
+                print(f"⚠️ [dashboard] Auto-validation failed for #{sid}: {ve}")
+
+        # Sort validations by session_id
+        validations.sort(key=lambda v: v.get("session_id", 0))
+
+        # 4. Protocol logs (only complete sessions)
+        protocol_logs = []
+        for f in sorted(logs_dir.glob("validation_*.json")):
+            try:
+                data = json.loads(f.read_text())
+                if data.get("phases_completed", 0) != data.get("total_phases", 8):
+                    continue
+                protocol_logs.append({
+                    "filename": f.name,
+                    "phases_completed": data.get("phases_completed", 0),
+                    "total_phases": data.get("total_phases", 8),
+                    "complete": True,
+                    "start_iso": data.get("protocol_start_iso", ""),
+                    "metadata": data.get("metadata", {}),
+                })
+            except Exception:
+                pass
 
         return {
             "status": "success",
@@ -1223,30 +1262,80 @@ async def doc_session_detail(session_id: int):
                         d[k] = d[k].isoformat()
                 result["recording"] = d
 
-        # 2. Validation result
+        # 2. Validation result — from disk, or compute on-the-fly and save
         logs_dir = Path(__file__).parent / "validation_logs"
+        logs_dir.mkdir(exist_ok=True)
         val_file = logs_dir / f"validate-{session_id}.json"
         if val_file.exists():
             result["validation"] = json.loads(val_file.read_text())
+        else:
+            # Run validation on-the-fly and persist so the dashboard picks it up
+            try:
+                influx_v = get_influx_client()
+                metrics_v = influx_v.get_metrics(session_id) or session_db.get_metrics(session_id)
+                if metrics_v:
+                    markers_v = []
+                    try:
+                        events_v = influx_v.get_events(session_id)
+                        markers_v = [{"label": e.get("label", ""), "timestamp": e.get("timestamp", 0)} for e in (events_v or [])]
+                    except Exception:
+                        pass
+                    if not markers_v:
+                        raw_evts = session_db.get_events(session_id)
+                        markers_v = [{"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)} for e in (raw_evts or [])]
+                    val_result = {
+                        "status": "success",
+                        "session_id": session_id,
+                        "validation": run_all_tests(metrics_v, markers_v),
+                        "quality_score": SessionQualityScore.compute(metrics_v, markers_v),
+                        "markers_found": len(markers_v),
+                        "metrics_found": len(metrics_v),
+                    }
+                    val_file.write_text(json.dumps(val_result, default=str))
+                    result["validation"] = val_result
+            except Exception as ve:
+                print(f"⚠️ [doc/session] on-the-fly validation failed for #{session_id}: {ve}")
 
-        # 3. Find matching protocol log (complete only)
+        # 3. Find matching protocol log (match by session recording time ± 2h)
         result["protocol_log"] = None
+        rec = result.get("recording", {})
+        rec_start_iso = rec.get("started_at", "") if rec else ""
         if logs_dir.exists():
-            for f in sorted(logs_dir.glob("validation_*_COMPLETE.json"), reverse=True):
+            best_match = None
+            best_delta = None
+            for f in sorted(logs_dir.glob("validation_*_COMPLETE.json")):
                 try:
                     data = json.loads(f.read_text())
-                    # Match by checking if session name or timing aligns
-                    result["protocol_log"] = {
-                        "filename": f.name,
-                        "phases_completed": data.get("phases_completed", 0),
-                        "total_phases": data.get("total_phases", 8),
-                        "start_iso": data.get("protocol_start_iso", ""),
-                        "metadata": data.get("metadata", {}),
-                        "events": data.get("events", []),
-                    }
-                    break  # Use most recent complete log
+                    proto_iso = data.get("protocol_start_iso", "")
+                    # Try to match by timestamp proximity (within 2 hours)
+                    if rec_start_iso and proto_iso:
+                        from datetime import datetime, timezone
+                        try:
+                            t_rec = datetime.fromisoformat(rec_start_iso.replace("Z", "+00:00"))
+                            t_proto = datetime.fromisoformat(proto_iso.replace("Z", "+00:00"))
+                            delta = abs((t_rec - t_proto).total_seconds())
+                            if best_delta is None or delta < best_delta:
+                                best_delta = delta
+                                best_match = (f, data)
+                        except Exception:
+                            if best_match is None:
+                                best_match = (f, data)
+                    else:
+                        if best_match is None:
+                            best_match = (f, data)
                 except Exception:
                     pass
+            # Only use if within 2 hours of the recording
+            if best_match and (best_delta is None or best_delta < 7200):
+                f, data = best_match
+                result["protocol_log"] = {
+                    "filename": f.name,
+                    "phases_completed": data.get("phases_completed", 0),
+                    "total_phases": data.get("total_phases", 8),
+                    "start_iso": data.get("protocol_start_iso", ""),
+                    "metadata": data.get("metadata", {}),
+                    "events": data.get("events", []),
+                }
 
         # 4. Metrics summary from InfluxDB
         try:
@@ -1259,12 +1348,15 @@ async def doc_session_detail(session_id: int):
                     vals = [m.get(band, 0) for m in metrics if m.get(band) is not None]
                     bands_avg[band] = sum(vals) / len(vals) if vals else 0
                 coh_vals = [m.get('coherence', 0) for m in metrics if m.get('coherence') is not None]
+                sq_vals = [m.get('signal_quality', 0) for m in metrics if m.get('signal_quality') is not None]
                 result["metrics_summary"] = {
                     "total_windows": n,
-                    "duration_seconds": n * 2,  # 2s windows
+                    "duration_seconds": n / 5,  # metrics at 5Hz
                     "bands_avg": bands_avg,
                     "coherence_avg": sum(coh_vals) / len(coh_vals) if coh_vals else 0,
                     "coherence_max": max(coh_vals) if coh_vals else 0,
+                    "signal_quality_avg": sum(sq_vals) / len(sq_vals) if sq_vals else 0,
+                    "usable_windows": sum(1 for v in sq_vals if v >= 0.7),
                 }
         except Exception:
             pass
@@ -1499,7 +1591,7 @@ async def protocol_validate(session_id: int):
         # 4. Score compuesto
         quality = SessionQualityScore.compute(metrics, markers)
         
-        return {
+        result = {
             "status": "success",
             "session_id": session_id,
             "validation": test_results,
@@ -1507,6 +1599,18 @@ async def protocol_validate(session_id: int):
             "markers_found": len(markers),
             "metrics_found": len(metrics),
         }
+
+        # 5. Persistir al disco para que /doc/dashboard y /doc/session lo lean
+        try:
+            logs_dir = Path(__file__).parent / "validation_logs"
+            logs_dir.mkdir(exist_ok=True)
+            val_file = logs_dir / f"validate-{session_id}.json"
+            val_file.write_text(json.dumps(result, default=str))
+            print(f"✅ [validate] Guardado {val_file.name}")
+        except Exception as save_err:
+            print(f"⚠️ [validate] No se pudo guardar a disco: {save_err}")
+
+        return result
     except Exception as e:
         import traceback
         traceback.print_exc()

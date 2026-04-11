@@ -31,7 +31,11 @@ class SessionQualityScore:
     """
     
     # Minimum quality threshold for training data
-    MIN_TRAINING_SCORE = 50
+    MIN_TRAINING_SCORE = 65
+    
+    # Minimum number of metric windows for a session to be usable
+    # 500 windows @ 5Hz = 100 seconds of clean data
+    MIN_TRAINING_WINDOWS = 500
     
     # Minimum electrode quality to consider a window "clean"
     MIN_WINDOW_QUALITY = 0.4
@@ -108,7 +112,10 @@ class SessionQualityScore:
         return _sanitize({
             "total_score": round(total, 1),
             "grade": grade,
-            "passes_quality_threshold": total >= SessionQualityScore.MIN_TRAINING_SCORE,
+            "passes_quality_threshold": (
+                total >= SessionQualityScore.MIN_TRAINING_SCORE and
+                total_windows >= SessionQualityScore.MIN_TRAINING_WINDOWS
+            ),
             "components": {
                 "signal_quality": {
                     "score": round(signal_score, 1),
