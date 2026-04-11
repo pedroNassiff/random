@@ -13,7 +13,7 @@ import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 
-const API = import.meta.env.VITE_API_URL || import.meta.env.VITE_BRAIN_API_BASE || 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL || import.meta.env.VITE_BRAIN_API_BASE || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://api.random-lab.es')
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const BANDS = ['delta', 'theta', 'alpha', 'beta', 'gamma']
