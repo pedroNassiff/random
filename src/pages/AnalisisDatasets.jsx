@@ -4,7 +4,7 @@ import referenceData from './analisis-datasets/reference_data.json'
 import CopilotPanelLabs from '../components/CopilotPanelLabs'
 import { useCopilotStore } from '../stores/copilotStore'
 
-const API = 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // ── Paleta / constantes ───────────────────────────────────────────────────────
 const BANDS = ['delta', 'theta', 'alpha', 'beta', 'gamma']
