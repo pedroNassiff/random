@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home.jsx';
 import Work from './pages/Work.jsx';
 import ProjectDetail from './pages/ProjectDetail.jsx';
@@ -30,6 +30,7 @@ function AppRoutes() {
         <Route path="/lab/brain/doc/session/:sessionId" element={<SessionDetail />} />
         <Route path="/lab/:id" element={<LabDetail />} />
         <Route path="/analisis-datasets" element={<AnalisisDatasets />} />
+        <Route path="/lanalisis-datasets" element={<Navigate to="/analisis-datasets" replace />} />
       </Routes>
     </PageTransition>
   );

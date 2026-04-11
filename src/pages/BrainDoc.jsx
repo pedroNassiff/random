@@ -8,6 +8,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Liveline } from 'liveline'
+import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout'
+import 'react-grid-layout/css/styles.css'
+import 'react-resizable/css/styles.css'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -35,6 +39,45 @@ const NAV_SECTIONS = [
   { id: 'progress', label: 'Progreso' },
   { id: 'roadmap', label: 'Roadmap' },
 ]
+
+// ── Grid layout config ─────────────────────────────────────────────────────────
+const SECTIONS_CONFIG = [
+  { key: 'intro',        label: '01 — INTRODUCCIÓN',         accent: '#a78bfa' },
+  { key: 'objective',    label: '02 — OBJETIVO Y ALCANCE',   accent: '#3b82f6' },
+  { key: 'theory',       label: '03 — MARCO TEÓRICO',        accent: '#10b981' },
+  { key: 'architecture', label: '04 — ARQUITECTURA',         accent: '#f59e0b' },
+  { key: 'protocol',     label: '05 — PROTOCOLO',            accent: '#ef4444' },
+  { key: 'validation',   label: '06 — TESTS DE VALIDACIÓN',  accent: '#8b5cf6' },
+  { key: 'datasets',     label: '07 — DATASETS',             accent: '#3b82f6' },
+  { key: 'progress',     label: '08 — PROGRESO Y ANÁLISIS',  accent: '#10b981' },
+  { key: 'roadmap',      label: '09 — ROADMAP',              accent: '#6366f1' },
+]
+
+const BRAINDOC_LAYOUT_KEY = 'braindoc_dashboard_layout'
+const BRAINDOC_DEFAULT_LAYOUT = {
+  lg: [
+    { i: 'intro',        x: 0, y: 0,  w: 6,  h: 7,  minW: 4, minH: 4 },
+    { i: 'objective',    x: 6, y: 0,  w: 6,  h: 7,  minW: 4, minH: 4 },
+    { i: 'theory',       x: 0, y: 7,  w: 6,  h: 16, minW: 4, minH: 6 },
+    { i: 'architecture', x: 6, y: 7,  w: 6,  h: 16, minW: 4, minH: 6 },
+    { i: 'protocol',     x: 0, y: 23, w: 6,  h: 10, minW: 4, minH: 4 },
+    { i: 'validation',   x: 6, y: 23, w: 6,  h: 14, minW: 4, minH: 6 },
+    { i: 'datasets',     x: 0, y: 37, w: 6,  h: 12, minW: 4, minH: 4 },
+    { i: 'progress',     x: 6, y: 37, w: 6,  h: 17, minW: 4, minH: 6 },
+    { i: 'roadmap',      x: 0, y: 54, w: 12, h: 14, minW: 6, minH: 6 },
+  ],
+  sm: [
+    { i: 'intro',        x: 0, y: 0,  w: 1, h: 7  },
+    { i: 'objective',    x: 0, y: 7,  w: 1, h: 7  },
+    { i: 'theory',       x: 0, y: 14, w: 1, h: 16 },
+    { i: 'architecture', x: 0, y: 30, w: 1, h: 16 },
+    { i: 'protocol',     x: 0, y: 46, w: 1, h: 10 },
+    { i: 'validation',   x: 0, y: 56, w: 1, h: 14 },
+    { i: 'datasets',     x: 0, y: 70, w: 1, h: 12 },
+    { i: 'progress',     x: 0, y: 82, w: 1, h: 17 },
+    { i: 'roadmap',      x: 0, y: 99, w: 1, h: 14 },
+  ],
+}
 
 // ── Data hooks ────────────────────────────────────────────────────────────────
 function useDashboardData() {
@@ -456,6 +499,18 @@ function SectionProtocol() {
 // ── Section: Validation Tests ─────────────────────────────────────────────────
 function SectionValidation({ validations }) {
   const navigate = useNavigate()
+  const [filter, setFilter] = React.useState('usable') // 'all' | 'usable' | 'not_usable'
+
+  const filtered = React.useMemo(() => {
+    if (!validations) return []
+    if (filter === 'all') return validations
+    return validations.filter(v => {
+      const q = v.quality_score || {}
+      const usable = q.passes_quality_threshold ?? v.validation?.summary?.usable_for_training ?? false
+      return filter === 'usable' ? usable : !usable
+    })
+  }, [validations, filter])
+
   return (
     <Card id="validation" title="06 — TESTS DE VALIDACIÓN CIENTÍFICA" accent="#8b5cf6">
       <p style={pStyle}>
@@ -507,33 +562,55 @@ function SectionValidation({ validations }) {
       {/* Validation results table */}
       {validations && validations.length > 0 && (
         <>
-          <h4 style={h4Style}>Resultados por sesión</h4>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginTop: 20, marginBottom: 8 }}>
+            <h4 style={{ ...h4Style, margin: 0 }}>Resultados por sesión</h4>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[['all', 'Todas', '#6b7280'], ['usable', 'Usables', '#10b981'], ['not_usable', 'No usables', '#ef4444']].map(([val, label, color]) => (
+                <button
+                  key={val}
+                  onClick={() => setFilter(val)}
+                  style={{
+                    padding: '3px 10px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.65rem',
+                    cursor: 'pointer', border: `1px solid ${filter === val ? color : color + '44'}`,
+                    background: filter === val ? color + '22' : 'transparent',
+                    color: filter === val ? color : 'rgba(255,255,255,0.35)',
+                    transition: 'all 0.15s',
+                  }}
+                >{label}</button>
+              ))}
+            </div>
+          </div>
           <Table
             headers={['Sesión', 'Grade', 'Score', 'Berger', 'Cognitivo', 'Coherencia', 'Ventanas', 'Usable']}
-            rows={validations.map(v => {
+            rows={filtered.map(v => {
               const q = v.quality_score || {}
-              const val = v.validation || {}
-              const berger = val.berger_effect || {}
-              const cognitive = val.cognitive_reactivity || {}
-              const coherence = val.coherence_stability || {}
+              const val = (v.validation?.tests) ? v.validation : {}
+              const tests = val.tests || {}
+              const berger = tests.berger_effect || {}
+              const bg_m = berger.metrics || {}
+              const cognitive = tests.cognitive_reactivity || {}
+              const cog_m = cognitive.metrics || {}
+              const coherence = tests.coherence_stability || {}
+              const coh_m = coherence.metrics || {}
+              const usable = q.passes_quality_threshold ?? val.summary?.usable_for_training ?? false
               return [
                 <span
                   onClick={() => navigate(`/lab/brain/doc/session/${v.session_id}`)}
                   style={{ color: '#8b5cf6', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}
                 >#{v.session_id}</span>,
                 <span style={{ color: GRADE_COLORS[q.grade] || '#9ca3af', fontWeight: 700 }}>{q.grade || '—'}</span>,
-                (q.quality_score || 0).toFixed(1),
+                (q.total_score ?? q.quality_score ?? 0).toFixed(1),
                 <span style={{ color: berger.passed ? '#10b981' : '#ef4444' }}>
-                  {berger.passed ? '✓' : '✗'} {(berger.ratio || 0).toFixed(2)}×
+                  {berger.passed ? '✓' : '✗'} {(bg_m.ratio || 0).toFixed(2)}×
                 </span>,
                 <span style={{ color: cognitive.passed ? '#10b981' : '#ef4444' }}>
-                  {cognitive.passed ? '✓' : '✗'} β{(cognitive.beta_ratio || 0).toFixed(2)}×
+                  {cognitive.passed ? '✓' : '✗'} β{(cog_m.beta_ratio || 0).toFixed(2)}×
                 </span>,
                 <span style={{ color: coherence.passed ? '#10b981' : '#ef4444' }}>
-                  {coherence.passed ? '✓' : '✗'} {(coherence.autocorrelation || 0).toFixed(2)}
+                  {coherence.passed ? '✓' : '✗'} {(coh_m.autocorrelation_lag1 || 0).toFixed(2)}
                 </span>,
                 v.metrics_found || '—',
-                q.usable_for_training ? <Badge color="#10b981">Sí</Badge> : <Badge color="#ef4444">No</Badge>,
+                usable ? <Badge color="#10b981">Sí</Badge> : <Badge color="#ef4444">No</Badge>,
               ]
             })}
           />
@@ -554,9 +631,11 @@ function SectionDatasets({ data }) {
 
   const completeSessions = protocolLogs.filter(l => l.complete).length
   const partialSessions = protocolLogs.filter(l => !l.complete).length
-  const usableSessions = validations.filter(v => v.quality_score?.usable_for_training).length
+  const usableSessions = validations.filter(v =>
+    v.quality_score?.passes_quality_threshold ?? v.validation?.summary?.usable_for_training
+  ).length
   const avgScore = validations.length > 0
-    ? (validations.reduce((acc, v) => acc + (v.quality_score?.quality_score || 0), 0) / validations.length).toFixed(1)
+    ? (validations.reduce((acc, v) => acc + (v.quality_score?.total_score ?? v.quality_score?.quality_score ?? 0), 0) / validations.length).toFixed(1)
     : '—'
 
   return (
@@ -629,13 +708,107 @@ function SectionDatasets({ data }) {
   )
 }
 
+// ── SVG chart helpers (section 08) ────────────────────────────────────────────
+function SessionProgressChart({ sorted }) {
+  if (!sorted || sorted.length < 2) return null
+  const W = 560, H = 120, PAD_B = 20, PAD_T = 16
+  const inner = H - PAD_T - PAD_B
+  const scores  = sorted.map(v => v.quality_score?.total_score ?? 0)
+  const bergers = sorted.map(v => Math.min(100, (v.validation?.tests?.berger_effect?.metrics?.ratio ?? 0) * 40))
+  const cohs    = sorted.map(v => (v.validation?.tests?.coherence_stability?.metrics?.autocorrelation_lag1 ?? 0) * 100)
+
+  const toX = i => (i / (sorted.length - 1)) * W
+  const toY = v => PAD_T + inner - (Math.min(100, Math.max(0, v)) / 100) * inner
+
+  const pts = arr => arr.map((v, i) => `${toX(i)},${toY(v)}`).join(' ')
+  const area = arr => `${pts(arr)} ${W},${H - PAD_B} 0,${H - PAD_B}`
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg viewBox={`0 0 ${W} ${H + 4}`} style={{ width: '100%', minWidth: 320 }}>
+        <defs>
+          <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Grid lines */}
+        {[25, 50, 65, 75, 100].map(v => (
+          <line key={v} x1={0} y1={toY(v)} x2={W} y2={toY(v)}
+            stroke={v === 65 ? '#10b981' : 'rgba(255,255,255,0.06)'}
+            strokeWidth={v === 65 ? 0.8 : 0.5}
+            strokeDasharray={v === 65 ? '4,3' : undefined}
+          />
+        ))}
+        <text x={W - 2} y={toY(65) - 3} fontSize="7" fill="#10b981" opacity="0.5" textAnchor="end">65 (umbral)</text>
+
+        {/* Berger × 40 */}
+        <polyline points={pts(bergers)} fill="none" stroke="#a78bfa" strokeWidth="1" opacity="0.5" strokeLinejoin="round" />
+        {/* Coherence × 100 */}
+        <polyline points={pts(cohs)} fill="none" stroke="#3b82f6" strokeWidth="1" opacity="0.5" strokeLinejoin="round" />
+        {/* Score area + line */}
+        <polygon points={area(scores)} fill="url(#sg)" />
+        <polyline points={pts(scores)} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" />
+
+        {/* Dots */}
+        {sorted.map((v, i) => {
+          const score = scores[i]
+          const grade = v.quality_score?.grade || '?'
+          const usable = v.quality_score?.passes_quality_threshold ?? false
+          return (
+            <g key={v.session_id}>
+              <circle cx={toX(i)} cy={toY(score)} r={usable ? 4.5 : 3}
+                fill={GRADE_COLORS[grade] || '#9ca3af'}
+                stroke={usable ? '#fff' : 'rgba(0,0,0,0.4)'}
+                strokeWidth={usable ? 1.5 : 1}
+              />
+              <text x={toX(i)} y={H + 2} fontSize="7" fill="rgba(255,255,255,0.35)" textAnchor="middle">
+                #{v.session_id}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
+        {[['#10b981', 'Score /100'], ['#a78bfa', 'Berger ×40'], ['#3b82f6', 'Coherencia ×100']].map(([c, l]) => (
+          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+            <span style={{ width: 16, height: 2, background: c, display: 'inline-block', borderRadius: 1 }} />
+            {l}
+          </span>
+        ))}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+          <svg width="12" height="12" viewBox="0 0 12 12">
+            <circle cx={6} cy={6} r={4.5} fill="#9ca3af" stroke="#fff" strokeWidth="1.5" />
+          </svg>
+          Usable
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ── Section: Progress ─────────────────────────────────────────────────────────
 function SectionProgress({ validations }) {
   const navigate = useNavigate()
-  if (!validations || validations.length === 0) return null
+  const [filter, setFilter] = React.useState('all')
 
-  // Sort by session_id
-  const sorted = [...validations].sort((a, b) => (a.session_id || 0) - (b.session_id || 0))
+  // Sort by session_id — computed before the early return so hooks order is stable
+  const sorted = React.useMemo(
+    () => [...(validations || [])].sort((a, b) => (a.session_id || 0) - (b.session_id || 0)),
+    [validations]
+  )
+
+  const filteredDetail = React.useMemo(() => {
+    if (filter === 'all') return sorted
+    return sorted.filter(v => {
+      const usable = v.quality_score?.passes_quality_threshold ?? v.validation?.summary?.usable_for_training ?? false
+      return filter === 'usable' ? usable : !usable
+    })
+  }, [sorted, filter])
+
+  if (!validations || validations.length === 0) return null
 
   return (
     <Card id="progress" title="08 — PROGRESO Y ANÁLISIS" accent="#10b981">
@@ -645,11 +818,15 @@ function SectionProgress({ validations }) {
         a medida que tanto el practicante como el sistema mejoran.
       </p>
 
-      {/* Score timeline visualization */}
+      {/* SVG multi-metric chart */}
+      <h4 style={h4Style}>Tendencias de calidad</h4>
+      <SessionProgressChart sorted={sorted} />
+
+      {/* Score bar timeline */}
       <h4 style={h4Style}>Evolución de scores</h4>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120, padding: '8px 0' }}>
         {sorted.map(v => {
-          const score = v.quality_score?.quality_score || 0
+          const score = v.quality_score?.total_score ?? v.quality_score?.quality_score ?? 0
           const grade = v.quality_score?.grade || '?'
           return (
             <div key={v.session_id} onClick={() => navigate(`/lab/brain/doc/session/${v.session_id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer' }} title={`Ver sesión #${v.session_id}`}>
@@ -672,9 +849,26 @@ function SectionProgress({ validations }) {
         })}
       </div>
 
-      {/* Detailed comparison */}
-      <h4 style={h4Style}>Comparativa detallada</h4>
-      {sorted.map(v => {
+      {/* Detailed comparison with filter */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '20px 0 8px 0' }}>
+        <h4 style={{ ...h4Style, margin: 0 }}>Comparativa detallada</h4>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[['all', 'Todas', '#6b7280'], ['usable', 'Usables', '#10b981'], ['not_usable', 'No usables', '#ef4444']].map(([val, label, color]) => (
+            <button
+              key={val}
+              onClick={() => setFilter(val)}
+              style={{
+                padding: '3px 10px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.65rem',
+                cursor: 'pointer', border: `1px solid ${filter === val ? color : color + '44'}`,
+                background: filter === val ? color + '22' : 'transparent',
+                color: filter === val ? color : 'rgba(255,255,255,0.35)',
+                transition: 'all 0.15s',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+      {filteredDetail.map(v => {
         const q = v.quality_score || {}
         const components = q.components || {}
         return (
@@ -684,7 +878,7 @@ function SectionProgress({ validations }) {
                 Sesión #{v.session_id}
               </span>
               <span style={{ fontSize: '1.2rem', fontWeight: 700, color: GRADE_COLORS[q.grade] || '#9ca3af', fontFamily: 'monospace' }}>
-                {q.grade} · {(q.quality_score || 0).toFixed(1)}
+                {q.grade} · {(q.total_score ?? q.quality_score ?? 0).toFixed(1)}
               </span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
@@ -829,11 +1023,71 @@ const h4Style = {
   margin: '20px 0 8px 0', fontFamily: 'monospace',
 }
 
+// ── Grid drag handle ──────────────────────────────────────────────────────────
+function DocItemHeader({ label, accent }) {
+  return (
+    <div
+      className="doc-drag-handle"
+      style={{
+        padding: '7px 16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: `${accent}10`,
+        borderBottom: `1px solid ${accent}22`,
+        cursor: 'grab', userSelect: 'none', flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: '0.65rem', color: `${accent}dd`, fontFamily: 'monospace', fontWeight: 600 }}>
+        {label}
+      </span>
+      <span style={{ color: `${accent}55`, fontSize: '0.9rem' }}>⠿</span>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function BrainDoc() {
   const navigate = useNavigate()
   const { data, loading, error, reload } = useDashboardData()
   const [activeSection, setActiveSection] = useState('intro')
+  const { containerRef: gridRef, width: gridWidth } = useContainerWidth()
+
+  const [layouts, setLayouts] = useState(() => {
+    try {
+      const saved = localStorage.getItem(BRAINDOC_LAYOUT_KEY)
+      if (!saved) return BRAINDOC_DEFAULT_LAYOUT
+      const parsed = JSON.parse(saved)
+      if (!parsed.lg || parsed.lg.length !== BRAINDOC_DEFAULT_LAYOUT.lg.length) {
+        localStorage.removeItem(BRAINDOC_LAYOUT_KEY)
+        return BRAINDOC_DEFAULT_LAYOUT
+      }
+      return parsed
+    } catch { return BRAINDOC_DEFAULT_LAYOUT }
+  })
+
+  const handleLayoutChange = useCallback((_, allLayouts) => {
+    setLayouts(allLayouts)
+    localStorage.setItem(BRAINDOC_LAYOUT_KEY, JSON.stringify(allLayouts))
+  }, [])
+
+  const resetLayout = () => {
+    setLayouts(BRAINDOC_DEFAULT_LAYOUT)
+    localStorage.removeItem(BRAINDOC_LAYOUT_KEY)
+  }
+
+  const renderSection = useCallback((key) => {
+    switch (key) {
+      case 'intro':        return <SectionIntro />
+      case 'objective':    return <SectionObjective />
+      case 'theory':       return <SectionTheory />
+      case 'architecture': return <SectionArchitecture />
+      case 'protocol':     return <SectionProtocol />
+      case 'validation':   return <SectionValidation validations={data?.validations} />
+      case 'datasets':     return <SectionDatasets data={data} />
+      case 'progress':     return <SectionProgress validations={data?.validations} />
+      case 'roadmap':      return <SectionRoadmap />
+      default:             return null
+    }
+  }, [data])
 
   // Track scroll position for nav highlighting
   useEffect(() => {
@@ -866,14 +1120,12 @@ export default function BrainDoc() {
         padding: '20px 0', display: 'flex', flexDirection: 'column',
         overflowY: 'auto',
       }}>
-        {/* Back button */}
         <button
           onClick={() => navigate('/lab/brain')}
           style={{
             background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
             fontSize: '0.72rem', fontFamily: 'monospace', cursor: 'pointer',
-            padding: '8px 16px', textAlign: 'left',
-            transition: 'color 0.2s',
+            padding: '8px 16px', textAlign: 'left', transition: 'color 0.2s',
           }}
           onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}
@@ -881,7 +1133,6 @@ export default function BrainDoc() {
           ← ADA
         </button>
 
-        {/* Title */}
         <div style={{ padding: '12px 16px', marginBottom: 8 }}>
           <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
             .RANDOM() / LAB
@@ -891,13 +1142,19 @@ export default function BrainDoc() {
           </div>
         </div>
 
-        {/* Nav items */}
         {NAV_SECTIONS.map(s => (
           <button
             key={s.id}
             onClick={() => {
               const el = document.getElementById(s.id)
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              if (el) {
+                const container = document.getElementById('doc-scroll')
+                if (container) {
+                  const cRect = container.getBoundingClientRect()
+                  const eRect = el.getBoundingClientRect()
+                  container.scrollBy({ top: eRect.top - cRect.top - 20, behavior: 'smooth' })
+                }
+              }
             }}
             style={{
               background: activeSection === s.id ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
@@ -914,12 +1171,9 @@ export default function BrainDoc() {
           </button>
         ))}
 
-        {/* Status */}
         <div style={{ marginTop: 'auto', padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           {loading ? (
-            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
-              Cargando datos...
-            </div>
+            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Cargando datos...</div>
           ) : error ? (
             <div style={{ fontSize: '0.6rem', color: '#ef4444', fontFamily: 'monospace' }}>
               Error: {error}
@@ -933,51 +1187,75 @@ export default function BrainDoc() {
               {data?.total_validations || 0} validaciones
             </div>
           )}
+          <button
+            onClick={resetLayout}
+            style={{
+              display: 'block', marginTop: 8, background: 'none',
+              border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)',
+              fontSize: '0.58rem', cursor: 'pointer', fontFamily: 'monospace',
+              padding: '3px 8px', borderRadius: 4, width: '100%', transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+          >
+            ↺ reset layout
+          </button>
         </div>
       </nav>
 
       {/* ─── Main content ─── */}
       <main
         id="doc-scroll"
-        style={{
-          flex: 1, overflowY: 'auto', padding: '32px 40px',
-          maxWidth: 900, margin: '0 auto',
-        }}
+        style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '32px 24px 32px 32px' }}
       >
-        {/* Header */}
-        <header style={{ marginBottom: 32 }}>
+        <header style={{ marginBottom: 28 }}>
           <h1 style={{
             fontSize: '1.6rem', fontWeight: 700, color: '#e2e8f0',
             fontFamily: 'monospace', margin: 0, letterSpacing: '-0.02em',
           }}>
             ADA — Documentación Científica
           </h1>
-          <p style={{
-            fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)',
-            fontFamily: 'monospace', margin: '8px 0 0 0',
-          }}>
+          <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', margin: '8px 0 0 0' }}>
             Análisis de Datos de Actividad cerebral · Random Lab · Marzo 2026
           </p>
-          <p style={{
-            fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)',
-            margin: '4px 0 0 0',
-          }}>
+          <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', margin: '4px 0 0 0' }}>
             Pedro Nassiff — CTO / Investigador principal
           </p>
         </header>
 
-        {/* Content sections */}
-        <SectionIntro />
-        <SectionObjective />
-        <SectionTheory />
-        <SectionArchitecture />
-        <SectionProtocol />
-        <SectionValidation validations={data?.validations} />
-        <SectionDatasets data={data} />
-        <SectionProgress validations={data?.validations} />
-        <SectionRoadmap />
+        {/* ─── Responsive drag-and-drop grid ─── */}
+        <div ref={gridRef}>
+          <ResponsiveGridLayout
+            width={gridWidth}
+            layouts={layouts}
+            onLayoutChange={handleLayoutChange}
+            breakpoints={{ lg: 1100, sm: 0 }}
+            cols={{ lg: 12, sm: 1 }}
+            rowHeight={40}
+            draggableHandle=".doc-drag-handle"
+            margin={[16, 16]}
+            containerPadding={[0, 0]}
+            useCSSTransforms
+          >
+            {SECTIONS_CONFIG.map(({ key, label, accent }) => (
+              <div
+                key={key}
+                style={{
+                  display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                  background: 'rgba(15, 15, 25, 0.85)',
+                  border: `1px solid ${accent}33`, borderRadius: 12,
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <DocItemHeader label={label} accent={accent} />
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {renderSection(key)}
+                </div>
+              </div>
+            ))}
+          </ResponsiveGridLayout>
+        </div>
 
-        {/* Footer */}
         <footer style={{
           textAlign: 'center', padding: '40px 0 60px',
           fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace',

@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Liveline } from 'liveline'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -122,6 +123,42 @@ const SESSION_NOTES = {
     ],
     conditions: 'Sesión grabada como referencia baseline del sistema',
   },
+  34: {
+    observations: [
+      'Score A (91.4) — la mejor sesión registrada hasta ahora',
+      'Berger excelente: ratio 2.545× (alpha abiertos=0.58, cerrados=1.48 µV²) — el doble y medio',
+      'Cero artefactos EOG en baseline (0 ventanas rechazadas en toda la calibración)',
+      'Reactividad cognitiva passed good: beta subió 1.41× y gamma 1.93× durante cálculo',
+      'Coherencia excelente: autocorr 0.72 — por encima del umbral de "señal neural real"',
+      '8558 ventanas de 30 min de protocolo completo — completeness 100%',
+    ],
+    learnings: [
+      'Berger 2.5× es el rango ideal para Muse 2 — confirma que el hardware funciona bien',
+      'Gamma 1.93× durante tarea cognitiva es notable — activa prefrontal + cortex parietal',
+      'La coherencia >0.7 clasifica como "Real neural coherence, excellent signal" en las interpretaciones del sistema',
+    ],
+    conditions: 'Protocolo de 30 min completo, sesión de referencia de alta calidad',
+  },
+  35: {
+    observations: [
+      'Score B (79.3), 28.6 minutos de datos — 8587 ventanas de métricas',
+      'Berger excelente: ratio 1.554× — alpha closed 0.946 vs open 0.609',
+      'Reactividad cognitiva passed good: beta 1.43×, gamma 0.833× (gamma no subió pero beta sí)',
+      'deep_relaxation dominó el 76.9% de la sesión — el estado más profundo registrado como dominante',
+      'deep_meditation alcanzó el 5.1% — ~88 segundos sostenidos',
+      'Alpha media solo 0.112 normalizado — baja porque delta (0.617) domina el espectro',
+      '0% blink contamination en toda la sesión — sin artefactos de parpadeo',
+      'Coherencia media 0.544, peor en el último tercio (0.506) — señal se volvió más variable al final',
+    ],
+    learnings: [
+      'Delta alto (0.617) + theta elevado (0.208) + alpha bajo = patrón típico de sueño ligero/meditación profunda con ojos cerrados',
+      'La fórmula de estado "deep_relaxation" del sistema detecta correctamente el estado meditativo — el modelo de clasificación funciona',
+      'El ratio Berger de 1.554 es "excellent" (>1.5×) según la literatura (Cannard et al. 2021)',
+      'Gamma bajo (0.040) → ausencia de actividad gamma = sin arousal cognitivo, sin ansiedad — estado puro de quietud',
+      'PLV=0.648 (Phase Locking Value) indica sincronización inter-hemisférica moderada-alta durante la sesión',
+    ],
+    conditions: 'Sesión de protocolo completo, 28.6 minutos efectivos de grabación',
+  },
 }
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
@@ -200,13 +237,116 @@ function useSessionData(sessionId) {
   return { data, loading, error, reload: load }
 }
 
+function useSessionTimeSeries(recordingId) {
+  const [metrics, setMetrics] = useState(null)
+
+  useEffect(() => {
+    if (!recordingId) return
+    fetch(`${API}/sessions/${recordingId}/metrics`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && Array.isArray(d)) setMetrics(d) })
+      .catch(() => {})
+  }, [recordingId])
+
+  return metrics
+}
+
+// ── Section: Time-series live charts ─────────────────────────────────────────
+function SectionTimeSeries({ metrics }) {
+  if (!metrics || metrics.length < 3) {
+    return (
+      <Card title="Actividad durante la sesión" accent="#10b981">
+        <p style={{ ...pStyle, textAlign: 'center', padding: '20px 0' }}>
+          Cargando datos de tiempo real...
+        </p>
+      </Card>
+    )
+  }
+
+  // Build Liveline data from metrics — each metric has a _time (ISO) or index
+  const n = metrics.length
+  const BASE = Date.now() - n * 2000 // 2s per window at 5Hz
+  const toPoint = (m, i, field) => ({
+    time: m._time ? new Date(m._time).getTime() : BASE + i * 2000,
+    value: parseFloat(m[field] ?? 0) || 0,
+  })
+
+  const alphaData   = metrics.map((m, i) => toPoint(m, i, 'alpha'))
+  const thetaData   = metrics.map((m, i) => toPoint(m, i, 'theta'))
+  const cohData     = metrics.map((m, i) => toPoint(m, i, 'coherence'))
+  const windowSecs  = n * 2
+
+  const bandSeries = [
+    { label: 'α alpha',  color: BAND_COLORS.alpha, data: alphaData },
+    { label: 'θ theta',  color: BAND_COLORS.theta, data: thetaData },
+  ]
+
+  const latestAlpha = alphaData[alphaData.length - 1]?.value ?? 0
+  const latestCoh   = cohData[cohData.length - 1]?.value ?? 0
+
+  const fmtTime = t => {
+    const s = Math.round((t - (metrics[0]?._time ? new Date(metrics[0]._time).getTime() : BASE)) / 1000)
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  }
+
+  return (
+    <Card title="Actividad durante la sesión" accent="#10b981">
+      <p style={pStyle}>
+        Evolución temporal de las métricas EEG a lo largo de la sesión. Cada punto 
+        representa una ventana de 2 segundos procesada en tiempo real.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, margin: '16px 0' }}>
+        <div>
+          <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginBottom: 6 }}>
+            Alpha (α) + Theta (θ) · {n} ventanas
+          </p>
+          <div style={{ height: 200 }}>
+            <Liveline
+              series={bandSeries}
+              theme="dark"
+              window={windowSecs}
+              formatValue={v => (v * 100).toFixed(1) + '%'}
+              formatTime={fmtTime}
+              badge={false}
+              scrub
+            />
+          </div>
+        </div>
+        <div>
+          <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginBottom: 6 }}>
+            Coherencia PLV
+          </p>
+          <div style={{ height: 200 }}>
+            <Liveline
+              data={cohData}
+              value={latestCoh}
+              color="#10b981"
+              theme="dark"
+              showValue
+              window={windowSecs}
+              formatValue={v => v.toFixed(3)}
+              formatTime={fmtTime}
+              badge={false}
+              scrub
+              exaggerate
+            />
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 // ── Section: Overview ─────────────────────────────────────────────────────────
 function SectionOverview({ data, sessionId }) {
   const recording = data?.recording || {}
   const quality = data?.validation?.quality_score || {}
+  const valSummary = data?.validation?.validation?.summary || {}
   const metricsSummary = data?.metrics_summary || {}
   const grade = quality.grade || '—'
   const score = (quality.total_score ?? quality.quality_score ?? 0).toFixed(1)
+  const usable = quality.passes_quality_threshold ?? valSummary.usable_for_training ?? false
 
   return (
     <Card title="Resumen de sesión" accent={GRADE_COLORS[grade] || '#6b7280'}>
@@ -228,7 +368,7 @@ function SectionOverview({ data, sessionId }) {
           <Stat label="Ventanas" value={metricsSummary.total_windows || '—'} color="#a78bfa" />
           <Stat label="Coherencia" value={(metricsSummary.coherence_avg || 0).toFixed(2)} color="#10b981" />
           <Stat label="Coh. máx" value={(metricsSummary.coherence_max || 0).toFixed(2)} color="#10b981" />
-          <Stat label="Entrenamiento" value={quality.usable_for_training ? 'Sí' : 'No'} color={quality.usable_for_training ? '#10b981' : '#ef4444'} />
+          <Stat label="Entrenamiento" value={usable ? 'Sí' : 'No'} color={usable ? '#10b981' : '#ef4444'} />
         </div>
       </div>
 
@@ -579,6 +719,7 @@ export default function SessionDetail() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
   const { data, loading, error, reload } = useSessionData(sessionId)
+  const metrics = useSessionTimeSeries(data?.recording?.id)
 
   if (loading) {
     return (
@@ -640,7 +781,7 @@ export default function SessionDetail() {
         </div>
 
         {/* Section links */}
-        {['Resumen', 'Video', 'Validación', 'Protocolo', 'Metadatos', 'Notas'].map(s => (
+        {['Resumen', 'Actividad', 'Video', 'Validación', 'Protocolo', 'Metadatos', 'Notas'].map(s => (
           <button
             key={s}
             onClick={() => {
@@ -695,6 +836,7 @@ export default function SessionDetail() {
         </header>
 
         <div id="section-resumen"><SectionOverview data={data} sessionId={sessionId} /></div>
+        <div id="section-actividad"><SectionTimeSeries metrics={metrics} /></div>
         <div id="section-video"><SectionVideo sessionId={Number(sessionId)} /></div>
         <div id="section-validacion"><SectionValidation data={data} /></div>
         <div id="section-protocolo"><SectionProtocol data={data} /></div>
