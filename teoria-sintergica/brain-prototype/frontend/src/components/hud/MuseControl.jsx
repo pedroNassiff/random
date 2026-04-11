@@ -268,6 +268,14 @@ export default function MuseControl({ onModeChange }) {
         const res = await fetch(`${API_BASE}/hardware/calibration/blinks`);
         const data = await res.json();
         if (data.status === 'success' && data.blink_count > 0) {
+          // GATE: Rechazar detecciones cuando la señal es puro ruido
+          const sq = data.signal_quality || {};
+          const sqVals = Object.values(sq).filter(v => typeof v === 'number');
+          const avgSQ = sqVals.length ? sqVals.reduce((a, b) => a + b, 0) / sqVals.length : 0;
+          if (avgSQ < 0.5) {
+            console.log(`⚠️ Blink rejected: signal quality too low (${avgSQ.toFixed(2)})`);
+            return;
+          }
           // Detectamos parpadeo(s) en esta ventana
           // Solo contamos 1 por detección (las ventanas se solapan)
           confirmedBlinksRef.current += 1;
@@ -388,10 +396,10 @@ export default function MuseControl({ onModeChange }) {
     
     const detectedBlinks = confirmedBlinksRef.current; // Usar ref para valor actualizado
     const alphaRatio = alphaClosed / (alphaOpen || 1);
-    // Alpha debe aumentar al cerrar ojos, pero ser tolerante con ruido
-    // Si ratio > 0.9, consideramos que al menos no hay problema grave de señal
-    const alphaOk = alphaRatio > 0.9; // Más tolerante - antes era 1.15
-    const alphaIncreased = alphaRatio > 1.0; // Para el mensaje
+    // Alpha DEBE aumentar al cerrar ojos (Berger effect, 1929).
+    // ratio > 1.0 = alpha subió. Mínimo aceptable: 1.05 (5% aumento).
+    const alphaOk = alphaRatio >= 1.05;
+    const alphaIncreased = alphaRatio > 1.15;
     const passed = detectedBlinks >= 3 && alphaOk;
     
     console.log(`📊 Calibration evaluation: blinks=${detectedBlinks}, alphaOpen=${alphaOpen.toFixed(2)}, alphaClosed=${alphaClosed.toFixed(2)}, ratio=${alphaRatio.toFixed(2)}`);

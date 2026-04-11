@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
@@ -19,7 +19,7 @@ load_dotenv()
 
 from models import SyntergicState, FrequencyBands, Vector3
 from ai.inference import SyntergicBrain
-from hardware import MuseConnector, MuseToSyntergicAdapter
+from hardware import MuseConnector, MuseToSyntergicAdapter, EOGDetector
 # Legacy SQLite (for backward compatibility)
 from database import get_database, get_recorder, SessionRecorder
 # New PostgreSQL + InfluxDB
@@ -31,6 +31,11 @@ from analytics.service import AnalyticsService
 
 from automation import router as automation_router
 from automation.service import AutomationService
+
+# AI Copilot
+from ai.copilot_labs_service import CopilotLabsService
+from recording.validation_protocol import ValidationProtocol
+from recording.validation import run_all_tests, SessionQualityScore
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -71,6 +76,18 @@ class MarkerRequest(BaseModel):
     label: str
     event_type: Optional[str] = "marker"
 
+# ── Copilot Pydantic models ───────────────────────────────────────────────────
+class CopilotChatRequest(BaseModel):
+    message: str
+    session_context: Optional[Any] = None  # pre-computed analysis from frontend
+    user_tier: str = "free"
+
+class CopilotChatResponse(BaseModel):
+    text: str
+    model_used: str
+    complexity: str
+    widgets: List[Any] = []
+
 # Inicializar el Cerebro Digital (Carga modelo y datos)
 print("=" * 60)
 print("SYNTERGIC BRAIN API - Initializing...")
@@ -87,6 +104,10 @@ session_recorder: Optional[SessionRecorderV2] = None
 # Legacy SQLite database (for old sessions)
 print("✓ Initializing session database...")
 session_db = get_database()
+
+# Validation protocol (scientific recording)
+print("✓ Initializing validation protocol...")
+validation_protocol = ValidationProtocol(recorder=None)  # recorder set when Muse connects
 print("=" * 60)
 
 # Allow CORS for frontend
@@ -143,6 +164,9 @@ async def startup():
     app.state.automation_service = AutomationService(app.state.db_pool)
     print("Automation service initialized")
 
+    app.state.copilot_service = CopilotLabsService()
+    print("✅ Copilot Labs service initialized")
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -151,11 +175,108 @@ async def shutdown():
         await app.state.analytics_pool.close()
         print("✓ Analytics database pool closed")
 
+    if hasattr(app.state, "copilot_service"):
+        await app.state.copilot_service.aclose()
+
 # Include analytics router
 app.include_router(analytics_router)
 
 # Include automation router
 app.include_router(automation_router)
+
+# ============================================
+# Copilot Labs Endpoint
+# ============================================
+
+@app.post("/api/copilot/labs/chat", response_model=CopilotChatResponse)
+async def copilot_labs_chat(request: CopilotChatRequest):
+    """
+    Procesa un mensaje del copiloto AI para Labs/ADA.
+
+    El frontend envía el contexto de la sesión ya analizado
+    (análisis pre-computado), evitando necesidad de acceso a DB
+    desde este endpoint.
+
+    Body:
+        message:         Pregunta del usuario.
+        session_context: Dict con 'analysis', 'name', 'duration_seconds', etc.
+        user_tier:       'free' | 'premium'.
+    """
+    service: CopilotLabsService = app.state.copilot_service
+    try:
+        result = await service.process_message(
+            message=request.message,
+            session_context=request.session_context,
+            user_tier=request.user_tier,
+        )
+        return CopilotChatResponse(**result)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("Copilot error: %s", exc)
+        return CopilotChatResponse(
+            text="❌ Error interno del copiloto. Revisa los logs del backend.",
+            model_used="none",
+            complexity="unknown",
+            widgets=[],
+        )
+
+
+@app.post("/api/tts")
+async def text_to_speech(request: Request):
+    """
+    Convierte texto a voz con ElevenLabs (Rachel, ES).
+    Devuelve audio/mpeg stream listo para reproducir en el frontend.
+    
+    Body JSON: { "text": "...", "voice_id": "..." (opcional) }
+    """
+    import os, httpx
+    api_key = os.getenv("ELEVENLABS_API_KEY", "")
+    if not api_key:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content={"error": "ELEVENLABS_API_KEY no configurado"})
+
+    body = await request.json()
+    text = body.get("text", "").strip()
+    if not text:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=400, content={"error": "text requerido"})
+
+    # Rachel (voz femenina, cálida, contemplativa) — multilingual v2
+    voice_id = body.get("voice_id", "21m00Tcm4TlvDq8ikWAM")
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
+    payload = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.85,
+            "similarity_boost": 0.75,
+            "style": 0.15,
+            "use_speaker_boost": True,
+        },
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                url,
+                json=payload,
+                headers={"xi-api-key": api_key, "Accept": "audio/mpeg"},
+            )
+            resp.raise_for_status()
+
+        from fastapi.responses import Response
+        return Response(
+            content=resp.content,
+            media_type="audio/mpeg",
+            headers={"Cache-Control": "no-store"},
+        )
+    except httpx.HTTPStatusError as exc:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=502, content={"error": f"ElevenLabs HTTP {exc.response.status_code}"})
+    except Exception as exc:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=500, content={"error": str(exc)})
 
 # ============================================
 # Brain Endpoints
@@ -360,16 +481,59 @@ async def refresh_playlist():
 async def discover_devices():
     """
     Busca dispositivos Muse 2 disponibles vía Bluetooth.
-    
-    Returns:
-        Lista de dispositivos encontrados con nombre, dirección y RSSI.
+    muselsl.list_muses() usa asyncio.run() internamente — si se llama desde
+    el event loop de FastAPI falla silenciosamente devolviendo lista vacía.
+    Solución: ejecutar discover() en un thread separado con asyncio.to_thread().
     """
-    devices = muse_connector.discover(timeout=10.0)
+    import logging
+    log = logging.getLogger("discover_devices")
+    log.info("[/hardware/devices] Iniciando BLE scan en thread separado...")
+    print("[/hardware/devices] Iniciando BLE scan (thread separado)...")
+
+    try:
+        # Correr en thread para que list_muses() pueda usar asyncio.run() sin conflicto
+        devices = await asyncio.to_thread(muse_connector.discover, 10.0)
+    except Exception as exc:
+        log.exception("[/hardware/devices] Error en discover: %s", exc)
+        print(f"[/hardware/devices] ERROR en discover: {exc}")
+        return {"status": "error", "devices": [], "count": 0, "error": str(exc)}
+
+    print(f"[/hardware/devices] Scan terminado. Dispositivos encontrados: {len(devices)}")
+    for d in devices:
+        info = d.to_dict()
+        print(f"  └─ {info.get('name')} | {info.get('address')} | RSSI: {info.get('rssi')}")
+
     return {
         "status": "success",
         "devices": [d.to_dict() for d in devices],
         "count": len(devices)
     }
+
+@app.get("/hardware/battery/{address}")
+async def get_device_battery(address: str):
+    """
+    Lee el nivel de batería del Muse vía BLE.
+
+    Conecta brevemente al dispositivo para leer la característica de telemetría.
+    Llamar ANTES de /hardware/connect (muselsl ocupa la conexión BLE después).
+
+    Returns:
+        battery_level: 0-100 o null si no se pudo leer.
+    """
+    # On macOS, BLE addresses are UUIDs with dashes (e.g. 6D5F179A-C0AF-...-293F).
+    # BleakClient needs the dashed format — do NOT convert to colons here.
+    # (Only the muselsl connect endpoint needs the colon-separated format.)
+    print(f"[/hardware/battery] Leyendo batería de {address}...")
+    try:
+        battery = await asyncio.to_thread(muse_connector.read_battery, address)
+        return {
+            "status": "success" if battery is not None else "timeout",
+            "battery_level": battery,
+            "address": address
+        }
+    except Exception as exc:
+        print(f"[/hardware/battery] Error: {exc}")
+        return {"status": "error", "battery_level": None, "address": address, "error": str(exc)}
 
 @app.post("/hardware/connect-stream")
 async def connect_to_existing_stream():
@@ -395,19 +559,23 @@ async def connect_to_existing_stream():
 async def connect_hardware(address: str):
     """
     Conecta a un Muse 2 específico.
-    
+
     Args:
-        address: MAC address del dispositivo (ej: "XX:XX:XX:XX:XX:XX")
+        address: UUID del dispositivo macOS (ej: "6D5F179A-C0AF-DCA5-3B60-7812EF8E293F")
+                 Se mantiene en formato UUID con guiones — es el formato que Bleak/CoreBluetooth
+                 usa en macOS. NO convertir a colons (eso rompe la conexión BLE).
     """
-    # Decodificar address (puede venir URL-encoded)
-    address = address.replace("-", ":")
-    
-    success = muse_connector.connect(address)
+    # Ejecutar en thread separado: connect() llama read_battery() que crea su propio
+    # event loop con asyncio.new_event_loop(). Si se llama desde el event loop de
+    # FastAPI (sin thread), el new_event_loop() entra en conflicto y la coroutine
+    # queda sin awaitar. Mismo patrón que discover().
+    success = await asyncio.to_thread(muse_connector.connect, address)
     if success:
+        device_dict = muse_connector.device_info.to_dict() if muse_connector.device_info else None
         return {
             "status": "success",
             "message": f"Connected to Muse 2: {address}",
-            "device": muse_connector.device_info.to_dict() if muse_connector.device_info else None
+            "device": device_dict
         }
     return {
         "status": "error",
@@ -440,6 +608,19 @@ async def hardware_status():
     if muse_connector.is_streaming:
         status['buffer'] = muse_connector.get_buffer_status()
         status['signal_quality'] = muse_connector.get_signal_quality()
+        status['data_stale'] = muse_connector.is_data_stale
+        # Tiempo desde la última muestra real (para diagnosticar drops)
+        if muse_connector._last_sample_time > 0:
+            status['seconds_since_last_sample'] = round(
+                time.time() - muse_connector._last_sample_time, 2
+            )
+    
+    # Estado del proceso muselsl
+    if muse_connector._muselsl_process:
+        poll = muse_connector._muselsl_process.poll()
+        status['muselsl_alive'] = poll is None
+        if poll is not None:
+            status['muselsl_exit_code'] = poll
     
     return {
         "status": "success",
@@ -657,6 +838,12 @@ async def get_calibration_snapshot():
         if bad_posterior:
             print(f"⚠️  [Snapshot] Canales posteriores débiles {bad_posterior} — alpha puede ser impreciso (TP9={posterior_quality['TP9']:.2f}, TP10={posterior_quality['TP10']:.2f})")
         
+        # EOG blink detection: flag this window as contaminated by eye blinks.
+        # Uses frontal channels AF7/AF8 as natural EOG sensors.
+        # Consumers (calibration, recording, live viz) use this flag to decide
+        # whether to include this sample in alpha calculations.
+        eog = EOGDetector.detect_detailed(data, fs)
+        
         return {
             "status": "success",
             "bands": bands,                        # µV² — para cálculos (ratio alpha, calibración)
@@ -665,6 +852,8 @@ async def get_calibration_snapshot():
             "signal_quality": signal_quality,
             "posterior_quality": posterior_quality,
             "alpha_by_channel": alpha_by_posterior,  # Alpha TP9 vs TP10 individual
+            "blink_contaminated": eog['blink_detected'],  # True if blink artifact in this window
+            "eog": eog,                            # Detailed EOG diagnostics
             "timestamp": window.timestamp
         }
         
@@ -752,6 +941,14 @@ async def detect_blinks():
         signal_quality = muse_connector.get_signal_quality()
         avg_quality = sum(signal_quality.values()) / len(signal_quality) if signal_quality else 1.0
         bad_channels = [ch for ch, q in signal_quality.items() if q < 0.4] if signal_quality else []
+        
+        # NOTE: NO quality gate here. Blinks ARE artifacts — they temporarily
+        # destroy signal quality scores (blink = 400-800µV spike, quality checker
+        # flags anything > 200µV as poor). Gating on quality during blink
+        # detection is contradictory and prevents detecting blinks 2-5 after
+        # blink 1 crashes the quality score. The frontend handles the higher-level
+        # validation (was this a real blink pattern vs random noise).
+        
         if bad_channels and random.random() < 0.05:
             print(f"⚠️  [Blink] Mala señal en {bad_channels} (avg={avg_quality:.2f}) — threshold adaptado a {min_amplitude:.0f}µV (95th pct={percentile_95:.0f}µV)")
         
@@ -941,6 +1138,237 @@ async def add_recording_marker(request: MarkerRequest):
 
 
 # =============================================================================
+# DOCUMENTATION DASHBOARD ENDPOINT
+# =============================================================================
+
+@app.get("/doc/dashboard")
+async def doc_dashboard():
+    """
+    Aggregated data for the ADA documentation dashboard.
+    Returns sessions list, validation results, and project stats.
+    Auto-computes validation for sessions that don't have a file yet.
+    """
+    try:
+        # 1. Sessions from PostgreSQL
+        pg = get_postgres_client_sync()
+        sessions = []
+        if pg:
+            recordings = pg.get_all_recordings(limit=200)
+            for r in recordings:
+                d = asdict(r)
+                for k in ('started_at', 'ended_at'):
+                    if d.get(k) and hasattr(d[k], 'isoformat'):
+                        d[k] = d[k].isoformat()
+                sessions.append(d)
+
+        # 2. Validation logs from disk
+        logs_dir = Path(__file__).parent / "validation_logs"
+        logs_dir.mkdir(exist_ok=True)
+        validations = []
+        validated_ids = set()
+        for f in sorted(logs_dir.glob("validate-*.json")):
+            try:
+                data = json.loads(f.read_text())
+                validations.append(data)
+                validated_ids.add(data.get("session_id"))
+            except Exception:
+                pass
+
+        # 3. Auto-compute validation for sessions without files (up to 20 most recent)
+        influx_bulk = get_influx_client()
+        missing = [s for s in sessions if s.get("id") not in validated_ids][-20:]
+        for s in missing:
+            sid = s.get("id")
+            if not sid:
+                continue
+            try:
+                metrics_v = influx_bulk.get_metrics(sid) or session_db.get_metrics(sid)
+                if not metrics_v:
+                    continue
+                markers_v = []
+                try:
+                    events_v = influx_bulk.get_events(sid)
+                    markers_v = [{"label": e.get("label", ""), "timestamp": e.get("timestamp", 0)} for e in (events_v or [])]
+                except Exception:
+                    pass
+                if not markers_v:
+                    raw_evts = session_db.get_events(sid)
+                    markers_v = [{"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)} for e in (raw_evts or [])]
+                val_result = {
+                    "status": "success",
+                    "session_id": sid,
+                    "validation": run_all_tests(metrics_v, markers_v),
+                    "quality_score": SessionQualityScore.compute(metrics_v, markers_v),
+                    "markers_found": len(markers_v),
+                    "metrics_found": len(metrics_v),
+                }
+                (logs_dir / f"validate-{sid}.json").write_text(json.dumps(val_result, default=str))
+                validations.append(val_result)
+                print(f"✅ [dashboard] Auto-validated session #{sid}")
+            except Exception as ve:
+                print(f"⚠️ [dashboard] Auto-validation failed for #{sid}: {ve}")
+
+        # Sort validations by session_id
+        validations.sort(key=lambda v: v.get("session_id", 0))
+
+        # 4. Protocol logs (only complete sessions)
+        protocol_logs = []
+        for f in sorted(logs_dir.glob("validation_*.json")):
+            try:
+                data = json.loads(f.read_text())
+                if data.get("phases_completed", 0) != data.get("total_phases", 8):
+                    continue
+                protocol_logs.append({
+                    "filename": f.name,
+                    "phases_completed": data.get("phases_completed", 0),
+                    "total_phases": data.get("total_phases", 8),
+                    "complete": True,
+                    "start_iso": data.get("protocol_start_iso", ""),
+                    "metadata": data.get("metadata", {}),
+                })
+            except Exception:
+                pass
+
+        return {
+            "status": "success",
+            "sessions": sessions,
+            "validations": validations,
+            "protocol_logs": protocol_logs,
+            "total_sessions": len(sessions),
+            "total_validations": len(validations),
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/doc/session/{session_id}")
+async def doc_session_detail(session_id: int):
+    """
+    Detailed data for a single session: recording info, validation, protocol log, metrics summary.
+    """
+    try:
+        result = {"status": "success", "session_id": session_id}
+
+        # 1. Recording from PostgreSQL
+        pg = get_postgres_client_sync()
+        if pg:
+            recording = pg.get_recording(session_id)
+            if recording:
+                d = asdict(recording)
+                for k in ('started_at', 'ended_at'):
+                    if d.get(k) and hasattr(d[k], 'isoformat'):
+                        d[k] = d[k].isoformat()
+                result["recording"] = d
+
+        # 2. Validation result — from disk, or compute on-the-fly and save
+        logs_dir = Path(__file__).parent / "validation_logs"
+        logs_dir.mkdir(exist_ok=True)
+        val_file = logs_dir / f"validate-{session_id}.json"
+        if val_file.exists():
+            result["validation"] = json.loads(val_file.read_text())
+        else:
+            # Run validation on-the-fly and persist so the dashboard picks it up
+            try:
+                influx_v = get_influx_client()
+                metrics_v = influx_v.get_metrics(session_id) or session_db.get_metrics(session_id)
+                if metrics_v:
+                    markers_v = []
+                    try:
+                        events_v = influx_v.get_events(session_id)
+                        markers_v = [{"label": e.get("label", ""), "timestamp": e.get("timestamp", 0)} for e in (events_v or [])]
+                    except Exception:
+                        pass
+                    if not markers_v:
+                        raw_evts = session_db.get_events(session_id)
+                        markers_v = [{"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)} for e in (raw_evts or [])]
+                    val_result = {
+                        "status": "success",
+                        "session_id": session_id,
+                        "validation": run_all_tests(metrics_v, markers_v),
+                        "quality_score": SessionQualityScore.compute(metrics_v, markers_v),
+                        "markers_found": len(markers_v),
+                        "metrics_found": len(metrics_v),
+                    }
+                    val_file.write_text(json.dumps(val_result, default=str))
+                    result["validation"] = val_result
+            except Exception as ve:
+                print(f"⚠️ [doc/session] on-the-fly validation failed for #{session_id}: {ve}")
+
+        # 3. Find matching protocol log (match by session recording time ± 2h)
+        result["protocol_log"] = None
+        rec = result.get("recording", {})
+        rec_start_iso = rec.get("started_at", "") if rec else ""
+        if logs_dir.exists():
+            best_match = None
+            best_delta = None
+            for f in sorted(logs_dir.glob("validation_*_COMPLETE.json")):
+                try:
+                    data = json.loads(f.read_text())
+                    proto_iso = data.get("protocol_start_iso", "")
+                    # Try to match by timestamp proximity (within 2 hours)
+                    if rec_start_iso and proto_iso:
+                        from datetime import datetime, timezone
+                        try:
+                            t_rec = datetime.fromisoformat(rec_start_iso.replace("Z", "+00:00"))
+                            t_proto = datetime.fromisoformat(proto_iso.replace("Z", "+00:00"))
+                            delta = abs((t_rec - t_proto).total_seconds())
+                            if best_delta is None or delta < best_delta:
+                                best_delta = delta
+                                best_match = (f, data)
+                        except Exception:
+                            if best_match is None:
+                                best_match = (f, data)
+                    else:
+                        if best_match is None:
+                            best_match = (f, data)
+                except Exception:
+                    pass
+            # Only use if within 2 hours of the recording
+            if best_match and (best_delta is None or best_delta < 7200):
+                f, data = best_match
+                result["protocol_log"] = {
+                    "filename": f.name,
+                    "phases_completed": data.get("phases_completed", 0),
+                    "total_phases": data.get("total_phases", 8),
+                    "start_iso": data.get("protocol_start_iso", ""),
+                    "metadata": data.get("metadata", {}),
+                    "events": data.get("events", []),
+                }
+
+        # 4. Metrics summary from InfluxDB
+        try:
+            influx = get_influx_client()
+            metrics = influx.get_metrics(session_id)
+            if metrics:
+                n = len(metrics)
+                bands_avg = {}
+                for band in ['delta', 'theta', 'alpha', 'beta', 'gamma']:
+                    vals = [m.get(band, 0) for m in metrics if m.get(band) is not None]
+                    bands_avg[band] = sum(vals) / len(vals) if vals else 0
+                coh_vals = [m.get('coherence', 0) for m in metrics if m.get('coherence') is not None]
+                sq_vals = [m.get('signal_quality', 0) for m in metrics if m.get('signal_quality') is not None]
+                result["metrics_summary"] = {
+                    "total_windows": n,
+                    "duration_seconds": n / 5,  # metrics at 5Hz
+                    "bands_avg": bands_avg,
+                    "coherence_avg": sum(coh_vals) / len(coh_vals) if coh_vals else 0,
+                    "coherence_max": max(coh_vals) if coh_vals else 0,
+                    "signal_quality_avg": sum(sq_vals) / len(sq_vals) if sq_vals else 0,
+                    "usable_windows": sum(1 for v in sq_vals if v >= 0.7),
+                }
+        except Exception:
+            pass
+
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+
+
+# =============================================================================
 # SESSIONS ENDPOINTS (Session Management & Playback)
 # =============================================================================
 
@@ -1053,6 +1481,140 @@ async def delete_session(session_id: int):
         "status": "error",
         "message": f"Session {session_id} not found"
     }
+
+
+# ============================================
+# Validation Protocol Endpoints
+# ============================================
+
+class ProtocolStartRequest(BaseModel):
+    name: Optional[str] = ""
+    metadata: Optional[dict] = None
+
+@app.post("/protocol/start")
+async def protocol_start(request: ProtocolStartRequest):
+    """
+    Inicia el protocolo de validación científica.
+    Requiere Muse 2 conectado y streameando.
+    """
+    # Vincular recorder si hay Muse activo
+    if muse_connector.is_streaming and session_recorder is None:
+        try:
+            validation_protocol.recorder = get_recorder_v2(muse_connector)
+        except Exception:
+            pass  # funciona sin recorder también
+    
+    result = validation_protocol.start(
+        name=request.name or "",
+        metadata=request.metadata,
+    )
+    return result
+
+@app.post("/protocol/stop")
+async def protocol_stop():
+    """Detiene el protocolo y guarda el log."""
+    return validation_protocol.stop()
+
+@app.post("/protocol/pause")
+async def protocol_pause():
+    validation_protocol.pause()
+    return {"status": "success"}
+
+@app.post("/protocol/resume")
+async def protocol_resume():
+    validation_protocol.resume()
+    return {"status": "success"}
+
+@app.post("/protocol/advance")
+async def protocol_advance():
+    """Avanza manualmente a la siguiente fase."""
+    return validation_protocol.advance_phase()
+
+@app.post("/protocol/back")
+async def protocol_back():
+    """Retrocede a la fase anterior."""
+    return validation_protocol.go_back_phase()
+
+@app.get("/protocol/state")
+async def protocol_state():
+    """Estado actual del protocolo (polled por frontend cada 500ms)."""
+    return validation_protocol.get_state()
+
+
+@app.post("/protocol/validate/{session_id}")
+async def protocol_validate(session_id: int):
+    """
+    Ejecuta tests de validación científica sobre una sesión grabada.
+    
+    Retorna: Berger effect, cognitive reactivity, coherence stability,
+    y SessionQualityScore compuesto.
+    """
+    try:
+        influx = get_influx_client()
+        
+        # 1. Obtener métricas desde InfluxDB
+        metrics = influx.get_metrics(session_id)
+        if not metrics:
+            metrics = session_db.get_metrics(session_id)
+        
+        if not metrics:
+            return {"status": "error", "message": "No metrics found for session"}
+        
+        # 2. Obtener marcadores — InfluxDB primero (donde el protocolo los graba),
+        #    luego fallback a SQLite legacy
+        markers = []
+        try:
+            influx_events = influx.get_events(session_id)
+            markers = [
+                {"label": e.get("label", ""), "timestamp": e.get("timestamp", 0)}
+                for e in (influx_events or [])
+            ]
+        except Exception as e_influx:
+            print(f"\u26a0\ufe0f [validate] InfluxDB events failed: {e_influx}, trying SQLite")
+        
+        # Fallback: SQLite legacy events
+        if not markers:
+            events = session_db.get_events(session_id)
+            markers = [
+                {"label": e.get("label", e.get("event_type", "")), "timestamp": e.get("timestamp", 0)}
+                for e in (events or [])
+            ]
+        
+        print(f"\U0001f9ea [validate] session_id={session_id}: {len(metrics)} metrics, {len(markers)} markers")
+        if markers:
+            marker_labels = [m['label'] for m in markers[:20]]
+            print(f"    markers: {marker_labels}")
+        
+        # 3. Correr todos los tests
+        test_results = run_all_tests(metrics, markers)
+        
+        # 4. Score compuesto
+        quality = SessionQualityScore.compute(metrics, markers)
+        
+        result = {
+            "status": "success",
+            "session_id": session_id,
+            "validation": test_results,
+            "quality_score": quality,
+            "markers_found": len(markers),
+            "metrics_found": len(metrics),
+        }
+
+        # 5. Persistir al disco para que /doc/dashboard y /doc/session lo lean
+        try:
+            logs_dir = Path(__file__).parent / "validation_logs"
+            logs_dir.mkdir(exist_ok=True)
+            val_file = logs_dir / f"validate-{session_id}.json"
+            val_file.write_text(json.dumps(result, default=str))
+            print(f"✅ [validate] Guardado {val_file.name}")
+        except Exception as save_err:
+            print(f"⚠️ [validate] No se pudo guardar a disco: {save_err}")
+
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
 
 
 @app.websocket("/ws/brain-state")

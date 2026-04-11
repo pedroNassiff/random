@@ -4,7 +4,7 @@
  * Calibración mejorada con detección de parpadeos:
  * 1. Calidad de señal (verificar contacto) - 3s
  * 2. Parpadeos (detectar 5 parpadeos) - validación precisa
- * 3. Relajación (ojos cerrados) - baseline de alpha - 5s
+ * 3. Relajación (ojos abiertos + ojos cerrados) - baseline de alpha - 40s (20s + 20s)
  * 
  * También incluye grabación de sesiones EEG para reproducción posterior.
  */
@@ -35,7 +35,20 @@ export default function MuseControl({ onModeChange }) {
   const [error, setError] = useState(null);
   const [signalQuality, setSignalQuality] = useState(null);
   const [showInstructions, setShowInstructions] = useState(false);
-  
+
+  // Device picker
+  const [discoveredDevices, setDiscoveredDevices] = useState([]);
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [lastMuseAddress, setLastMuseAddress] = useState(() => localStorage.getItem('muse_last_address') || null);
+  const [scanCountdown, setScanCountdown] = useState(0);
+  const scanTimerRef = useRef(null);
+  const [deviceBatteries, setDeviceBatteries] = useState({}); // address → battery % (null = cargando)
+  const [connectedDevice, setConnectedDevice] = useState(null); // { name, address, battery } after connect
+
+  // Device buffer + status (polled from /hardware/status)
+  const [deviceBuffer, setDeviceBuffer] = useState(null); // { samples, fill_percent, duration_available }
+  const [deviceAddress, setDeviceAddress] = useState(null);
+
   // Live EEG bands from WebSocket store
   const bands = useBrainStore(s => s.bands);
   const bandsDisplay = useBrainStore(s => s.bandsDisplay);
@@ -92,6 +105,31 @@ export default function MuseControl({ onModeChange }) {
     }
   };
 
+  // ── Auto-recuperar estado al montar (página refrescada, backend sigue conectado) ──
+  useEffect(() => {
+    const recover = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/hardware/status`);
+        const data = await res.json();
+        if (data.is_connected || data.is_streaming) {
+          const info = data.device_info || {};
+          const name = info.name || lastMuseAddress || 'Muse 2';
+          const address = info.address || lastMuseAddress;
+          const battery = info.battery_level ?? null;
+          setConnectedDevice({ name, address, battery });
+          if (address) setDeviceAddress(address);
+          if (data.buffer) setDeviceBuffer(data.buffer);
+          if (data.signal_quality) setSignalQuality(data.signal_quality);
+          setStatus(data.is_streaming ? MUSE_STATUS.STREAMING : MUSE_STATUS.CONNECTED);
+          console.log('[MuseControl] Sesión Muse recuperada al montar:', name, address);
+        }
+      } catch (e) {
+        // Backend no disponible al montar — no hacer nada
+      }
+    };
+    recover();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Polling del estado
   useEffect(() => {
     if (status !== MUSE_STATUS.STREAMING && status !== MUSE_STATUS.CALIBRATING) return;
@@ -100,9 +138,9 @@ export default function MuseControl({ onModeChange }) {
       try {
         const res = await fetch(`${API_BASE}/hardware/status`);
         const data = await res.json();
-        if (data.signal_quality) {
-          setSignalQuality(data.signal_quality);
-        }
+        if (data.signal_quality) setSignalQuality(data.signal_quality);
+        if (data.buffer)        setDeviceBuffer(data.buffer);
+        if (data.device_info?.address) setDeviceAddress(data.device_info.address);
       } catch (err) {
         console.error('Error fetching status:', err);
       }
@@ -115,6 +153,7 @@ export default function MuseControl({ onModeChange }) {
     return () => {
       if (calibrationInterval.current) clearInterval(calibrationInterval.current);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (scanTimerRef.current) clearInterval(scanTimerRef.current);
     };
   }, []);
   
@@ -136,39 +175,143 @@ export default function MuseControl({ onModeChange }) {
   }, [isRecording]);
 
   const scanDevices = async () => {
-    console.log('[MuseControl] scanDevices → POST', `${API_BASE}/hardware/connect-stream`);
+    // Primero: comprobar si el backend ya tiene el Muse conectado
+    // (ocurre cuando se refresca la página pero el backend sigue corriendo)
+    try {
+      const statusRes = await fetch(`${API_BASE}/hardware/status`);
+      const statusData = await statusRes.json();
+      if (statusData.is_connected || statusData.is_streaming) {
+        const info = statusData.device_info || {};
+        const name = info.name || lastMuseAddress || 'Muse 2';
+        const address = info.address || lastMuseAddress;
+        const battery = info.battery_level ?? null;
+        setConnectedDevice({ name, address, battery });
+        if (address) setDeviceAddress(address);
+        if (statusData.buffer) setDeviceBuffer(statusData.buffer);
+        console.log('[MuseControl] Sesión ya activa en backend — saltando scan BLE:', name);
+        if (statusData.is_streaming) {
+          setStatus(MUSE_STATUS.STREAMING);
+        } else {
+          // Conectado pero sin stream activo — reiniciar stream automáticamente
+          console.log('[MuseControl] CONNECTED pero no streaming — reactivando stream...');
+          setStatus(MUSE_STATUS.CONNECTED);
+          startStream();
+        }
+        return; // no hace falta escanear
+      }
+    } catch (_) {
+      // Backend no responde — continuar con scan normal
+    }
+
+    const url = `${API_BASE}/hardware/devices`;
+    console.group('[MuseControl] scanDevices');
+    console.log('API_BASE:', API_BASE);
+    console.log('URL:', url);
+    console.log('lastMuseAddress (localStorage):', lastMuseAddress);
+
     setStatus(MUSE_STATUS.SCANNING);
     setError(null);
-    
+
+    // Countdown timer (backend scan takes ~10s)
+    let remaining = 11;
+    setScanCountdown(remaining);
+    scanTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setScanCountdown(remaining);
+      if (remaining <= 0) clearInterval(scanTimerRef.current);
+    }, 1000);
+
     try {
-      const streamRes = await fetch(`${API_BASE}/hardware/connect-stream`, { method: 'POST' });
-      const streamData = await streamRes.json();
-      console.log('[MuseControl] connect-stream response:', streamData);
-      
-      if (streamData.status === 'success') {
-        setStatus(MUSE_STATUS.CONNECTED);
-        return;
-      }
-    } catch (err) {
-      console.warn('[MuseControl] connect-stream failed (no existing stream):', err.message);
-    }
-    
-    try {
-      console.log('[MuseControl] GET', `${API_BASE}/hardware/devices`);
-      const res = await fetch(`${API_BASE}/hardware/devices`);
+      console.log('[MuseControl] → GET', url);
+      const res = await fetch(url);
+      console.log('[MuseControl] ← HTTP', res.status, res.statusText);
+
+      clearInterval(scanTimerRef.current);
+      setScanCountdown(0);
+
       const data = await res.json();
-      console.log('[MuseControl] devices response:', data);
-      
+      console.log('[MuseControl] response body:', JSON.stringify(data, null, 2));
+
       if (data.devices?.length > 0) {
+        console.log(`[MuseControl] ${data.devices.length} device(s) found:`);
+        data.devices.forEach((d, i) => console.log(`  [${i}]`, d.name, '|', d.address, '| RSSI:', d.rssi));
+
+        // Put last-used device first
+        const sorted = [...data.devices].sort((a, b) => {
+          if (a.address === lastMuseAddress) return -1;
+          if (b.address === lastMuseAddress) return 1;
+          return 0;
+        });
+        setDiscoveredDevices(sorted);
+        setShowDeviceModal(true);
         setStatus(MUSE_STATUS.DISCONNECTED);
+        // Batería: se lee en el backend durante connect(), no aquí,
+        // para evitar que BleakClient y muselsl peleen por la conexión BLE.
       } else {
-        setError('No se encontró stream. Ejecuta: ./scripts/start_muse.sh');
+        console.warn('[MuseControl] No devices found. Full response:', data);
+        setError('No se encontraron dispositivos Muse. ¿LED azul parpadeando?');
         setStatus(MUSE_STATUS.ERROR);
       }
     } catch (err) {
-      console.error('[MuseControl] devices fetch error:', err.message);
-      setError('Error al conectar. ¿Backend corriendo?');
+      clearInterval(scanTimerRef.current);
+      setScanCountdown(0);
+      console.error('[MuseControl] fetch error:', err.name, err.message);
+      setError(`Error al escanear: ${err.message}`);
       setStatus(MUSE_STATUS.ERROR);
+    } finally {
+      console.groupEnd();
+    }
+  };
+
+  const connectToDevice = async (address) => {
+    const url = `${API_BASE}/hardware/connect/${encodeURIComponent(address)}`;
+    console.group('[MuseControl] connectToDevice');
+    console.log('address:', address);
+    console.log('URL:', url);
+
+    // Capture device name before closing modal
+    const deviceMeta = discoveredDevices.find(d => d.address === address);
+    setConnectedDevice({
+      name: deviceMeta?.name || 'Muse',
+      address,
+      battery: null, // se actualiza desde la respuesta del connect
+    });
+
+    setShowDeviceModal(false);
+    setStatus(MUSE_STATUS.SCANNING);
+    setError(null);
+
+    localStorage.setItem('muse_last_address', address);
+    setLastMuseAddress(address);
+
+    try {
+      console.log('[MuseControl] → POST', url);
+      const res = await fetch(url, { method: 'POST' });
+      console.log('[MuseControl] ← HTTP', res.status, res.statusText);
+
+      const data = await res.json();
+      console.log('[MuseControl] connect response:', JSON.stringify(data, null, 2));
+
+      if (data.status === 'success') {
+        // Actualizar batería desde la respuesta del backend
+        const batteryFromBackend = data.device?.battery_level ?? null;
+        if (batteryFromBackend !== null) {
+          setConnectedDevice(prev => prev ? { ...prev, battery: batteryFromBackend } : prev);
+        }
+        console.log('[MuseControl] Connected! Battery:', batteryFromBackend, '% — Starting stream...');
+        setStatus(MUSE_STATUS.CONNECTED);
+        startStream();
+      } else {
+        console.error('[MuseControl] Connect failed:', data.message);
+        setError(data.message || 'No se pudo conectar al dispositivo');
+        setStatus(MUSE_STATUS.ERROR);
+      }
+    } catch (err) {
+      console.error('[MuseControl] connectToDevice fetch error:', err.name, err.message);
+      setError(`Error al conectar: ${err.message}`);
+      setStatus(MUSE_STATUS.ERROR);
+    } finally {
+      console.groupEnd();
     }
   };
 
@@ -249,6 +392,7 @@ export default function MuseControl({ onModeChange }) {
     let samples = [];
     let elapsed = 0;
     const duration = 3000;
+    const warmupMs = 1000; // Discard first 1s — EMA buffer settling transient after BLE→LSL handoff
     
     calibrationInterval.current = setInterval(async () => {
       elapsed += 200;
@@ -258,11 +402,11 @@ export default function MuseControl({ onModeChange }) {
         const res = await fetch(`${API_BASE}/hardware/calibration/snapshot`);
         const data = await res.json();
         if (data.status === 'success') {
-          samples.push(data);
+          if (elapsed > warmupMs) samples.push(data); // warmup samples logged but not used for SQ
           setCurrentMetrics(data);
-          // Log every snapshot with full signal quality + bands
           logCal('signal_check_sample', 'signal_check', {
             elapsed_ms: elapsed,
+            warmup: elapsed <= warmupMs,
             bands: data.bands,
             signal_quality: data.signal_quality,
             coherence: data.coherence,
@@ -278,19 +422,39 @@ export default function MuseControl({ onModeChange }) {
           return acc + (qualities.reduce((a, b) => a + b, 0) / qualities.length || 0);
         }, 0) / (samples.length || 1);
         
+        // Contar electrodos con buen contacto (quality >= 0.8) en la última muestra
+        const lastQuality = samples.at(-1)?.signal_quality || {};
+        const goodElectrodes = Object.values(lastQuality).filter(q => q >= 0.8).length;
+        
+        // Verificar rango fisiológico: gamma > 5000 µV² = ruido de línea (sin casco)
+        const lastBands = samples.at(-1)?.bands || {};
+        const gammaPhysiological = (lastBands.gamma || 0) < 5000;
+        const deltaPhysiological = (lastBands.delta || 0) < 10000;
+        const bandsOk = gammaPhysiological && deltaPhysiological;
+        
+        const passed = avgQuality >= 0.5 && goodElectrodes >= 2 && bandsOk;
+        
         logCal('signal_check_result', 'signal_check', {
           avgQuality: parseFloat(avgQuality.toFixed(4)),
           samplesCollected: samples.length,
-          passed: avgQuality >= 0.2,
-          threshold: 0.2,
-          perElectrode_last: samples.at(-1)?.signal_quality || null,
+          passed,
+          threshold: 0.5,
+          goodElectrodes,
+          bandsOk,
+          gamma_last: parseFloat((lastBands.gamma || 0).toFixed(1)),
+          delta_last: parseFloat((lastBands.delta || 0).toFixed(1)),
+          perElectrode_last: lastQuality,
         });
 
-        if (avgQuality < 0.2) {
+        if (!passed) {
+          let reason = 'Señal débil.';
+          if (avgQuality < 0.5) reason = `Calidad de señal muy baja (${(avgQuality * 100).toFixed(0)}%). Ajusta la diadema.`;
+          else if (goodElectrodes < 2) reason = `Solo ${goodElectrodes} electrodo(s) con buen contacto. Necesitas al menos 2. Humedece los sensores.`;
+          else if (!bandsOk) reason = 'Señal fuera de rango fisiológico — ¿el casco está puesto?';
           setCalibrationStep(CALIBRATION_STEPS.FAILED);
-          setCalibrationResults({ passed: false, reason: 'Señal muy débil. Ajusta la diadema.' });
+          setCalibrationResults({ passed: false, reason });
           setStatus(MUSE_STATUS.STREAMING);
-          logCal('calibration_failed', 'result', { reason: 'signal_too_weak', avgQuality });
+          logCal('calibration_failed', 'result', { reason, avgQuality, goodElectrodes, bandsOk });
         } else {
           setTimeout(() => runBlinkTest(), 500);
         }
@@ -312,6 +476,29 @@ export default function MuseControl({ onModeChange }) {
       duration_ms: duration,
       poll_interval_ms: 300,
     });
+
+    // Poll up to 3s for SQ to recover >0.7 (blink artifacts clear within ~500ms-2s)
+    // Non-blocking: if it never recovers, we log a warning and proceed anyway.
+    const sqRecoveryThenRelax = async () => {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise(r => setTimeout(r, 300));
+        try {
+          const res = await fetch(`${API_BASE}/hardware/calibration/snapshot`);
+          const snap = await res.json();
+          if (snap.status === 'success') {
+            const sqVals = Object.values(snap.signal_quality || {});
+            const avgSQ = sqVals.length ? sqVals.reduce((a, b) => a + b, 0) / sqVals.length : 0;
+            logCal('post_blink_sq_recovery', 'blink_test', {
+              attempt, waited_ms: (attempt + 1) * 300,
+              avgSQ: parseFloat(avgSQ.toFixed(3)),
+              recovered: avgSQ >= 0.7,
+            });
+            if (avgSQ >= 0.7) break;
+          }
+        } catch (_) {}
+      }
+      runRelaxationTest();
+    };
     
     calibrationInterval.current = setInterval(async () => {
       elapsed += 300;
@@ -342,6 +529,11 @@ export default function MuseControl({ onModeChange }) {
         });
 
         if (data.status === 'success' && data.blink_count > 0) {
+          // NOTE: No quality gate here. Blinks ARE artifacts that temporarily
+          // crash signal quality (400-800µV spike → SQ drops to 0.3).
+          // The backend already validates the blink pattern (amplitude,
+          // prominence, physiological timing). If the backend says it's
+          // a blink, we count it.
           // Detectamos parpadeo(s) en esta ventana
           // Solo contamos 1 por detección (las ventanas se solapan)
           confirmedBlinksRef.current += 1;
@@ -381,7 +573,7 @@ export default function MuseControl({ onModeChange }) {
           target: targetBlinks,
           elapsed_ms: elapsed,
         });
-        setTimeout(() => runRelaxationTest(), 800);
+        sqRecoveryThenRelax();
         return;
       }
       
@@ -397,7 +589,7 @@ export default function MuseControl({ onModeChange }) {
             target: targetBlinks,
             elapsed_ms: elapsed,
           });
-          setTimeout(() => runRelaxationTest(), 800);
+          sqRecoveryThenRelax();
         } else {
           playBeep(330, 0.3); // Sonido de fallo
           setCalibrationStep(CALIBRATION_STEPS.FAILED);
@@ -431,8 +623,8 @@ export default function MuseControl({ onModeChange }) {
     let eyesOpenSamples = [];
     let eyesClosedSamples = [];
     let elapsed = 0;
-    const eyesOpenDuration = 4500;  // 4.5s ojos abiertos (1.5s warmup + 3s útiles)
-    const eyesClosedDuration = 7400; // 7.4s ojos cerrados: 2.2s warmup (11 samples × 200ms) + 5.2s útiles
+    const eyesOpenDuration = 20000;  // 20s ojos abiertos: 2s warmup + 18s útiles
+    const eyesClosedDuration = 20000; // 20s ojos cerrados: 2s warmup + 18s útiles
     const totalDuration = eyesOpenDuration + eyesClosedDuration;
     let phase = 'open'; // 'open' -> 'closed'
     let phaseBeeped = false;
@@ -443,8 +635,7 @@ export default function MuseControl({ onModeChange }) {
     logCal('relaxation_start', 'eyes_open', {
       eyes_open_duration_ms: eyesOpenDuration,
       eyes_closed_duration_ms: eyesClosedDuration,
-      warmup_open_skip_ms: 1500,
-      warmup_open_stable_n: 7,
+      warmup_open_skip_ms: 2000,
       warmup_closed_skip_ms: 2200,
       poll_interval_ms: 200,
     });
@@ -477,21 +668,34 @@ export default function MuseControl({ onModeChange }) {
         const res = await fetch(`${API_BASE}/hardware/calibration/snapshot`);
         const data = await res.json();
         if (data.status === 'success') {
-          if (phase === 'open') {
-            eyesOpenSamples.push(data);
+          // EOG filter: skip blink-contaminated windows for alpha calculation.
+          // Blinks propagate via volume conduction to TP9/TP10 and inflate alpha.
+          // The backend detects blinks using frontal AF7/AF8 channels.
+          const isClean = !data.blink_contaminated;
+          
+          if (isClean) {
+            if (phase === 'open') {
+              eyesOpenSamples.push(data);
+            } else {
+              eyesClosedSamples.push(data);
+            }
           } else {
-            eyesClosedSamples.push(data);
+            console.log(`⚡ EOG rejected [${phase}]: alpha=${data.bands?.alpha?.toFixed(1)}µV² (peak=${data.eog?.frontal_peak_uv?.toFixed(0)}µV)`);
           }
+          
           setCurrentMetrics(data);
-          console.log(`📊 Alpha snapshot [${phase}]: alpha=${data.bands?.alpha?.toFixed(1)}, beta=${data.bands?.beta?.toFixed(1)}`);
+          console.log(`📊 Alpha snapshot [${phase}]${isClean ? '' : ' ⚡BLINK'}: alpha=${data.bands?.alpha?.toFixed(1)}, beta=${data.bands?.beta?.toFixed(1)}`);
 
-          // Log every sample with full bands + quality
-          logCal('relaxation_sample', phase === 'open' ? 'eyes_open' : 'eyes_closed', {
+          // Log every sample with full bands + quality + EOG status
+          logCal(isClean ? 'relaxation_sample' : 'relaxation_sample_eog_rejected',
+            phase === 'open' ? 'eyes_open' : 'eyes_closed', {
             elapsed_ms: elapsed,
             phase,
             bands: data.bands,
             coherence: data.coherence,
             signal_quality: data.signal_quality,
+            blink_contaminated: data.blink_contaminated,
+            eog: data.eog,
           });
         }
       } catch (err) {
@@ -502,30 +706,31 @@ export default function MuseControl({ onModeChange }) {
         clearInterval(calibrationInterval.current);
         
         // --- WARMUP OJOS ABIERTOS ---
-        // Descartar primeros 1500ms (artefactos del test de parpadeos al inicio)
-        const warmupOpen   = Math.ceil(1500 / 200); // 8 muestras
-        // Solo usar las primeras 7 muestras estables post-warmup (baseline real).
-        // Log3 mostró un 'posterior alpha drift': tras 3-4s de ojos abiertos quieto,
-        // el alpha posterior sube de 9µV² a 57-101µV² naturalmente.
-        // Si incluimos esas muestras tardías, alpha_open queda inflado (26.7 vs 9.2 µV² real)
-        // y el ratio aparece invertido (0.51x en vez de 1.44x).
-        const openStableN  = 7;
+        // Descartar primeros 2000ms: artefactos de transición desde el blink test.
+        const warmupOpen = Math.ceil(2000 / 200); // 10 muestras
 
         // --- WARMUP OJOS CERRADOS ---
         // La ventana Welch usa los últimos 2s del buffer.
-        // La fase eyes_closed empieza en elapsed_ms ~4600.
-        // Con warmup=8 (1600ms), el primer sample usado tiene ventana [4200-6200ms] → incluye 400ms
-        // de la fase anterior → artefactos de transición (90, 46µV² en log3).
-        // Para que la ventana esté ENTERAMENTE en eyes_closed: necesitamos t > transition + 2000ms.
-        // Con margen de 200ms: warmup = 11 samples = 2200ms → ventana [4800, 6800ms] ≡ todo closed. ✅
+        // Para que la ventana esté ENTERAMENTE en eyes_closed necesitamos
+        // descartar los primeros 2200ms tras la transición (margen para Welch).
         const warmupClosed = Math.ceil(2200 / 200); // 11 muestras
 
-        const openFiltered   = eyesOpenSamples.slice(warmupOpen, warmupOpen + openStableN);
-        const closedFiltered = eyesClosedSamples.slice(warmupClosed);
-        const openToUse   = openFiltered.length > 2   ? openFiltered   : eyesOpenSamples.slice(warmupOpen);
-        const closedToUse = closedFiltered.length > 2 ? closedFiltered : eyesClosedSamples;
+        // Con 20s por fase y los warmups, quedan ~18s útiles por fase (~90 muestras).
+        // Se usa TODA la ventana estable — sin límite artificial de N muestras.
+        const openToUse   = eyesOpenSamples.slice(warmupOpen);
+        const closedToUse = eyesClosedSamples.slice(warmupClosed);
         
-        // Media recortada: descartar top 20% más altos (spikes)
+        // Median: robust estimator for bimodal distributions.
+        // Even with EOG filtering, residual blink-adjacent windows may inflate
+        // the mean. Median captures the center of the clean distribution.
+        const median = (arr, key) => {
+          const vals = arr.map(s => s.bands?.[key] || 0).sort((a, b) => a - b);
+          if (vals.length === 0) return 0;
+          const mid = Math.floor(vals.length / 2);
+          return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+        };
+        
+        // Trimmed mean still used for non-alpha bands (less affected by EOG)
         const trimmedMean = (arr, key, trimTop = 0.2) => {
           const vals = arr.map(s => s.bands?.[key] || 0).sort((a, b) => a - b);
           const cutoff = Math.floor(vals.length * (1 - trimTop));
@@ -533,8 +738,9 @@ export default function MuseControl({ onModeChange }) {
           return trimmed.reduce((a, b) => a + b, 0) / (trimmed.length || 1);
         };
         
-        const avgAlphaOpen   = trimmedMean(openToUse, 'alpha');
-        const avgAlphaClosed = trimmedMean(closedToUse, 'alpha');
+        // Alpha uses MEDIAN (robust to residual EOG), other bands use trimmedMean
+        const avgAlphaOpen   = median(openToUse, 'alpha');
+        const avgAlphaClosed = median(closedToUse, 'alpha');
         
         console.log(`📊 Alpha after warmup trim: open=${avgAlphaOpen.toFixed(1)} (${openToUse.length} samples, skipped ${warmupOpen}), closed=${avgAlphaClosed.toFixed(1)} (${closedToUse.length} samples, skipped ${warmupClosed})`);
 
@@ -566,41 +772,54 @@ export default function MuseControl({ onModeChange }) {
           },
           alpha_ratio: parseFloat((avgAlphaClosed / (avgAlphaOpen || 1)).toFixed(4)),
           threshold: 0.5,
+          eog_filtering: {
+            open_total_snapshots: eyesOpenSamples.length + (eyesOpenDuration / 200 - eyesOpenSamples.length),
+            open_clean_samples: eyesOpenSamples.length,
+            closed_clean_samples: eyesClosedSamples.length,
+            estimator: 'median',  // Changed from trimmedMean — robust to residual EOG
+          },
         });
         
+        // Coherencia promedio de las muestras con ojos cerrados (señal real > 0.8)
+        const avgCoherence = closedToUse.reduce((acc, s) => acc + (s.coherence || 0), 0) / (closedToUse.length || 1);
+        
         setBaselineAlpha(avgAlphaOpen);
-        evaluateCalibration(avgAlphaOpen, avgAlphaClosed);
+        evaluateCalibration(avgAlphaOpen, avgAlphaClosed, avgCoherence);
       }
     }, 200);
   };
 
-  const evaluateCalibration = (alphaOpen, alphaClosed) => {
+  const evaluateCalibration = (alphaOpen, alphaClosed, avgCoherence = 0) => {
     // La calibración es exitosa si:
     // 1. Detectamos suficientes parpadeos (ya validado antes)
     // 2. Alpha con ojos cerrados es MAYOR que con ojos abiertos (fisiología normal)
-    // Esto valida que realmente cerró los ojos y la señal es real
+    // 3. Coherencia > 0.75 (señal cerebral real vs ruido — sin casco ~0.5-0.65)
     
-    const detectedBlinks = confirmedBlinksRef.current; // Usar ref para valor actualizado
+    const detectedBlinks = confirmedBlinksRef.current;
     const alphaRatio = alphaClosed / (alphaOpen || 1);
-    // 0.5 = tolerante: cualquier señal razonablemente real pasa
-    // (después del warmup trim los valores son mucho más realistas)
-    const alphaOk = alphaRatio > 0.5;
-    const alphaIncreased = alphaRatio > 1.0;
-    const passed = detectedBlinks >= 3 && alphaOk;
+    // Alpha DEBE aumentar al cerrar ojos (Berger effect, 1929).
+    // ratio > 1.0 = alpha subió. Mínimo aceptable: 1.05 (5% aumento).
+    // Ratio < 1.0 con ojos cerrados = la señal no está captando actividad cortical real.
+    const alphaOk = alphaRatio >= 1.05;
+    const alphaIncreased = alphaRatio > 1.15;
+    const coherenceOk = avgCoherence > 0.75;
+    const passed = detectedBlinks >= 3 && alphaOk && coherenceOk;
     
-    console.log(`📊 Calibration evaluation: blinks=${detectedBlinks}, alphaOpen=${alphaOpen.toFixed(2)}, alphaClosed=${alphaClosed.toFixed(2)}, ratio=${alphaRatio.toFixed(2)}`);
+    console.log(`📊 Calibration evaluation: blinks=${detectedBlinks}, alphaOpen=${alphaOpen.toFixed(2)}, alphaClosed=${alphaClosed.toFixed(2)}, ratio=${alphaRatio.toFixed(2)}, coherence=${avgCoherence.toFixed(3)}`);
     
     let reason;
     if (passed) {
       if (alphaIncreased) {
-        reason = `✓ Calibración exitosa: Alpha aumentó ${((alphaRatio - 1) * 100).toFixed(0)}% al cerrar ojos`;
+        reason = `✓ Calibración exitosa: Alpha aumentó ${((alphaRatio - 1) * 100).toFixed(0)}% al cerrar ojos (coherencia: ${avgCoherence.toFixed(2)})`;
       } else {
-        reason = `✓ Calibración exitosa: Señal EEG válida detectada`;
+        reason = `✓ Calibración exitosa: Efecto Berger detectado, ratio ${alphaRatio.toFixed(2)} (coherencia: ${avgCoherence.toFixed(2)})`;
       }
     } else if (detectedBlinks < 3) {
-      reason = `✕ Pocos parpadeos detectados (${detectedBlinks}/${targetBlinks})`;
+      reason = `✕ Pocos parpadeos detectados (${detectedBlinks}/${targetBlinks}). Asegúrate de pestañear fuerte cuando el test lo pida.`;
     } else if (!alphaOk) {
-      reason = `✕ Alpha disminuyó mucho al cerrar ojos (ratio: ${alphaRatio.toFixed(2)}). Verifica que el sensor esté bien colocado.`;
+      reason = `✕ Alpha no aumentó al cerrar ojos (ratio: ${alphaRatio.toFixed(2)}, necesario ≥1.05). ¿Cerraste los ojos durante la fase 'ojos cerrados'? Verifica que los sensores frontales tengan buen contacto.`;
+    } else if (!coherenceOk) {
+      reason = `✕ Coherencia hemisférica baja (${avgCoherence.toFixed(2)}). ¿El casco está bien puesto? Humedece los sensores.`;
     } else {
       reason = '✕ No se pudo completar la calibración';
     }
@@ -614,7 +833,10 @@ export default function MuseControl({ onModeChange }) {
       alpha_ratio: parseFloat(alphaRatio.toFixed(4)),
       alpha_ok: alphaOk,
       alpha_increased: alphaIncreased,
-      threshold_ratio: 0.5,
+      coherence_avg: parseFloat(avgCoherence.toFixed(4)),
+      coherence_ok: coherenceOk,
+      threshold_ratio: 1.05,
+      threshold_coherence: 0.75,
       reason,
     };
 
@@ -678,6 +900,7 @@ export default function MuseControl({ onModeChange }) {
         setShowRecordingModal(false);
         setSessionName('');
         setSessionNotes('');
+        useBrainStore.getState().setSessionActive(true);
       } else {
         setError(data.message || 'Error al iniciar grabación');
       }
@@ -694,6 +917,7 @@ export default function MuseControl({ onModeChange }) {
       if (data.status === 'success') {
         setIsRecording(false);
         setRecordingSessionId(null);
+        useBrainStore.getState().setSessionActive(false);
         // Mostrar resumen breve
         console.log('Recording saved:', data.session);
       }
@@ -764,25 +988,144 @@ export default function MuseControl({ onModeChange }) {
         };
       case CALIBRATION_STEPS.RELAXATION:
         if (relaxationPhase === 'open') {
+          // calibrationProgress 0→50 maps to 0→100% of open phase
+          const openProgress = Math.min(calibrationProgress * 2, 100);
           return { 
             emoji: '👀', 
             text: 'MANTÉN OJOS ABIERTOS', 
             subtext: 'Midiendo baseline... escucha el pip',
-            timeRemaining: getTimeRemaining(8000),
+            timeRemaining: Math.ceil((20000 * (100 - openProgress) / 100) / 1000),
             showTimer: true
           };
         } else {
+          // calibrationProgress 50→100 maps to 0→100% of closed phase
+          const closedProgress = Math.min((calibrationProgress - 50) * 2, 100);
           return { 
             emoji: '😌', 
             text: 'CIERRA LOS OJOS', 
             subtext: 'Relájate... pip para abrirlos',
-            timeRemaining: getTimeRemaining(8000),
+            timeRemaining: Math.ceil((20000 * (100 - closedProgress) / 100) / 1000),
             showTimer: true
           };
         }
       default:
         return null;
     }
+  };
+
+  // ── Detecta señal plana (todos los valores iguales = waiting_data) ──────────
+  const isWaitingData = bands &&
+    Object.values(bands).every(v => Math.abs(v - 0.2) < 0.001);
+
+  const renderDeviceStatus = () => {
+    const noFlow = deviceBuffer?.samples === 0 || isWaitingData;
+    const fillPct = deviceBuffer?.fill_percent ?? 0;
+    const shortAddr = deviceAddress
+      ? deviceAddress.replace(/:/g, '').slice(-6).toUpperCase()
+      : '——';
+
+    return (
+      <div style={{
+        marginBottom: '10px',
+        padding: '10px 12px',
+        background: noFlow ? 'rgba(255,100,0,0.08)' : 'rgba(0,255,136,0.05)',
+        border: `1px solid ${noFlow ? 'rgba(255,100,0,0.3)' : 'rgba(0,255,136,0.15)'}`,
+        borderRadius: '8px',
+        fontSize: '0.65rem',
+        fontFamily: 'monospace',
+      }}>
+        {/* Fila superior: ID + estado */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{
+              width: '7px', height: '7px', borderRadius: '50%',
+              background: noFlow ? '#ff6400' : '#00ff88',
+              boxShadow: `0 0 8px ${noFlow ? '#ff640066' : '#00ff8866'}`,
+              animation: noFlow ? 'none' : 'pulse 2s infinite',
+            }} />
+            <span style={{ opacity: 0.8, color: '#cceeff' }}>{connectedDevice?.name || 'Muse'}</span>
+            {connectedDevice?.battery != null && (
+              <span style={{
+                fontSize: '0.6rem', fontWeight: 'bold',
+                color: connectedDevice.battery > 40 ? '#44ff88' : connectedDevice.battery > 15 ? '#ffaa00' : '#ff4444'
+              }}>
+                {connectedDevice.battery > 80 ? '🔋' : connectedDevice.battery > 40 ? '🪫' : '⚡'}
+                {' '}{connectedDevice.battery}%
+              </span>
+            )}
+            <span style={{ opacity: 0.3 }}>#{shortAddr}</span>
+          </div>
+          <span style={{ color: noFlow ? '#ff8844' : '#00ff88', fontWeight: 'bold' }}>
+            {noFlow ? 'SIN DATOS' : 'STREAMING'}
+          </span>
+        </div>
+
+        {/* Buffer fill */}
+        <div style={{ marginBottom: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <span style={{ opacity: 0.4 }}>Buffer EEG</span>
+            <span style={{ color: fillPct > 10 ? '#00ff88' : '#ff6400' }}>
+              {deviceBuffer ? `${deviceBuffer.samples} muestras (${fillPct.toFixed(0)}%)` : '—'}
+            </span>
+          </div>
+          <div style={{ height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{
+              width: `${fillPct}%`, height: '100%',
+              background: fillPct > 10 ? '#00ff88' : '#ff6400',
+              transition: 'width 0.5s',
+            }} />
+          </div>
+        </div>
+
+        {/* Warning si no hay datos */}
+        {noFlow && (
+          <div style={{
+            marginTop: '7px', padding: '7px 9px',
+            background: 'rgba(255,80,0,0.12)',
+            border: '1px solid rgba(255,80,0,0.25)',
+            borderRadius: '6px',
+            lineHeight: '1.6',
+          }}>
+            <div style={{ color: '#ff8844', fontWeight: 'bold', marginBottom: '4px' }}>
+              ⚠ EEG no recibido
+            </div>
+            <div style={{ opacity: 0.65 }}>Posibles causas:</div>
+            <div style={{ opacity: 0.55, paddingLeft: '8px' }}>
+              • Batería baja — recarga el Muse<br />
+              • Electrodos sin contacto — ajusta la diadema<br />
+              • Stream LSL roto — desconecta y reconecta
+            </div>
+            <button
+              onClick={async () => {
+                // Check if backend is still connected — avoid disconnecting a live device
+                try {
+                  const res = await fetch(`${API_BASE}/hardware/status`);
+                  const data = await res.json();
+                  if (data.is_connected || data.is_streaming) {
+                    // Backend still has the device — just recover the UI state
+                    setError(null);
+                    scanDevices();
+                    return;
+                  }
+                } catch (_) {}
+                // Backend lost device — full disconnect + rescan
+                await disconnect();
+                setTimeout(() => scanDevices(), 300);
+              }}
+              style={{
+                marginTop: '8px', width: '100%', padding: '6px',
+                background: 'rgba(255,80,0,0.2)',
+                border: '1px solid rgba(255,80,0,0.4)',
+                borderRadius: '5px', color: '#ff8844',
+                fontSize: '0.62rem', cursor: 'pointer', fontFamily: 'monospace',
+              }}
+            >
+              ↺ Desconectar y reconectar
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderSignalQuality = () => {
@@ -1095,25 +1438,134 @@ export default function MuseControl({ onModeChange }) {
         </div>
       )}
 
-      {/* Instrucciones */}
+      {/* Instrucciones — solo si no se sabe qué hacer */}
       {status === MUSE_STATUS.DISCONNECTED && (
         <div style={{ marginBottom: '10px' }}>
           <button onClick={() => setShowInstructions(!showInstructions)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', cursor: 'pointer', padding: 0 }}>
             {showInstructions ? '▼' : '▶'} Instrucciones
           </button>
-          
+
           {showInstructions && (
-            <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(0,100,200,0.1)', borderRadius: '6px', fontSize: '0.65rem', lineHeight: '1.5' }}>
-              <p style={{ margin: '0 0 5px 0' }}>1. Enciende el Muse (LED azul)</p>
-              <p style={{ margin: '0 0 5px 0' }}>2. En terminal:</p>
-              <code style={{ display: 'block', background: 'rgba(0,0,0,0.3)', padding: '5px', borderRadius: '4px', fontSize: '0.6rem', marginBottom: '5px' }}>
-                cd backend && ./scripts/start_muse.sh
-              </code>
-              <p style={{ margin: '0' }}>3. Cuando veas "Streaming...", click Conectar</p>
+            <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(0,100,200,0.1)', borderRadius: '6px', fontSize: '0.65rem', lineHeight: '1.6' }}>
+              <p style={{ margin: '0 0 4px 0' }}>1. Enciende el Muse 2 (LED parpadeando azul)</p>
+              <p style={{ margin: '0' }}>2. Haz click en <strong>Escanear</strong> — la UI busca y conecta directamente</p>
             </div>
           )}
         </div>
       )}
+
+      {/* Device picker modal */}
+      {showDeviceModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1001
+        }}>
+          <div style={{
+            background: 'rgba(0, 15, 30, 0.98)',
+            border: '1px solid rgba(0,170,255,0.3)',
+            borderRadius: '14px',
+            padding: '20px',
+            maxWidth: '360px',
+            width: '90%',
+            fontFamily: 'monospace'
+          }}>
+            {/* Modal header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00aaff' }}>Dispositivos encontrados</div>
+                <div style={{ fontSize: '0.6rem', opacity: 0.45, marginTop: '2px' }}>
+                  {discoveredDevices.length} Muse {discoveredDevices.length === 1 ? 'detectado' : 'detectados'}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDeviceModal(false)}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '1.1rem', cursor: 'pointer', lineHeight: 1 }}
+              >✕</button>
+            </div>
+
+            {/* Device list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {discoveredDevices.map((device) => {
+                const isLast = device.address === lastMuseAddress;
+                return (
+                  <button
+                    key={device.address}
+                    onClick={() => connectToDevice(device.address)}
+                    style={{
+                      width: '100%', padding: '12px 14px',
+                      background: isLast ? 'rgba(0,170,255,0.12)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isLast ? 'rgba(0,170,255,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '8px', color: '#fff', cursor: 'pointer',
+                      textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = isLast ? 'rgba(0,170,255,0.22)' : 'rgba(255,255,255,0.09)'}
+                    onMouseLeave={e => e.currentTarget.style.background = isLast ? 'rgba(0,170,255,0.12)' : 'rgba(255,255,255,0.04)'}
+                  >
+                    <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>🎧</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: isLast ? '#00aaff' : '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {device.name || 'Muse'}
+                        {isLast && (
+                          <span style={{ fontSize: '0.55rem', background: 'rgba(0,170,255,0.25)', borderRadius: '4px', padding: '1px 5px', fontWeight: 'normal' }}>último</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.58rem', opacity: 0.4, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {device.address}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+                      {/* RSSI (batería se lee en el backend durante connect, no aquí) */}
+                      {device.rssi !== undefined && (
+                        <div style={{ fontSize: '0.58rem', opacity: 0.35 }}>{device.rssi} dBm</div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Fallback: use existing LSL stream */}
+            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <button
+                onClick={async () => {
+                  setShowDeviceModal(false);
+                  setStatus(MUSE_STATUS.SCANNING);
+                  setError(null);
+                  try {
+                    const res = await fetch(`${API_BASE}/hardware/connect-stream`, { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                      setStatus(MUSE_STATUS.CONNECTED);
+                      startStream();
+                    } else {
+                      setError('No se encontró stream LSL activo');
+                      setStatus(MUSE_STATUS.ERROR);
+                    }
+                  } catch {
+                    setError('No se encontró stream LSL activo');
+                    setStatus(MUSE_STATUS.ERROR);
+                  }
+                }}
+                style={{
+                  width: '100%', padding: '8px',
+                  background: 'transparent',
+                  border: '1px dashed rgba(255,255,255,0.12)',
+                  borderRadius: '6px', color: 'rgba(255,255,255,0.3)',
+                  fontSize: '0.62rem', cursor: 'pointer', fontFamily: 'monospace'
+                }}
+              >
+                Usar stream LSL existente (start_muse.sh)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Device status — visible siempre que esté streaming o calibrando */}
+      {(status === MUSE_STATUS.STREAMING || status === MUSE_STATUS.CALIBRATING) && renderDeviceStatus()}
 
       {/* Calibración */}
       {(status === MUSE_STATUS.CALIBRATING || calibrationStep === CALIBRATION_STEPS.COMPLETE || calibrationStep === CALIBRATION_STEPS.FAILED) && renderCalibration()}
@@ -1329,11 +1781,13 @@ export default function MuseControl({ onModeChange }) {
       {/* Botones */}
       <div style={{ display: 'flex', gap: '8px', marginTop: '15px', flexWrap: 'wrap' }}>
         {status === MUSE_STATUS.DISCONNECTED && (
-          <ActionButton onClick={scanDevices} color="#00aaff">🔌 Conectar</ActionButton>
+          <ActionButton onClick={scanDevices} color="#00aaff">� Escanear Muse</ActionButton>
         )}
-        
+
         {status === MUSE_STATUS.SCANNING && (
-          <ActionButton disabled color="#666">⏳ Buscando...</ActionButton>
+          <ActionButton disabled color="#666">
+            {scanCountdown > 0 ? `🔍 Escaneando ${scanCountdown}s...` : '⏳ Conectando...'}
+          </ActionButton>
         )}
         
         {status === MUSE_STATUS.CONNECTED && (
@@ -1351,7 +1805,7 @@ export default function MuseControl({ onModeChange }) {
         )}
         
         {status === MUSE_STATUS.ERROR && (
-          <ActionButton onClick={() => { setStatus(MUSE_STATUS.DISCONNECTED); setError(null); }} color="#666">↺ Reintentar</ActionButton>
+          <ActionButton onClick={() => { setError(null); scanDevices(); }} color="#00aaff">↺ Reconectar</ActionButton>
         )}
       </div>
     </div>

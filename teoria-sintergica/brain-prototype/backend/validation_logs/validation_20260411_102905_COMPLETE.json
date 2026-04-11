@@ -1,0 +1,233 @@
+{
+  "metadata": {
+    "name": "pv-p-35",
+    "notes": "",
+    "time_of_day": "morning",
+    "sleep_quality": 5,
+    "caffeine": false,
+    "prior_meditation_min": 0,
+    "subjective_pre": 5,
+    "subjective_post": 0
+  },
+  "protocol_start": 1775894345.013234,
+  "protocol_start_iso": "2026-04-11T09:59:05.013234",
+  "phases_completed": 8,
+  "total_phases": 8,
+  "total_events": 18,
+  "events": [
+    {
+      "time": 1775894345.030557,
+      "time_iso": "2026-04-11T09:59:05.030558",
+      "elapsed": 0.017347097396850586,
+      "event": "protocol_start",
+      "data": {
+        "name": "pv-p-35",
+        "total_phases": 8,
+        "total_duration": 1800
+      }
+    },
+    {
+      "time": 1775894345.05953,
+      "time_iso": "2026-04-11T09:59:05.059532",
+      "elapsed": 0.046304941177368164,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_open",
+        "label": "BASELINE",
+        "duration": 120,
+        "instruction": "Ojos abiertos"
+      }
+    },
+    {
+      "time": 1775894465.080107,
+      "time_iso": "2026-04-11T10:01:05.080108",
+      "elapsed": 120.06687998771667,
+      "event": "phase_end",
+      "data": {
+        "phase": "baseline_open",
+        "elapsed": 120.01868915557861,
+        "expected_duration": 120,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775894465.082696,
+      "time_iso": "2026-04-11T10:01:05.082697",
+      "elapsed": 120.06946992874146,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_closed",
+        "label": "BASELINE",
+        "duration": 120,
+        "instruction": "Cerr\u00e1 los ojos"
+      }
+    },
+    {
+      "time": 1775894585.091727,
+      "time_iso": "2026-04-11T10:03:05.091728",
+      "elapsed": 240.0784990787506,
+      "event": "phase_end",
+      "data": {
+        "phase": "baseline_closed",
+        "elapsed": 120.00774598121643,
+        "expected_duration": 120,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775894585.094432,
+      "time_iso": "2026-04-11T10:03:05.094433",
+      "elapsed": 240.08120226860046,
+      "event": "phase_start",
+      "data": {
+        "phase": "shamatha",
+        "label": "SHAMATHA",
+        "duration": 300,
+        "instruction": "Atenci\u00f3n en la respiraci\u00f3n"
+      }
+    },
+    {
+      "time": 1775894885.109131,
+      "time_iso": "2026-04-11T10:08:05.109133",
+      "elapsed": 540.0959050655365,
+      "event": "phase_end",
+      "data": {
+        "phase": "shamatha",
+        "elapsed": 300.0127799510956,
+        "expected_duration": 300,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775894885.113024,
+      "time_iso": "2026-04-11T10:08:05.113026",
+      "elapsed": 540.0998020172119,
+      "event": "phase_start",
+      "data": {
+        "phase": "meditation_free",
+        "label": "MEDITACI\u00d3N LIBRE",
+        "duration": 600,
+        "instruction": "Meditaci\u00f3n libre"
+      }
+    },
+    {
+      "time": 1775895485.127986,
+      "time_iso": "2026-04-11T10:18:05.127987",
+      "elapsed": 1140.1147582530975,
+      "event": "phase_end",
+      "data": {
+        "phase": "meditation_free",
+        "elapsed": 600.0136592388153,
+        "expected_duration": 600,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775895485.1310341,
+      "time_iso": "2026-04-11T10:18:05.131034",
+      "elapsed": 1140.1178019046783,
+      "event": "phase_start",
+      "data": {
+        "phase": "cognitive_task",
+        "label": "TAREA COGNITIVA",
+        "duration": 60,
+        "instruction": "1000 - 7 = ?"
+      }
+    },
+    {
+      "time": 1775895545.141458,
+      "time_iso": "2026-04-11T10:19:05.141459",
+      "elapsed": 1200.1282291412354,
+      "event": "phase_end",
+      "data": {
+        "phase": "cognitive_task",
+        "elapsed": 60.00962781906128,
+        "expected_duration": 60,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775895545.1454048,
+      "time_iso": "2026-04-11T10:19:05.145408",
+      "elapsed": 1200.1321771144867,
+      "event": "phase_start",
+      "data": {
+        "phase": "recovery",
+        "label": "RECUPERACI\u00d3N",
+        "duration": 180,
+        "instruction": "Solt\u00e1 el esfuerzo"
+      }
+    },
+    {
+      "time": 1775895725.167735,
+      "time_iso": "2026-04-11T10:22:05.167736",
+      "elapsed": 1380.154508113861,
+      "event": "phase_end",
+      "data": {
+        "phase": "recovery",
+        "elapsed": 180.02241587638855,
+        "expected_duration": 180,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775895725.1707351,
+      "time_iso": "2026-04-11T10:22:05.170735",
+      "elapsed": 1380.157504081726,
+      "event": "phase_start",
+      "data": {
+        "phase": "deep_meditation",
+        "label": "PROFUNDIZACI\u00d3N",
+        "duration": 300,
+        "instruction": "Solt\u00e1 todo"
+      }
+    },
+    {
+      "time": 1775896025.1840692,
+      "time_iso": "2026-04-11T10:27:05.184070",
+      "elapsed": 1680.1708421707153,
+      "event": "phase_end",
+      "data": {
+        "phase": "deep_meditation",
+        "elapsed": 300.01230001449585,
+        "expected_duration": 300,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775896025.186749,
+      "time_iso": "2026-04-11T10:27:05.186750",
+      "elapsed": 1680.1735191345215,
+      "event": "phase_start",
+      "data": {
+        "phase": "close",
+        "label": "CIERRE",
+        "duration": 120,
+        "instruction": "Volv\u00e9 al cuerpo"
+      }
+    },
+    {
+      "time": 1775896145.198196,
+      "time_iso": "2026-04-11T10:29:05.198197",
+      "elapsed": 1800.1849689483643,
+      "event": "phase_end",
+      "data": {
+        "phase": "close",
+        "elapsed": 120.0082471370697,
+        "expected_duration": 120,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1775896145.200994,
+      "time_iso": "2026-04-11T10:29:05.200995",
+      "elapsed": 1800.18776512146,
+      "event": "protocol_stop",
+      "data": {
+        "completed_phases": 8,
+        "total_phases": 8,
+        "total_elapsed": 1800.1877522468567
+      }
+    }
+  ]
+}

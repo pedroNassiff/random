@@ -58,6 +58,9 @@ class MuseConnector(EEGDevice):
     LEFT_CHANNELS = [0, 1]   # TP9, AF7
     RIGHT_CHANNELS = [2, 3]  # AF8, TP10
     
+    # Muse GATT telemetry characteristic (battery + temp)
+    MUSE_TELEMETRY_UUID = '273e000b-4c4d-454d-96be-f03bac821358'
+    
     def __init__(self, buffer_duration: float = 10.0):
         """
         Args:
@@ -77,6 +80,17 @@ class MuseConnector(EEGDevice):
         self._stop_event = Event()
         self._buffer_lock = Lock()
         
+        # Stale data detection: track when last sample arrived
+        self._last_sample_time: float = 0.0
+        self._stale_threshold: float = 3.0  # seconds without new data → stale
+        
+        # EMA smoothing for signal quality — previene que spikes aislados de BLE
+        # (1-2 samples en 256) causen la oscilación 100→30 cada 3-5s en la UI.
+        # alpha=0.3: 1 drop de 0.3 → EMA = 0.79 (sigue por encima del gate de 0.5)
+        # Si la calidad es mala sostenida (>3-4 polls), EMA converge hacia 0.3 correctamente.
+        self._quality_ema: Dict[str, float] = {}
+        self._quality_ema_alpha: float = 0.3
+        
         # Proceso de muselsl
         self._muselsl_process: Optional[subprocess.Popen] = None
         
@@ -84,39 +98,67 @@ class MuseConnector(EEGDevice):
         self._inlet = None
         
     def discover(self, timeout: float = 10.0) -> List[DeviceInfo]:
-        """Descubre dispositivos Muse disponibles."""
+        """
+        Descubre dispositivos Muse disponibles via BleakScanner directamente.
+
+        Bypaseamos muselsl.list_muses() porque su backends.py usa
+        asyncio.get_event_loop() (deprecated en Python 3.10+) que lanza
+        RuntimeError en threads sin event loop (Python 3.13).
+
+        Se ejecuta siempre desde asyncio.to_thread() en main.py.
+        """
+        import asyncio
+        import traceback
+
         try:
-            from muselsl import list_muses
-            
-            print(f"🔍 Buscando dispositivos Muse ({timeout}s timeout)...")
-            muses = list_muses(timeout=timeout)
-            
-            devices = []
-            for muse in muses:
-                devices.append(DeviceInfo(
-                    name=muse.get('name', 'Muse'),
-                    address=muse['address'],
-                    device_type='muse2',
-                    rssi=muse.get('rssi')
-                ))
-            
-            if devices:
-                print(f"✅ Encontrados {len(devices)} dispositivo(s)")
-            else:
-                print("⚠️ No se encontraron dispositivos Muse")
-                print("   → Verifica que el Muse esté encendido")
-                print("   → Verifica que Bluetooth esté activado")
-            
-            return devices
-            
+            from bleak import BleakScanner
         except ImportError:
-            self._error_message = "muselsl no instalado. Ejecutar: pip install muselsl"
+            self._error_message = "bleak no instalado. Ejecutar: pip install bleak"
             self._status = DeviceStatus.ERROR
+            print("[discover] ERROR: bleak no instalado")
             return []
+
+        print(f"[discover] BleakScanner.discover(timeout={timeout}) — iniciando BLE scan...")
+
+        # Python 3.13: los threads no tienen event loop. Creamos uno.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            ble_devices = loop.run_until_complete(
+                BleakScanner.discover(timeout=timeout)
+            )
         except Exception as e:
-            self._error_message = f"Error en discovery: {str(e)}"
+            print(f"[discover] Exception en BleakScanner: {e}")
+            traceback.print_exc()
+            self._error_message = f"Error en BLE scan: {e}"
             self._status = DeviceStatus.ERROR
             return []
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+        print(f"[discover] BLE scan completo. Total dispositivos BT: {len(ble_devices)}")
+
+        devices = []
+        for d in ble_devices:
+            name = d.name or ''
+            print(f"[discover]   {name!r:30s} | {d.address}")
+            if 'muse' in name.lower():
+                rssi = getattr(d, 'rssi', None)
+                print(f"[discover]   ✅ MUSE: {name} | {d.address} | RSSI: {rssi}")
+                devices.append(DeviceInfo(
+                    name=name,
+                    address=d.address,
+                    device_type='muse2',
+                    rssi=rssi,
+                ))
+
+        if devices:
+            print(f"[discover] ✅ {len(devices)} Muse encontrado(s)")
+        else:
+            print("[discover] ⚠️  Ningún Muse encontrado entre los dispositivos BT visibles")
+
+        return devices
     
     def connect(self, address: str) -> bool:
         """
@@ -128,36 +170,53 @@ class MuseConnector(EEGDevice):
             self._status = DeviceStatus.CONNECTING
             print(f"🔌 Conectando a Muse: {address}")
             
-            # Iniciar muselsl stream en background
+            # Leer batería ANTES de iniciar muselsl — el Muse solo acepta una conexión BLE
+            # a la vez. Si leemos batería y muselsl se conectan en paralelo, uno falla.
+            print(f"[connect] Leyendo batería de {address}...")
+            battery = self.read_battery(address)
+            if battery is not None:
+                print(f"[connect] Batería: {battery}%")
+            else:
+                print(f"[connect] Batería: no disponible")
+
+            # Iniciar muselsl stream en background.
+            # En macOS el address es un UUID con guiones (6D5F179A-C0AF-...) — formato CoreBluetooth.
+            # NO convertir a colons: Bleak en macOS necesita el formato UUID.
             self._muselsl_process = subprocess.Popen(
-                [sys.executable, '-m', 'muselsl', 'stream', 
-                 '--address', address,
-                 '--ppg', '--acc'],  # Incluir sensores extra
+                [sys.executable, '-m', 'muselsl', 'stream',
+                 '--address', address],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
             
+            # Log muselsl stderr en background para diagnosticar desconexiones BLE
+            self._muselsl_log_thread = Thread(
+                target=self._log_muselsl_stderr, daemon=True
+            )
+            self._muselsl_log_thread.start()
+
             # Esperar a que se establezca conexión
             time.sleep(5)
-            
+
             # Verificar que el proceso sigue corriendo
             if self._muselsl_process.poll() is not None:
                 stderr = self._muselsl_process.stderr.read().decode()
                 self._error_message = f"muselsl falló: {stderr}"
                 self._status = DeviceStatus.ERROR
                 return False
-            
-            # Guardar info del dispositivo
+
+            # Guardar info del dispositivo (incluyendo batería)
             self._device_info = DeviceInfo(
                 name="Muse 2",
                 address=address,
-                device_type='muse2'
+                device_type='muse2',
+                battery_level=battery
             )
-            
+
             self._status = DeviceStatus.CONNECTED
             print(f"✅ Conectado a Muse 2: {address}")
             return True
-            
+
         except FileNotFoundError:
             self._error_message = "muselsl no encontrado en PATH"
             self._status = DeviceStatus.ERROR
@@ -186,7 +245,60 @@ class MuseConnector(EEGDevice):
         # Limpiar estado
         self._device_info = None
         self._status = DeviceStatus.DISCONNECTED
-        print("✅ Desconectado")
+
+    def _log_muselsl_stderr(self):
+        """Lee stderr de muselsl en background para diagnosticar desconexiones BLE."""
+        proc = self._muselsl_process
+        if not proc or not proc.stderr:
+            return
+        for line in iter(proc.stderr.readline, b''):
+            text = line.decode('utf-8', errors='ignore').strip()
+            if text:
+                print(f"[muselsl-stderr] {text}")
+        
+        # El pipe se cerró = muselsl murió
+        exit_code = proc.poll()
+        print(f"⚠️ [muselsl] Proceso terminó (exit code: {exit_code})")
+        
+        # Auto-restart si no fue un stop intencional
+        if not self._stop_event.is_set() and self._device_info:
+            address = self._device_info.address
+            if address and address != "LSL-EXTERNAL":
+                print(f"🔄 [muselsl] Auto-reiniciando stream para {address}...")
+                time.sleep(3)  # esperar a que BLE se libere
+                try:
+                    self._muselsl_process = subprocess.Popen(
+                        [sys.executable, '-m', 'muselsl', 'stream',
+                         '--address', address],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    # Re-lanzar logger de stderr
+                    Thread(target=self._log_muselsl_stderr, daemon=True).start()
+                    print(f"✅ [muselsl] Proceso reiniciado (PID: {self._muselsl_process.pid})")
+                    
+                    # Esperar y reconectar inlet
+                    time.sleep(5)
+                    if not self._stop_event.is_set():
+                        from pylsl import StreamInlet, resolve_byprop
+                        streams = resolve_byprop('type', 'EEG', timeout=10)
+                        if streams:
+                            self._inlet = StreamInlet(streams[0])
+                            self._last_sample_time = time.time()
+                            # Reiniciar el thread de datos si murió (agotó max_reconnect)
+                            if self._stream_thread is None or not self._stream_thread.is_alive():
+                                self._status = DeviceStatus.STREAMING
+                                self._stop_event.clear()
+                                from threading import Thread
+                                self._stream_thread = Thread(target=self._stream_loop, daemon=True)
+                                self._stream_thread.start()
+                                print(f"✅ [muselsl] Auto-restart completo (stream+thread reiniciados): {streams[0].name()}")
+                            else:
+                                print(f"✅ [muselsl] LSL stream reconectado: {streams[0].name()}")
+                        else:
+                            print("⚠️ [muselsl] Proceso reinició pero no aparece stream LSL")
+                except Exception as e:
+                    print(f"❌ [muselsl] Error en auto-restart: {e}")
     
     def connect_to_existing_stream(self) -> bool:
         """
@@ -227,7 +339,91 @@ class MuseConnector(EEGDevice):
         except Exception as e:
             self._error_message = f"Error: {str(e)}"
             return False
-    
+
+    def read_battery(self, address: str) -> Optional[int]:
+        """
+        Lee el nivel de batería del Muse vía BLE.
+
+        Conecta brevemente con BleakClient, suscribe a la característica de
+        telemetría y espera la primera notificación para extraer la batería.
+        Solo funciona ANTES de que muselsl ocupe la conexión BLE.
+
+        Returns:
+            Nivel de batería 0-100, o None si no se pudo leer.
+        """
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self._read_battery_async(address))
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+    async def _read_battery_async(self, address: str) -> Optional[int]:
+        """Lógica async de lectura de batería.
+
+        En lugar de esperar la característica de telemetría (que sólo envía
+        datos periódicamente), enviamos el comando 's' (ask_control) al
+        control characteristic. La respuesta incluye directamente el campo
+        \"bp\" (battery percentage) como número 0-100.
+
+        Comando: [0x02, 0x73, 0x0a] = len('s')+1, ord('s'), ord('\\n')
+        Respuesta: JSON-like string, e.g. {\"rc\":0,\"bp\":50,...}
+        """
+        import asyncio
+        import json
+        import re
+        from bleak import BleakClient
+
+        # Muse GATT control characteristic (stream toggle + command channel)
+        CONTROL_UUID = '273e0001-4c4d-454d-96be-f03bac821358'
+        # 'ask_control' command: _write_cmd_str('s') → [len+1, ord('s'), ord('\n')]
+        CMD_ASK_CONTROL = bytes([0x02, 0x73, 0x0a])
+
+        battery_pct = None
+        event = asyncio.Event()
+        buf = []
+
+        def on_control(sender, data):
+            """Accumulate control response chunks until we get 'rc' (end marker)."""
+            nonlocal battery_pct
+            try:
+                chunk = bytes(data).decode('utf-8', errors='ignore').strip()
+                buf.append(chunk)
+                combined = ''.join(buf)
+                # Response arrives in chunks; wait until we have the end marker
+                if 'rc' in combined:
+                    # Extract bp field: {"bp":50,...} or bp":50
+                    m = re.search(r'"bp"\s*:\s*(\d+)', combined)
+                    if m:
+                        battery_pct = int(m.group(1))
+                        print(f"[battery] {address}: {battery_pct}% (from control response)")
+                    else:
+                        print(f"[battery] Control response sin bp: {combined!r}")
+                    event.set()
+            except Exception as e:
+                print(f"[battery] Error parseando control response: {e}")
+                event.set()
+
+        try:
+            async with BleakClient(address, timeout=8.0) as client:
+                await client.start_notify(CONTROL_UUID, on_control)
+                # Request control info (returns bp, sn, hn, etc.)
+                await client.write_gatt_char(CONTROL_UUID, CMD_ASK_CONTROL, response=False)
+                try:
+                    await asyncio.wait_for(event.wait(), timeout=4.0)
+                except asyncio.TimeoutError:
+                    print(f"[battery] Timeout esperando control response de {address}")
+                try:
+                    await client.stop_notify(CONTROL_UUID)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[battery] Error BLE {address}: {e}")
+
+        return battery_pct
+
     def start_stream(self) -> bool:
         """Inicia la recepción de datos EEG via LSL."""
         if not self.is_connected:
@@ -292,35 +488,109 @@ class MuseConnector(EEGDevice):
         Loop de recepción de datos (ejecuta en thread separado).
         
         Recibe muestras del LSL inlet y las almacena en el buffer circular.
+        Si el stream se pierde (BLE disconnect), detecta stale data y reconecta.
         """
+        reconnect_attempts = 0
+        max_reconnect = 5
+        stale_logged = False
+        
         while not self._stop_event.is_set():
             try:
                 # Pull sample con timeout
                 sample, timestamp = self._inlet.pull_sample(timeout=1.0)
                 
                 if sample:
+                    reconnect_attempts = 0  # reset on successful read
+                    if stale_logged:
+                        print("✅ Stream recuperado — datos fluyendo de nuevo")
+                        stale_logged = False
                     with self._buffer_lock:
                         # Agregar a buffers
                         for i, ch in enumerate(self.CHANNELS):
                             if i < len(sample):
                                 self._buffer[ch].append(sample[i])
                         self._timestamps.append(timestamp)
+                        self._last_sample_time = time.time()
+                else:
+                    # pull_sample retornó None — no hay datos
+                    # Detectar si llevamos mucho sin datos (BLE drop silencioso)
+                    if self._last_sample_time > 0:
+                        gap = time.time() - self._last_sample_time
+                        if gap > self._stale_threshold and not stale_logged:
+                            print(f"⚠️ Stream stale: {gap:.1f}s sin datos EEG. Posible desconexión BLE.")
+                            stale_logged = True
+                        
+                        if gap > 8.0:
+                            # Más de 8s sin datos: intentar reconectar LSL
+                            reconnect_attempts += 1
+                            if reconnect_attempts > max_reconnect:
+                                print("❌ Stream loop: máximo de reconexiones alcanzado.")
+                                # Si muselsl sigue vivo, mantener CONNECTED (no ERROR) para que
+                                # el frontend pueda recuperar la UI y reintentar el stream.
+                                # Si ya murió, el auto-restart de _log_muselsl_stderr se encarga.
+                                if self._muselsl_process and self._muselsl_process.poll() is None:
+                                    self._status = DeviceStatus.CONNECTED
+                                    print("⚠️ muselsl aún vivo → estado CONNECTED (UI puede recuperar)")
+                                else:
+                                    self._status = DeviceStatus.ERROR
+                                    self._error_message = "BLE desconectado — sin datos por >8s tras 5 intentos"
+                                break
+                            
+                            print(f"🔄 Reconectando LSL stream (intento {reconnect_attempts}/{max_reconnect})...")
+                            try:
+                                from pylsl import StreamInlet, resolve_byprop
+                                streams = resolve_byprop('type', 'EEG', timeout=5)
+                                if streams:
+                                    self._inlet = StreamInlet(streams[0])
+                                    self._last_sample_time = time.time()  # reset timer
+                                    stale_logged = False
+                                    print(f"✅ Reconectado a LSL stream: {streams[0].name()}")
+                                else:
+                                    print("⚠️ No se encontró stream LSL. muselsl puede estar reconectando BLE...")
+                            except Exception as re_err:
+                                print(f"⚠️ Error en reconexión LSL: {re_err}")
                         
             except Exception as e:
-                if not self._stop_event.is_set():
-                    print(f"⚠️ Error en stream loop: {e}")
-                break
-    
+                if self._stop_event.is_set():
+                    break
+                print(f"⚠️ Excepción en stream loop: {e}")
+                reconnect_attempts += 1
+                if reconnect_attempts >= max_reconnect:
+                    print("❌ Stream loop: máximo de reconexiones alcanzado. Deteniendo.")
+                    if self._muselsl_process and self._muselsl_process.poll() is None:
+                        self._status = DeviceStatus.CONNECTED
+                        print("⚠️ muselsl aún vivo → estado CONNECTED (UI puede recuperar)")
+                    else:
+                        self._status = DeviceStatus.ERROR
+                        self._error_message = f"LSL stream perdido tras {max_reconnect} intentos: {e}"
+                    break
+                time.sleep(2)
+
+    @property
+    def is_data_stale(self) -> bool:
+        """True if no new EEG samples have arrived for > stale_threshold seconds."""
+        if self._last_sample_time == 0:
+            return True
+        return (time.time() - self._last_sample_time) > self._stale_threshold
+
     def get_window(self, duration: float = 2.0) -> Optional[EEGWindow]:
         """
         Obtiene una ventana de datos EEG del buffer.
+        
+        Returns None if:
+          - Not enough samples in buffer
+          - Data is stale (no new samples for > 3s, e.g. BLE disconnect)
         
         Args:
             duration: Duración de la ventana en segundos
             
         Returns:
-            EEGWindow o None si no hay suficientes datos
+            EEGWindow o None si no hay suficientes datos o datos stale
         """
+        # Stale data guard: if BLE dropped, don't return old buffer data
+        if self.is_data_stale:
+            return None
+        
         n_samples_needed = int(self.SAMPLING_RATE * duration)
         
         with self._buffer_lock:
@@ -348,7 +618,12 @@ class MuseConnector(EEGDevice):
     
     def get_signal_quality(self) -> Dict[str, float]:
         """
-        Calcula calidad de señal para cada canal.
+        Calcula calidad de señal para cada canal con EMA smoothing.
+        
+        El smoothing previene que un spike BLE de 1-2 samples en la ventana de
+        1s haga que la calidad caiga 100→30 instantáneamente. Un drop real
+        (electrodo suelto) tarda ~3-4 polls en reflejarse en la EMA, lo cual
+        es suficientemente rápido para el UX (< 1 segundo).
         
         Returns:
             Dict {channel_name: quality_score}
@@ -361,9 +636,18 @@ class MuseConnector(EEGDevice):
         quality = {}
         for i, ch in enumerate(self.CHANNELS):
             signal = window.data[i]
-            quality[ch] = SignalQualityChecker.compute_quality_score(
+            raw_score = SignalQualityChecker.compute_quality_score(
                 signal, self.SAMPLING_RATE
             )
+            # Aplicar EMA: si no hay historial, inicializamos con el raw score actual
+            if ch not in self._quality_ema:
+                self._quality_ema[ch] = raw_score
+            else:
+                self._quality_ema[ch] = (
+                    self._quality_ema_alpha * raw_score
+                    + (1 - self._quality_ema_alpha) * self._quality_ema[ch]
+                )
+            quality[ch] = round(self._quality_ema[ch], 4)
         
         return quality
     
@@ -372,16 +656,20 @@ class MuseConnector(EEGDevice):
         Obtiene estado del buffer.
         
         Returns:
-            Dict con info del buffer
+            Dict con info del buffer, including stale detection
         """
         with self._buffer_lock:
             samples_in_buffer = len(self._timestamps)
+        
+        since_last = time.time() - self._last_sample_time if self._last_sample_time > 0 else -1
         
         return {
             'samples': samples_in_buffer,
             'capacity': self._buffer_size,
             'fill_percent': (samples_in_buffer / self._buffer_size) * 100,
-            'duration_available': samples_in_buffer / self.SAMPLING_RATE
+            'duration_available': samples_in_buffer / self.SAMPLING_RATE,
+            'is_stale': self.is_data_stale,
+            'seconds_since_last_sample': round(since_last, 1),
         }
 
 

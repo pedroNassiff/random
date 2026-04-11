@@ -1,7 +1,13 @@
 import { useBrainStore } from '../store'
 
+// Frecuencia central de cada banda (Hz) — para display consistente con la banda dominante
+const BAND_CENTERS = { delta: 2.0, theta: 6.0, alpha: 10.0, beta: 21.5, gamma: 40.0 }
+
+// Nombres legibles de cada banda
+const BAND_LABELS = { delta: 'Delta', theta: 'Theta', alpha: 'Alpha', beta: 'Beta', gamma: 'Gamma' }
+
 export function StateIndicator() {
-  const { state, frequency, bands } = useBrainStore()
+  const { state, bands } = useBrainStore()
 
   // Map states to visual properties
   const stateConfig = {
@@ -46,10 +52,14 @@ export function StateIndicator() {
 
   const config = stateConfig[state] || stateConfig['unknown']
 
-  // Find dominant band
-  const dominantBand = Object.entries(bands).reduce((max, [key, value]) => 
+  // Banda dominante por potencia raw (lo que ADA también reporta)
+  const dominantBand = Object.entries(bands).reduce((max, [key, value]) =>
     value > max.value ? { key, value } : max
   , { key: 'none', value: 0 })
+
+  // Frecuencia derivada de la banda dominante — consistente con lo que ADA muestra
+  const dominantFreq = BAND_CENTERS[dominantBand.key] ?? 0
+  const dominantPct  = (dominantBand.value * 100).toFixed(1)
 
   return (
     <div style={{
@@ -100,7 +110,7 @@ export function StateIndicator() {
             Freq.
           </div>
           <div style={{ color: '#fff', fontSize: '0.8rem', fontFamily: 'monospace', marginTop: 3 }}>
-            {frequency.toFixed(1)} Hz
+            {dominantFreq.toFixed(1)} Hz
           </div>
         </div>
         <div>
@@ -108,7 +118,10 @@ export function StateIndicator() {
             Banda
           </div>
           <div style={{ color: '#fff', fontSize: '0.8rem', fontFamily: 'monospace', marginTop: 3, textTransform: 'uppercase' }}>
-            {dominantBand.key}
+            {BAND_LABELS[dominantBand.key] ?? dominantBand.key}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.5rem', fontFamily: 'monospace', marginTop: 1 }}>
+            {dominantPct}% potencia
           </div>
         </div>
       </div>

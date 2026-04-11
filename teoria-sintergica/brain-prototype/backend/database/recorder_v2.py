@@ -364,7 +364,7 @@ class SessionRecorderV2:
         """Background thread that computes and stores metrics."""
         # Import here to avoid circular imports
         try:
-            from hardware import MuseToSyntergicAdapter
+            from hardware import MuseToSyntergicAdapter, EOGDetector
             from analysis.metrics import SyntergicMetrics
         except ImportError:
             print("⚠️ Metrics modules not available")
@@ -378,6 +378,9 @@ class SessionRecorderV2:
                 if window is not None:
                     timestamp = time.time() - self._start_time
                     
+                    # Detect EOG blink artifact using frontal channels
+                    blink_detected = EOGDetector.detect(window.data, window.fs)
+                    
                     # Compute metrics
                     eeg_data = MuseToSyntergicAdapter.prepare_for_analysis(window)
                     metrics = SyntergicMetrics.compute_all(eeg_data, fs=window.fs)
@@ -389,6 +392,7 @@ class SessionRecorderV2:
                         avg_quality = sum(quality.values()) / len(quality)
                     
                     # Create metric snapshot
+                    bands_raw = metrics.get('bands_raw', {})
                     snapshot = MetricSnapshot(
                         timestamp=timestamp,
                         coherence=metrics.get('coherence', 0),
@@ -401,7 +405,13 @@ class SessionRecorderV2:
                         gamma=metrics.get('bands', {}).get('gamma', 0),
                         dominant_frequency=metrics.get('dominant_frequency', 0),
                         state=metrics.get('state', ''),
-                        signal_quality=avg_quality
+                        signal_quality=avg_quality,
+                        delta_raw=bands_raw.get('delta', 0),
+                        theta_raw=bands_raw.get('theta', 0),
+                        alpha_raw=bands_raw.get('alpha', 0),
+                        beta_raw=bands_raw.get('beta', 0),
+                        gamma_raw=bands_raw.get('gamma', 0),
+                        blink_contaminated=blink_detected,
                     )
                     
                     with self._buffer_lock:

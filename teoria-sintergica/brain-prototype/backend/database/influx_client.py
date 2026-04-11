@@ -17,11 +17,11 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS, ASYNCHRONOUS
 
 
-# Connection settings
-INFLUX_URL = os.getenv('INFLUX_URL', 'http://localhost:8086')
-INFLUX_TOKEN = os.getenv('INFLUX_TOKEN', 'my-super-secret-auth-token')
-INFLUX_ORG = os.getenv('INFLUX_ORG', 'teoria-sintergica')
-INFLUX_BUCKET = os.getenv('INFLUX_BUCKET', 'eeg-data')
+# Connection settings — support both INFLUXDB_* (.env) and INFLUX_* (legacy) prefixes
+INFLUX_URL = os.getenv('INFLUXDB_URL', os.getenv('INFLUX_URL', 'http://localhost:8086'))
+INFLUX_TOKEN = os.getenv('INFLUXDB_TOKEN', os.getenv('INFLUX_TOKEN', 'my-super-secret-auth-token'))
+INFLUX_ORG = os.getenv('INFLUXDB_ORG', os.getenv('INFLUX_ORG', 'teoria-sintergica'))
+INFLUX_BUCKET = os.getenv('INFLUXDB_BUCKET', os.getenv('INFLUX_BUCKET', 'eeg-data'))
 
 
 @dataclass
@@ -50,6 +50,14 @@ class MetricSnapshot:
     dominant_frequency: float = 0.0
     state: str = ""
     signal_quality: float = 0.0
+    # Potencia absoluta µV²/Hz (NO normalizada) — necesaria para Berger effect
+    delta_raw: float = 0.0
+    theta_raw: float = 0.0
+    alpha_raw: float = 0.0
+    beta_raw: float = 0.0
+    gamma_raw: float = 0.0
+    # EOG blink artifact detected in this window (frontal AF7/AF8 > 80µV)
+    blink_contaminated: bool = False
 
 
 class InfluxDBEEGClient:
@@ -225,6 +233,12 @@ class InfluxDBEEGClient:
                 .field("gamma", float(m.gamma))
                 .field("dominant_frequency", float(m.dominant_frequency))
                 .field("signal_quality", float(m.signal_quality))
+                .field("delta_raw", float(m.delta_raw))
+                .field("theta_raw", float(m.theta_raw))
+                .field("alpha_raw", float(m.alpha_raw))
+                .field("beta_raw", float(m.beta_raw))
+                .field("gamma_raw", float(m.gamma_raw))
+                .field("blink_contaminated", m.blink_contaminated)
                 .time(int(ts * 1e9), WritePrecision.NS)
             )
             
@@ -352,11 +366,49 @@ class InfluxDBEEGClient:
                     'alpha': record.values.get('alpha', 0),
                     'beta': record.values.get('beta', 0),
                     'gamma': record.values.get('gamma', 0),
-                    'state': record.values.get('state', '')
+                    'state': record.values.get('state', ''),
+                    'signal_quality': record.values.get('signal_quality', 0),
+                    'dominant_frequency': record.values.get('dominant_frequency', 0),
+                    'delta_raw': record.values.get('delta_raw', 0),
+                    'theta_raw': record.values.get('theta_raw', 0),
+                    'alpha_raw': record.values.get('alpha_raw', 0),
+                    'beta_raw': record.values.get('beta_raw', 0),
+                    'gamma_raw': record.values.get('gamma_raw', 0),
+                    'blink_contaminated': bool(record.values.get('blink_contaminated', False)),
                 })
         
         return metrics
     
+    def get_events(
+        self,
+        recording_id: int,
+    ) -> List[Dict]:
+        """Get events/markers for a recording."""
+        if not self._connected:
+            self.connect()
+
+        query = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+            |> range(start: -30d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_event")
+            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> sort(columns: ["_time"])
+        '''
+
+        tables = self.query_api.query(query, org=INFLUX_ORG)
+
+        events = []
+        for table in tables:
+            for record in table.records:
+                events.append({
+                    'timestamp': record.get_time().timestamp(),
+                    'label': record.values.get('label', ''),
+                    'event_type': record.values.get('event_type', ''),
+                })
+
+        return events
+
     def get_aggregated_metrics(self, recording_id: int) -> Dict:
         """
         Get aggregated metrics for a recording (for PostgreSQL update).
@@ -367,12 +419,14 @@ class InfluxDBEEGClient:
         if not self._connected:
             self.connect()
         
-        # Average metrics
+        # Average metrics — exclude boolean field blink_contaminated
+        # which causes 'unsupported input type for mean aggregate: boolean'
         avg_query = f'''
         from(bucket: "{INFLUX_BUCKET}")
             |> range(start: -30d)
             |> filter(fn: (r) => r["_measurement"] == "eeg_metrics")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> filter(fn: (r) => r["_field"] != "blink_contaminated")
             |> mean()
         '''
         

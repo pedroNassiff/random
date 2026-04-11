@@ -48,9 +48,14 @@ export const useBrainStore = create((set) => ({
   sessionPaused:    false,
   _msgCount:        0,
 
+  // Active session flag — true when recording, protocol, or dataset is playing
+  // Guards TTS + auto-analysis to avoid wasting API resources when idle
+  isSessionActive:  false,
+
   // Actions
   togglePlay:       () => set((s) => ({ isPlaying: !s.isPlaying })),
   setSessionPaused: (paused) => set({ sessionPaused: paused }),
+  setSessionActive: (active) => set({ isSessionActive: active }),
 
   setBrainState: (newState) => set({
     coherence:        newState.coherence,
