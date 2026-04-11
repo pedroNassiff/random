@@ -12,9 +12,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useCopilotStore } from '../stores/copilotStore'
 
-const API = import.meta.env.DEV
-  ? 'http://localhost:8000'
-  : 'https://api.random-lab.es'
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://api.random-lab.es')
 
 const COPILOT_URL = `${API}/api/copilot/labs/chat`
 
