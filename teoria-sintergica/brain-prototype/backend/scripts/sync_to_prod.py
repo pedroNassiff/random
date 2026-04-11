@@ -520,10 +520,8 @@ def main():
         return
 
     # Inyectar skip_samples en sync_session si se pasa --no-samples
-    _orig_upload_samples = upload_influx_samples.__code__  # noqa
     if getattr(args, 'no_samples', False):
         global upload_influx_samples
-        _real_fn = upload_influx_samples
         upload_influx_samples = lambda sid: (print(f"   ⏭  Skipping samples (--no-samples)"), 0)[1]
 
     if args.last:
