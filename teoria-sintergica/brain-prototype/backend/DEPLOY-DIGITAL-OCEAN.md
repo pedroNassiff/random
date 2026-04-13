@@ -480,7 +480,7 @@ ufw enable
 ```
 
 ### Fail2Ban (protección contra brute force)
-```bash
+```bashx
 apt install -y fail2ban
 systemctl enable fail2ban
 systemctl start fail2ban

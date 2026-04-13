@@ -36,6 +36,10 @@ from automation.service import AutomationService
 from ai.copilot_labs_service import CopilotLabsService
 from recording.validation_protocol import ValidationProtocol
 from recording.validation import run_all_tests, SessionQualityScore
+from prospecting_router import router as prospecting_router
+
+from prospecting_analysis import router as analysis_router
+from prospecting_pitch import router as pitch_router
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -131,6 +135,7 @@ app.add_middleware(
 app.add_middleware(SecurityMiddleware)
 
 # Trusted host guard — rejects requests with unknown Host headers
+_extra_hosts = [h.strip() for h in os.getenv("EXTRA_ALLOWED_HOSTS", "").split(",") if h.strip()]
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=[
@@ -138,6 +143,8 @@ app.add_middleware(
         "api.random-studio.io",
         "localhost",
         "127.0.0.1",
+        "*.trycloudflare.com",
+        *_extra_hosts,
     ],
 )
 
@@ -181,8 +188,14 @@ async def shutdown():
 # Include analytics router
 app.include_router(analytics_router)
 
+app.include_router(analysis_router)
+
 # Include automation router
 app.include_router(automation_router)
+
+# Include prospecting CRM router
+app.include_router(prospecting_router)
+app.include_router(pitch_router)
 
 # ============================================
 # Copilot Labs Endpoint
@@ -1326,7 +1339,7 @@ async def doc_session_detail(session_id: int):
                 except Exception:
                     pass
             # Only use if within 2 hours of the recording
-            if best_match and (best_delta is None or best_delta < 7200):
+            if best_match and (best_delta is None or best_delta < 21600):
                 f, data = best_match
                 result["protocol_log"] = {
                     "filename": f.name,

@@ -10,6 +10,7 @@ import LabDetail from './pages/LabDetail.jsx';
 import BrainDoc from './pages/BrainDoc.jsx';
 import SessionDetail from './pages/SessionDetail.jsx';
 import AnalisisDatasets from './pages/AnalisisDatasets.jsx';
+import PlanningProspeccion from './components/PlanningProspeccion.jsx';
 import PageTransition from './components/PageTransition.jsx';
 import { AnalyticsProvider } from './lib/useAnalytics.jsx';
 import './index.css';
@@ -30,6 +31,8 @@ function AppRoutes() {
         <Route path="/lab/brain/doc/session/:sessionId" element={<SessionDetail />} />
         <Route path="/lab/:id" element={<LabDetail />} />
         <Route path="/analisis-datasets" element={<AnalisisDatasets />} />
+        <Route path="/planning-prospeccion" element={<PlanningProspeccion />} />
+        <Route path="/planning-house" element={<Navigate to="/planning-prospeccion" replace />} />
         <Route path="/lanalisis-datasets" element={<Navigate to="/analisis-datasets" replace />} />
       </Routes>
     </PageTransition>

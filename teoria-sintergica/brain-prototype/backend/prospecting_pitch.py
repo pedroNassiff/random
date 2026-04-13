@@ -1,0 +1,259 @@
+"""
+Prospecting Pitch Router — /prospecting/pitch
+
+Handles:
+  POST /prospecting/pitch/send       — send email via SMTP (Hostinger)
+  GET  /prospecting/pitch/track/{id} — 1×1 pixel open tracking
+  GET  /prospecting/pitch/stats/{contact_id} — open/click stats per contact
+"""
+
+import os
+import json
+import uuid
+import smtplib
+import email.utils
+import urllib.request
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, List
+
+from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import Response
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+router = APIRouter(prefix="/prospecting/pitch", tags=["prospecting-pitch"])
+
+LOGS_FILE = Path(__file__).parent / "data" / "pitch_logs.json"
+LOGS_FILE.parent.mkdir(exist_ok=True)
+
+# ── 1×1 transparent GIF bytes ──────────────────────────────────────────────────
+PIXEL_GIF = (
+    b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00'
+    b'\xff\xff\xff\x00\x00\x00\x21\xf9\x04\x00\x00\x00\x00\x00'
+    b'\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b'
+)
+
+# ── SMTP config (Hostinger) ───────────────────────────────────────────────────
+SMTP_HOST     = os.getenv("SMTP_HOST",     "smtp.hostinger.com")
+SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER     = os.getenv("SMTP_USER",     "")   # your@yourdomain.com
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM     = os.getenv("SMTP_FROM",     SMTP_USER)
+_APP_URL_ENV  = os.getenv("APP_URL",       "http://localhost:8000")
+
+
+def _get_public_url() -> tuple[str, bool]:
+    """
+    Returns (public_url, is_local).
+    Priority:
+      1. APP_URL env var if it's not localhost
+      2. Auto-detect running ngrok tunnel via localhost:4040 API
+      3. Auto-detect cloudflared via localhost:4040 (same API shape)
+      4. Fallback to APP_URL (localhost) → is_local=True
+    """
+    if _APP_URL_ENV and "localhost" not in _APP_URL_ENV and "127.0.0.1" not in _APP_URL_ENV:
+        return _APP_URL_ENV.rstrip("/"), False
+
+    # Try ngrok local API
+    for ngrok_port in (4040, 4041, 4042):
+        try:
+            with urllib.request.urlopen(f"http://localhost:{ngrok_port}/api/tunnels", timeout=1) as r:
+                data = json.loads(r.read())
+            for tunnel in data.get("tunnels", []):
+                pub = tunnel.get("public_url", "")
+                if pub.startswith("https://"):
+                    return pub.rstrip("/"), False
+            # fallback to first http if no https
+            for tunnel in data.get("tunnels", []):
+                pub = tunnel.get("public_url", "")
+                if pub.startswith("http://"):
+                    return pub.rstrip("/"), False
+        except Exception:
+            pass
+
+    return _APP_URL_ENV.rstrip("/"), True
+
+
+# ── Persistence helpers ────────────────────────────────────────────────────────
+def _load_logs() -> dict:
+    if LOGS_FILE.exists():
+        try:
+            return json.loads(LOGS_FILE.read_text())
+        except Exception:
+            pass
+    return {}
+
+
+def _save_logs(logs: dict):
+    LOGS_FILE.write_text(json.dumps(logs, indent=2, default=str))
+
+
+# ── Pydantic models ────────────────────────────────────────────────────────────
+class SendPitchRequest(BaseModel):
+    contact_id: int
+    to_email: str
+    subject: str
+    body_html: str          # full HTML body (frontend renders template)
+    body_text: str          # plain text fallback
+    pitch_type: str = "email"  # "email" | "dm"
+    company: Optional[str] = ""
+    override_app_url: Optional[str] = None  # cloudflare/ngrok URL from frontend
+
+
+# ── Routes ─────────────────────────────────────────────────────────────────────
+@router.post("/send")
+def send_pitch(req: SendPitchRequest):
+    """Send a pitch email via Hostinger SMTP with embedded tracking pixel."""
+    if not SMTP_USER or not SMTP_PASSWORD:
+        raise HTTPException(
+            status_code=503,
+            detail="SMTP not configured. Add SMTP_USER and SMTP_PASSWORD to .env"
+        )
+
+    tracking_id = str(uuid.uuid4())
+    if req.override_app_url and req.override_app_url.startswith("http"):
+        app_url, is_local = req.override_app_url.rstrip("/"), False
+    else:
+        app_url, is_local = _get_public_url()
+    pixel_url   = f"{app_url}/prospecting/pitch/track/{tracking_id}"
+    pixel_tag   = f'<img src="{pixel_url}" width="1" height="1" alt="" style="display:none" />'
+
+    # Inject tracking pixel once, just before the last </body>
+    body_lower = req.body_html.lower()
+    last_body_idx = body_lower.rfind("</body>")
+    if last_body_idx != -1:
+        tracked_html = req.body_html[:last_body_idx] + pixel_tag + "\n" + req.body_html[last_body_idx:]
+    else:
+        tracked_html = req.body_html + "\n" + pixel_tag
+
+    # Build MIME message
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = req.subject
+    msg["From"]    = email.utils.formataddr(("Random Lab", SMTP_FROM))
+    msg["To"]      = req.to_email
+    msg["Message-ID"] = email.utils.make_msgid(domain=SMTP_FROM.split("@")[-1] if "@" in SMTP_FROM else "randomlab.io")
+
+    msg.attach(MIMEText(req.body_text, "plain", "utf-8"))
+    msg.attach(MIMEText(tracked_html,  "html",  "utf-8"))
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_FROM, [req.to_email], msg.as_string())
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"SMTP error: {str(e)}")
+
+    # Persist log entry
+    logs = _load_logs()
+    logs[tracking_id] = {
+        "tracking_id": tracking_id,
+        "contact_id":  req.contact_id,
+        "company":     req.company,
+        "to_email":    req.to_email,
+        "subject":     req.subject,
+        "pitch_type":  req.pitch_type,
+        "sent_at":     datetime.now().isoformat(),
+        "opens":       [],   # [{ timestamp, ip, user_agent }]
+        "clicks":      [],
+    }
+    _save_logs(logs)
+
+    return {
+        "status":      "sent",
+        "tracking_id": tracking_id,
+        "to":          req.to_email,
+        "pixel_url":   pixel_url,
+        "tracking_local": is_local,
+    }
+
+
+@router.get("/track/{tracking_id}")
+def track_open(tracking_id: str, request: Request):
+    """
+    Tracking pixel endpoint — called when the recipient opens the email.
+    Returns a 1×1 transparent GIF and records the open event.
+    Deduplicates multiple requests within 5 seconds (email clients often fire 2×).
+    """
+    logs = _load_logs()
+    if tracking_id in logs:
+        now = datetime.now()
+        opens = logs[tracking_id].get("opens", [])
+        # Deduplicate: skip if last open from same IP was less than 5 seconds ago
+        ip = request.client.host if request.client else "unknown"
+        recent = [o for o in opens if o.get("ip") == ip]
+        if recent:
+            last_ts = datetime.fromisoformat(recent[-1]["timestamp"])
+            if (now - last_ts).total_seconds() < 5:
+                # duplicate request from email client — skip
+                return Response(
+                    content=PIXEL_GIF,
+                    media_type="image/gif",
+                    headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"},
+                )
+        opens.append({
+            "timestamp":  now.isoformat(),
+            "ip":         ip,
+            "user_agent": request.headers.get("user-agent", ""),
+        })
+        logs[tracking_id]["opens"] = opens
+        _save_logs(logs)
+
+    return Response(
+        content=PIXEL_GIF,
+        media_type="image/gif",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma":        "no-cache",
+        },
+    )
+
+
+@router.get("/stats/{contact_id}")
+def pitch_stats(contact_id: int):
+    """Return all pitch logs + open events for a given contact."""
+    logs  = _load_logs()
+    items = [v for v in logs.values() if v.get("contact_id") == contact_id]
+    items.sort(key=lambda x: x.get("sent_at", ""), reverse=True)
+
+    return {
+        "contact_id": contact_id,
+        "total_sent": len(items),
+        "pitches":    [
+            {
+                **item,
+                "open_count":  len(item.get("opens", [])),
+                "last_opened": item["opens"][-1]["timestamp"] if item.get("opens") else None,
+            }
+            for item in items
+        ],
+    }
+
+
+@router.get("/all-stats")
+def all_pitch_stats():
+    """Return aggregated stats for all contacts (for dashboard)."""
+    logs = _load_logs()
+    return {
+        "total_sent":   len(logs),
+        "total_opens":  sum(len(v.get("opens", [])) for v in logs.values()),
+        "pitches":      list(logs.values()),
+    }
+
+
+@router.get("/tunnel-status")
+def tunnel_status():
+    """Check if a public tunnel (ngrok/cloudflared) is active for tracking."""
+    url, is_local = _get_public_url()
+    return {
+        "public_url": url,
+        "is_local":   is_local,
+        "tracking_active": not is_local,
+    }
