@@ -10,6 +10,11 @@ import xml.etree.ElementTree as _ET
 from typing import Optional
 from urllib.parse import urljoin, urlparse, urlunparse
 import httpx
+try:
+    from playwright.async_api import async_playwright
+    _PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    _PLAYWRIGHT_AVAILABLE = False
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -39,6 +44,7 @@ class ScrapeResult(BaseModel):
     url: str
     content: str
     status: str  # 'ok' | 'error'
+    emails: list[str] = []  # discovered contact emails, best first
 
 class ScrapeResponse(BaseModel):
     results: list[ScrapeResult]
@@ -81,7 +87,6 @@ _HEADERS = {
     "User-Agent": _CHROME_UA,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
 }
 
 _COMMON_PATHS = [
@@ -101,6 +106,122 @@ _SKIP_PATTERNS = [
     "/wp-admin", "/wp-login", "/admin", "/404", "/500",
     "/cdn-cgi", "/wp-content", ".pdf", ".zip", ".jpg", ".png",
 ]
+
+# ── Email extractor ────────────────────────────────────────────────────────────
+_EMAIL_RE = _re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+
+# Scored prefixes — higher = better for outreach
+_EMAIL_PREFIX_SCORE: list[tuple[list[str], int]] = [
+    (["hola", "hello", "hi", "hey"],                          100),
+    (["contacto", "contact", "contactenos", "contactus"],     95),
+    (["info", "information"],                                  90),
+    (["general", "mail", "email"],                            80),
+    (["team", "equipo"],                                      75),
+    (["press", "prensa", "media"],                            70),
+    (["ventas", "sales", "comercial", "business"],            65),
+    (["studio", "estudio"],                                   60),
+]
+_EMAIL_BLACKLIST = {
+    "noreply", "no-reply", "donotreply", "bounce", "mailer-daemon",
+    "postmaster", "abuse", "spam", "robot", "bot",
+    "support", "soporte", "help", "ayuda", "helpdesk",
+    "admin", "administrator", "webmaster", "root",
+    "sentry", "errors", "alerts", "notifications", "notify",
+    "wordpress", "woocommerce",
+}
+
+def _extract_emails(html_or_text: str, domain: str = "") -> list[str]:
+    """
+    Extract and rank email addresses from HTML/text.
+    Returns list sorted by outreach suitability (best first).
+    """
+    raw = _EMAIL_RE.findall(html_or_text)
+    seen: set[str] = set()
+    scored: list[tuple[int, str]] = []
+
+    site_domain = urlparse("https://" + domain).netloc.lower() if domain else ""
+
+    for email in raw:
+        email = email.lower().strip(".,;'\"")
+        if email in seen:
+            continue
+        seen.add(email)
+
+        local = email.split("@")[0]
+        email_domain = email.split("@")[1] if "@" in email else ""
+
+        # Skip obvious noise
+        if local in _EMAIL_BLACKLIST:
+            continue
+        if any(b in local for b in _EMAIL_BLACKLIST):
+            continue
+        # Skip emails from unrelated domains (unless we have no domain to compare)
+        if site_domain and email_domain and not site_domain.endswith(email_domain) and not email_domain.endswith(site_domain.split(".")[-2] + "." + site_domain.split(".")[-1]) if "." in site_domain else False:
+            continue
+        # Skip example/placeholder
+        if "example" in email or "yourdomain" in email or "correo" == local:
+            continue
+
+        score = 10  # base
+        for prefixes, s in _EMAIL_PREFIX_SCORE:
+            if any(local.startswith(p) or local == p for p in prefixes):
+                score = s
+                break
+
+        scored.append((score, email))
+
+    scored.sort(key=lambda x: -x[0])
+    return [e for _, e in scored[:8]]
+
+
+# ── Login walls ────────────────────────────────────────────────────────────────
+_LOGIN_WALL_SIGNALS = [
+    "únete a linkedin", "join linkedin", "registrarse | linkedin",
+    "sign in to your account", "create your account",
+    "you must be logged in", "please log in",
+    "iniciar sesión para ver",
+]
+
+def _is_login_wall(html: str) -> bool:
+    low = html[:3000].lower()
+    return sum(1 for s in _LOGIN_WALL_SIGNALS if s in low) >= 1
+
+# ── Noise line filter ──────────────────────────────────────────────────────────
+_NOISE_FRAGMENTS = [
+    # auth / forms
+    "inicia sesión", "iniciar sesión", "sign in", "log in",
+    "únete a", "join linkedin", "registrarse", "sign up", "crear cuenta",
+    "¿ya estás", "¿no eres tú?", "aceptar y unirse",
+    "contraseña", "password", "email o teléfono",
+    "continuar con google", "continue with google", "continue with facebook",
+    "¿has olvidado tu contraseña", "forgot password",
+    # legal boilerplate
+    "política de privacidad", "privacy policy", "condiciones de uso",
+    "terms of use", "terms of service", "política de cookies", "cookie policy",
+    "al hacer clic en", "by clicking",
+    # cookie banners
+    "aceptar cookies", "accept cookies", "rechazar cookies", "gestionar cookies",
+    "usamos cookies", "we use cookies",
+    # generic nav noise
+    "ver más", "read more", "leer más", "load more",
+    "suscribirse", "subscribe", "newsletter",
+    "© ", "all rights reserved", "todos los derechos reservados",
+]
+
+def _filter_noise(lines: list[str]) -> list[str]:
+    out = []
+    for line in lines:
+        low = line.lower()
+        # skip very short lines (nav items, button labels)
+        if len(line) < 8:
+            continue
+        # skip lines dominated by special chars (icons, separators)
+        if _re.match(r'^[\W\d\s]+$', line):
+            continue
+        if any(n in low for n in _NOISE_FRAGMENTS):
+            continue
+        out.append(line)
+    return out
 
 
 def _base_root(url: str) -> str:
@@ -143,6 +264,20 @@ def _score_url(url: str) -> int:
     if any(p in low for p in ["/pricing", "/precio", "/plan"]):            return 7
     if any(p in low for p in ["/contact", "/contacto"]):                   return 4
     return 3
+
+
+def _extract_strings(obj, out: list, depth: int = 0) -> None:
+    """Recursively extract readable strings from nested JSON/dict/list."""
+    if depth > 5 or len(out) > 40:
+        return
+    if isinstance(obj, str) and len(obj.strip()) > 10:
+        out.append(obj.strip()[:200])
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            _extract_strings(v, out, depth + 1)
+    elif isinstance(obj, list):
+        for item in obj[:15]:
+            _extract_strings(item, out, depth + 1)
 
 
 async def _try_fetch(url: str, client: httpx.AsyncClient, timeout: float = 10.0):
@@ -286,7 +421,8 @@ def _extract_page(url: str, html: str, max_body_lines: int = 150) -> str:
     if main:
         text = main.get_text(separator="\n", strip=True)
         lines = [l.strip() for l in text.splitlines() if len(l.strip()) >= 4]
-        # deduplicate consecutive
+        # remove noise + deduplicate consecutive
+        lines = _filter_noise(lines)
         deduped, prev = [], None
         for line in lines:
             if line != prev:
@@ -394,6 +530,191 @@ async def _rss_content(base: str, client: httpx.AsyncClient) -> str:
     return ""
 
 
+def _is_wordpress(html: str) -> bool:
+    """Detect WordPress sites via HTML signals."""
+    signals = [
+        'wp-content/', 'wp-includes/', 'wp-json',
+        '<link rel="https://api.w.org/"', 'generator" content="WordPress',
+    ]
+    lower = html[:8000].lower()
+    return any(s.lower() in lower for s in signals)
+
+
+async def _wordpress_api_content(base: str, client: httpx.AsyncClient) -> str:
+    """
+    Fetch pages + posts from WordPress REST API.
+    Returns formatted content of all pages and recent posts.
+    This is far more reliable than HTML scraping for WordPress sites.
+    """
+    sections: list[str] = []
+
+    # Pages (About, Work, Projects, etc.)
+    pages_r = await _try_fetch(f"{base}/wp-json/wp/v2/pages?per_page=20&_fields=title,content,link", client, timeout=12.0)
+    if pages_r:
+        try:
+            pages = json.loads(pages_r[1])
+            if isinstance(pages, list) and pages:
+                for page in pages:
+                    title = page.get("title", {}).get("rendered", "").strip()
+                    rendered = page.get("content", {}).get("rendered", "").strip()
+                    link = page.get("link", "")
+                    if not title or not rendered:
+                        continue
+                    text = BeautifulSoup(rendered, "html.parser").get_text(separator="\n", strip=True)
+                    lines = _filter_noise([l.strip() for l in text.splitlines() if len(l.strip()) >= 4])
+                    if lines:
+                        sections.append(f"[PÁGINA] {title}\n{link}\n" + "\n".join(lines[:60]))
+        except Exception:
+            pass
+
+    # Posts (case studies, blog)
+    posts_r = await _try_fetch(f"{base}/wp-json/wp/v2/posts?per_page=10&_fields=title,content,excerpt,link,date", client, timeout=12.0)
+    if posts_r:
+        try:
+            posts = json.loads(posts_r[1])
+            if isinstance(posts, list) and posts:
+                for post in posts:
+                    title = post.get("title", {}).get("rendered", "").strip()
+                    excerpt = post.get("excerpt", {}).get("rendered", "").strip()
+                    rendered = post.get("content", {}).get("rendered", "").strip()
+                    link = post.get("link", "")
+                    date = post.get("date", "")[:10]
+                    if not title:
+                        continue
+                    # Skip default "Hello World" placeholder posts
+                    if title.lower() in ("¡hola, mundo!", "hello world!", "hello world"):
+                        continue
+                    text = BeautifulSoup(excerpt or rendered, "html.parser").get_text(separator=" ", strip=True)
+                    if text and len(text) > 20:
+                        sections.append(f"[POST] {title} ({date})\n{link}\n{text[:400]}")
+        except Exception:
+            pass
+
+    if not sections:
+        return ""
+    return "WORDPRESS API — PÁGINAS Y POSTS:\n\n" + "\n\n".join(sections)
+
+
+async def _wordpress_custom_urls(base: str, client: httpx.AsyncClient) -> list[str]:
+    """
+    Discover URLs for custom post types via WP REST API types endpoint.
+    Returns list of page URLs to scrape for content.
+    This handles work/portfolio/project CPTs that store content in HTML templates.
+    """
+    urls: list[str] = []
+    types_r = await _try_fetch(f"{base}/wp-json/wp/v2/types", client, timeout=8.0)
+    if not types_r:
+        return urls
+    try:
+        types = json.loads(types_r[1])
+        # Skip built-in types already handled
+        skip = {"post", "page", "attachment", "nav_menu_item", "wp_block",
+                "wp_template", "wp_template_part", "wp_global_styles",
+                "wp_navigation", "wp_font_family", "wp_font_face"}
+        for type_key, type_info in types.items():
+            if type_key in skip:
+                continue
+            rest_base = type_info.get("rest_base") or type_key
+            items_r = await _try_fetch(
+                f"{base}/wp-json/wp/v2/{rest_base}?per_page=20&_fields=link,title",
+                client, timeout=10.0
+            )
+            if not items_r:
+                continue
+            try:
+                items = json.loads(items_r[1])
+                if isinstance(items, list):
+                    for item in items:
+                        link = item.get("link", "")
+                        if link and _same_domain(link, base):
+                            urls.append(link)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return urls
+
+
+async def _playwright_scrape(url: str) -> str:
+    """
+    Headless Chromium scrape for JS-heavy SPAs.
+    - Intercepts fetch() API calls to capture JSON responses
+    - Waits for networkidle (full JS render)
+    - Extracts rendered DOM + window SPA state (Next.js, Nuxt, etc.)
+    Falls back gracefully if playwright is not installed.
+    """
+    if not _PLAYWRIGHT_AVAILABLE:
+        return ""
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
+        )
+        context = await browser.new_context(
+            user_agent=_CHROME_UA,
+            extra_http_headers={"Accept-Language": "es-ES,es;q=0.9,en;q=0.8"},
+        )
+        page = await context.new_page()
+
+        # Intercept fetch() calls before navigation to capture JSON API responses
+        await page.add_init_script("""
+            window.__rnd_api = [];
+            const _f = window.fetch;
+            window.fetch = async (...a) => {
+                const r = await _f(...a);
+                try {
+                    if ((r.headers.get('content-type') || '').includes('application/json')
+                        && window.__rnd_api.length < 6) {
+                        const d = await r.clone().json();
+                        window.__rnd_api.push(d);
+                    }
+                } catch(e) {}
+                return r;
+            };
+        """)
+
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=25000)
+        except Exception:
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                await asyncio.sleep(3)
+            except Exception:
+                await browser.close()
+                return ""
+
+        html = await page.content()
+
+        spa_texts: list[str] = []
+        try:
+            raw = await page.evaluate("""() => JSON.stringify({
+                next: window.__NEXT_DATA__     || null,
+                nuxt: window.__NUXT__          || null,
+                init: window.__INITIAL_STATE__ || null,
+                api:  window.__rnd_api         || [],
+            })""")
+            if raw:
+                data_map = json.loads(raw)
+                for key, val in data_map.items():
+                    if val:
+                        texts: list[str] = []
+                        _extract_strings(val, texts)
+                        if texts:
+                            spa_texts.append(f"SPA {key.upper()}:\n" + "\n".join(texts[:25]))
+        except Exception:
+            pass
+
+        await browser.close()
+
+    parts: list[str] = []
+    body = _extract_page(url, html, max_body_lines=200)
+    if body:
+        parts.append(body)
+    parts.extend(spa_texts)
+    return "\n\n".join(parts)
+
+
 async def scrape_site(base_url: str, client: httpx.AsyncClient, max_subpages: int = 8) -> ScrapeResult:
     """Deep site scrape: homepage + sitemap + RSS + sub-pages."""
     if not base_url.startswith("http"):
@@ -419,6 +740,15 @@ async def scrape_site(base_url: str, client: httpx.AsyncClient, max_subpages: in
     if rss:
         all_sections.append(rss)
 
+    # ── 2b. WordPress REST API (much better than RSS for WP sites) ───────────
+    wp_cpt_urls: list[str] = []
+    if _is_wordpress(homepage_html):
+        wp_content = await _wordpress_api_content(base, client)
+        if wp_content:
+            all_sections.append(wp_content)
+        # Also discover custom post type URLs (work, portfolio, etc.) to crawl their HTML
+        wp_cpt_urls = await _wordpress_custom_urls(base, client)
+
     # ── 3. Sitemap ───────────────────────────────────────────────────────────
     sm_urls = await _sitemap_urls(base, client)
 
@@ -436,13 +766,16 @@ async def scrape_site(base_url: str, client: httpx.AsyncClient, max_subpages: in
     # ── 6. Merge, dedupe, score ──────────────────────────────────────────────
     seen = set(scraped)
     candidates: list[str] = []
-    for u in sm_urls + internal + probes:
+    for u in wp_cpt_urls + sm_urls + internal + probes:
         clean = u.rstrip("/")
         if clean not in seen and _same_domain(clean, base):
             seen.add(clean)
             candidates.append(clean)
-    candidates.sort(key=_score_url, reverse=True)
-    to_crawl = candidates[:max_subpages]
+    # WP CPT urls are already high-value — keep them, then fill with scored rest
+    cpt_set = {u.rstrip("/") for u in wp_cpt_urls}
+    cpt_candidates = [u for u in candidates if u in cpt_set]
+    other_candidates = sorted([u for u in candidates if u not in cpt_set], key=_score_url, reverse=True)
+    to_crawl = (cpt_candidates + other_candidates)[:max(max_subpages, len(cpt_candidates) + 4)]
 
     # ── 7. Crawl sub-pages ───────────────────────────────────────────────────
     async def _sub(url: str):
@@ -460,14 +793,27 @@ async def scrape_site(base_url: str, client: httpx.AsyncClient, max_subpages: in
             all_sections.append(f"=== {r[0]} ===\n{r[1][:2500]}")
 
     combined = "\n\n".join(all_sections)
+    domain = urlparse(base_url).netloc
+    # Collect emails from all crawled HTML
+    all_html = homepage_html + "\n".join(
+        section for section in all_sections
+    )
+    found_emails = _extract_emails(all_html, domain)
+
     if not combined.strip():
+        # Fallback: try Playwright for JS-rendered SPAs
+        if _PLAYWRIGHT_AVAILABLE:
+            pw_content = await _playwright_scrape(base_url)
+            if pw_content and len(pw_content.strip()) > 100:
+                return ScrapeResult(url=base_url, content=pw_content[:10000], status="ok", emails=found_emails)
         return ScrapeResult(
             url=base_url,
             content="",
-            status="error: El sitio parece ser una SPA sin contenido HTML estático visible. Ingresá la información manualmente.",
+            status="error: El sitio parece ser una SPA sin contenido accesible. Playwright no está instalado o el sitio bloquea scrapers.",
+            emails=found_emails,
         )
 
-    return ScrapeResult(url=base_url, content=combined[:10000], status="ok")
+    return ScrapeResult(url=base_url, content=combined[:10000], status="ok", emails=found_emails)
 
 
 async def scrape_url(url: str, client: httpx.AsyncClient) -> ScrapeResult:
@@ -477,9 +823,25 @@ async def scrape_url(url: str, client: httpx.AsyncClient) -> ScrapeResult:
             url = "https://" + url
         r = await _try_fetch(url, client, timeout=15.0)
         if not r:
+            # Fallback to Playwright (JS redirects, auth walls, etc.)
+            if _PLAYWRIGHT_AVAILABLE:
+                pw_content = await _playwright_scrape(url)
+                if pw_content and len(pw_content.strip()) > 100:
+                    return ScrapeResult(url=url, content=pw_content[:5000], status="ok", emails=_extract_emails(pw_content, urlparse(url).netloc))
             return ScrapeResult(url=url, content="", status="error: No se pudo acceder a la URL")
+        # Detect login walls before wasting tokens
+        if _is_login_wall(r[1]):
+            domain = urlparse(url).netloc
+            return ScrapeResult(url=url, content="", status=f"error: {domain} requiere login para ver este contenido. Ingresá la información manualmente.")
         content = _extract_page(r[0], r[1])
-        return ScrapeResult(url=url, content=content[:5000], status="ok")
+        found_emails = _extract_emails(r[1], urlparse(url).netloc)
+        # Fallback to Playwright if BS4 got too little (SPA)
+        if len(content.strip()) < 300 and _PLAYWRIGHT_AVAILABLE:
+            pw_content = await _playwright_scrape(url)
+            if pw_content and len(pw_content.strip()) > len(content.strip()):
+                content = pw_content
+                found_emails = _extract_emails(pw_content, urlparse(url).netloc) or found_emails
+        return ScrapeResult(url=url, content=content[:5000], status="ok", emails=found_emails)
     except Exception as e:
         err = str(e).replace("\n", " ").strip()
         if "999" in err and "linkedin" in url.lower():
@@ -565,6 +927,78 @@ El JSON debe ser parseado directamente con json.loads(). Si no podés analizar a
             tokens_used=message.usage.input_tokens + message.usage.output_tokens,
         )
 
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=502, detail=f"Error Anthropic API: {str(e)}")
+
+
+# ── Translate pitch ───────────────────────────────────────────────────────────
+class TranslatePitchRequest(BaseModel):
+    subject: str
+    text: str
+    html: str
+    lang: str  # 'en' | 'fr' | 'es'
+
+class TranslatePitchResponse(BaseModel):
+    subject: str
+    text: str
+    html: str
+
+_LANG_NAMES = {"en": "English", "fr": "French", "es": "Spanish", "ca": "Catalan"}
+
+@router.post("/translate-pitch", response_model=TranslatePitchResponse)
+async def translate_pitch(request: TranslatePitchRequest):
+    """
+    Translate a pitch email (subject, plain text, HTML) to the target language.
+    Uses Claude Haiku for speed. HTML tags/attributes are preserved verbatim.
+    """
+    lang_name = _LANG_NAMES.get(request.lang, "English")
+    if request.lang == "es":
+        # No-op for default language
+        return TranslatePitchResponse(subject=request.subject, text=request.text, html=request.html)
+
+    api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY / CLAUDE_API_KEY no configurada en .env")
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    system_prompt = (
+        f"You are a professional B2B sales email translator. "
+        f"Your task is to translate the provided pitch email content into {lang_name}. "
+        "Rules:\n"
+        "1. For the 'subject' and 'text' fields: translate naturally and professionally, preserving tone.\n"
+        "2. For the 'html' field: translate ONLY the visible human-readable text. "
+        "DO NOT change any HTML tags, CSS styles, attributes, URLs, email addresses, or code. "
+        "Only translate the text content between tags.\n"
+        "3. Keep brand names, company names, personal names, and technical terms as-is.\n"
+        "4. Maintain the same sales psychology and persuasion structure.\n"
+        "Respond ONLY with valid JSON, no markdown, no backticks:\n"
+        '{"subject": "...", "text": "...", "html": "..."}'
+    )
+
+    user_msg = json.dumps({"subject": request.subject, "text": request.text, "html": request.html}, ensure_ascii=False)
+
+    try:
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+        result = json.loads(raw)
+        return TranslatePitchResponse(
+            subject=result.get("subject", request.subject),
+            text=result.get("text", request.text),
+            html=result.get("html", request.html),
+        )
+    except (json.JSONDecodeError, KeyError) as e:
+        raise HTTPException(status_code=422, detail=f"Translation parsing error: {str(e)}")
     except anthropic.APIError as e:
         raise HTTPException(status_code=502, detail=f"Error Anthropic API: {str(e)}")
 

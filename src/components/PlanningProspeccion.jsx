@@ -11,8 +11,8 @@ const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://local
 const LS_KEY = 'prospeccion_board_fallback_v1'
 
 // ── Tier system (hardcoded until login) ──────────────────────────────────────
-const CURRENT_TIER = 'free' // 'free' | 'paid'
-const TIER_LIMITS  = { free: 5, paid: 20 }
+const CURRENT_TIER = 'paid' // 'free' | 'paid'
+const TIER_LIMITS  = { free: Infinity, paid: Infinity }
 const TIER_MODEL   = { free: 'claude-haiku-4-5', paid: 'claude-sonnet-4-6' }
 
 const getUsageKey   = () => `ai_analysis_usage_${new Date().toDateString()}`
@@ -36,7 +36,16 @@ EMPRESA A ANALIZAR:
 ${scrapedContent ? `\nINFORMACIÓN SCRAPEADA DE WEB:\n${scrapedContent}` : ''}
 
 INSTRUCCIONES:
-Identificá vectores de entrada concretos y oportunidades reales. Sé específico, no genérico. Pensá como un consultor que va a entrar a hacer un pitch.
+Identificá vectores de entrada concretos y oportunidades reales. Sé específico, no genérico. Pensá como un consultor senior de ventas B2B con psicología de ventas nivel experto.
+
+Para el pitch de email usá estos principios:
+- El opening_hook debe hablar de ELLOS, no de nosotros. Una observación concreta y específica sobre su negocio que muestre que los investigaste.
+- El pain_point debe ser la fricción REAL que viven day-to-day, en primera persona como si ellos lo dijeran. No genérico. Debe doler al leerlo.
+- El proof_point debe ser UN resultado concreto con número (porcentaje, tiempo, dinero) de un caso similar. Creíble, no exagerado.
+- El cta debe ser una sola pregunta específica, de bajo compromiso (15 min, no "reunión").
+- El ps_line debe crear scarcity o urgencia real (no falsa). Ej: "trabajo con 1 cliente por vertical", "slot libre hasta X".
+- El subject_line debe generar curiosidad o relevancia inmediata. NUNCA "propuesta" ni "colaboración".
+- La frase cta debe estar en español natural, sin formalidades excesivas.
 
 Respondé ÚNICAMENTE con este JSON (sin markdown, sin backticks, sin texto extra):
 {
@@ -44,9 +53,9 @@ Respondé ÚNICAMENTE con este JSON (sin markdown, sin backticks, sin texto extr
   "fit_category": "<high|mid|low>",
   "summary": "<resumen ejecutivo 2-3 oraciones>",
   "entry_vectors": [
-    { "title": "<nombre corto>", "description": "<descripción concreta de la solución>", "priority": "<high|mid|low>", "category": "<product|infra|ai|marketing|sales>" }
+    { "title": "<nombre corto>", "description": "<descripción concreta de la solución>", "pain": "<la fricción específica que resuelve, en lenguaje del cliente>", "priority": "<high|mid|low>", "category": "<product|infra|ai|marketing|sales>" }
   ],
-  "pain_points": ["<pain point concreto 1>", "<pain point 2>", ...],
+  "pain_points": ["<pain point concreto 1>", "<pain point 2>"],
   "opportunities": {
     "product": ["<oportunidad de producto/feature concreta>"],
     "tech_infra": ["<mejora de infra/modernización>"],
@@ -54,6 +63,12 @@ Respondé ÚNICAMENTE con este JSON (sin markdown, sin backticks, sin texto extr
     "marketing": ["<ángulo de marketing/posicionamiento>"],
     "sales": ["<táctica de venta/entrada comercial>"]
   },
+  "subject_line": "<asunto del email — genera curiosidad, NO dice propuesta ni colaboración>",
+  "opening_hook": "<1 oración sobre ELLOS — observación específica que demuestra que los investigaste>",
+  "pain_point": "<la fricción real que viven, escrita como si ellos la dijesen, 1-2 oraciones, específica y que duela>",
+  "proof_point": "<1 resultado concreto con número de un caso similar — creíble y específico>",
+  "cta": "<pregunta única de bajo compromiso, 15 min máx, informal pero profesional>",
+  "ps_line": "<P.D. con scarcity real o social proof adicional — 1 oración>",
   "recommended_approach": "<primeros 3 pasos concretos para entrar con este cliente>",
   "pitch_angle": "<una frase de pitch para el primer mensaje>"
 }
@@ -174,83 +189,145 @@ async function apiPitchStats(contactId) {
   return res.json()
 }
 
+async function apiTranslatePitch({ subject, text, html, lang }) {
+  const res = await fetch(`${API}/prospecting/translate-pitch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subject, text, html, lang }),
+  })
+  if (!res.ok) throw new Error('Translation error')
+  return res.json()
+}
+
 // ── Pitch template builders ───────────────────────────────────────────────────
 function buildEmailTemplate(contact, analysis) {
-  const topVector = analysis?.entry_vectors?.[0]
-  const pitchLine = analysis?.pitch_angle || `Me gustaría explorar cómo Random Lab puede colaborar con ${contact.company}.`
-  const approach  = analysis?.recommended_approach || ''
-  const dm        = contact.decision_maker || 'Equipo'
+  // ── Saludo: si hay nombre propio lo usamos, si no "equipo de {empresa}"
+  const rawDm      = contact.decision_maker?.split('/')[0]?.split('(')[0]?.trim() || ''
+  // Es un nombre propio si tiene 2+ palabras O empieza con mayúscula y no es genérico
+  const genericTerms = ['founder', 'ceo', 'cto', 'director', 'equipo', 'team', 'founders', 'cofounders']
+  const dmWords    = rawDm.toLowerCase().split(/\s+/)
+  const isProperName = rawDm.length > 0
+    && !genericTerms.some(t => dmWords.includes(t))
+    && /^[A-ZÁÉÍÓÚÑ]/.test(rawDm)
+  const greeting   = isProperName ? `Hola ${rawDm}` : `Hola equipo de ${contact.company}`
 
-  const text = `Hola ${dm},
+  const company    = contact.company || ''
+  const topVector  = analysis?.entry_vectors?.[0]
+  const pitchAngle = analysis?.pitch_angle || ''
+  const score      = analysis?.score || 0
 
-${pitchLine}
+  // ── Subject: curiosity gap + specificity, NOT "propuesta"
+  const subjects = [
+    `Una pregunta técnica sobre ${company}`,
+    `${company} — algo que noté`,
+    `Idea concreta para ${company}`,
+  ]
+  const subject = analysis?.subject_line || subjects[Math.floor(score / 34)] || subjects[0]
 
-Soy Pedro de Random Lab — consultora técnica especializada en arquitectura de sistemas, integración de IA y desarrollo 3D/WebGL.${topVector ? `\n\nIdentifiqué una oportunidad concreta para ${contact.company}: ${topVector.title} — ${topVector.description}` : ''}
+  // ── Opening hook: MUST come from analysis. Fallback uses pitch_angle (not raw vector description)
+  const hook = analysis?.opening_hook
+    || (pitchAngle ? pitchAngle : `Vi el trabajo de ${company} y me generó una pregunta concreta.`)
 
-${approach ? `Mi approach:\n${approach}\n` : ''}¿Tendría 20 minutos esta semana para una llamada exploratoria?
+  // ── Pain / tension
+  const pain = analysis?.pain_point
+    || topVector?.pain
+    || `Este tipo de fricción suele costar semanas y resources que podrían estar en el producto.`
 
-Saludos,
-Pedro Nassiff
-Random Lab
-`.trim()
+  // ── Proof: one concrete result
+  const proof = analysis?.proof_point
+    || `En proyectos similares hemos reducido ese ciclo un 40–60% en los primeros 90 días.`
+
+  // ── CTA
+  const cta = analysis?.cta || `¿Tenés 15 minutos esta semana para ver si aplica a ${company}?`
+
+  // ── PS
+  const ps = analysis?.ps_line || `P.D. — Trabajamos con un cliente por vertical a la vez para mantener foco. El slot de vuestro sector está disponible.`
+
+  const text = `${greeting},
+
+${hook}
+
+${pain}
+
+${proof}
+
+${cta}
+
+Pedro Nassiff · Random Lab
+https://random-lab.es
+
+${ps}`.trim()
 
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#0d0f1a;font-family:'Courier New',monospace;color:#e2e8f0;">
+<body style="margin:0;padding:0;background:#0d0f1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e2e8f0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0f1a;padding:40px 20px;">
     <tr><td>
       <table width="600" cellpadding="0" cellspacing="0" align="center"
-        style="background:#10121e;border:1px solid rgba(139,92,246,0.3);border-radius:12px;overflow:hidden;max-width:600px;width:100%;">
-        <!-- Header -->
+        style="background:#10121e;border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;max-width:600px;width:100%;">
+
+        <!-- Logo strip -->
         <tr>
-          <td style="padding:28px 32px 20px;border-bottom:1px solid rgba(255,255,255,0.07);background:linear-gradient(135deg,rgba(139,92,246,0.12) 0%,transparent 100%);">
-            <div style="font-size:10px;color:#8b5cf6;letter-spacing:0.25em;text-transform:uppercase;margin-bottom:8px;">Random Lab · Outreach</div>
-            <div style="font-size:22px;font-weight:700;color:#f1f5f9;letter-spacing:-0.02em;">Propuesta de colaboración</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.35);margin-top:6px;">Para: ${contact.company}</div>
+          <td style="padding:20px 32px 16px;border-bottom:1px solid rgba(255,255,255,0.05);">
+            <span style="font-size:10px;color:rgba(139,92,246,0.8);letter-spacing:0.3em;text-transform:uppercase;font-family:'Courier New',monospace;">Random Lab</span>
           </td>
         </tr>
+
         <!-- Body -->
         <tr>
-          <td style="padding:28px 32px;">
-            <p style="font-size:14px;color:rgba(255,255,255,0.75);line-height:1.7;margin:0 0 18px;">Hola ${dm},</p>
-            <p style="font-size:14px;color:rgba(255,255,255,0.75);line-height:1.7;margin:0 0 18px;font-style:italic;border-left:3px solid #8b5cf6;padding-left:14px;color:#c4b5fd;">"${pitchLine}"</p>
-            <p style="font-size:13px;color:rgba(255,255,255,0.55);line-height:1.7;margin:0 0 18px;">Soy Pedro de <strong style="color:#f1f5f9;">Random Lab</strong> — consultora técnica especializada en arquitectura de sistemas, integración de IA y desarrollo 3D/WebGL.</p>
-            ${topVector ? `
-            <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
+          <td style="padding:32px 32px 12px;">
+            <p style="font-size:15px;color:rgba(255,255,255,0.8);line-height:1.75;margin:0 0 8px;">${greeting},</p>
+
+            <!-- Hook — about them, not us -->
+            <p style="font-size:15px;color:rgba(255,255,255,0.85);line-height:1.75;margin:0 0 20px;">${hook}</p>
+
+            <!-- Pain -->
+            <p style="font-size:14px;color:rgba(255,255,255,0.55);line-height:1.75;margin:0 0 20px;padding:14px 18px;background:rgba(255,255,255,0.03);border-left:2px solid rgba(239,68,68,0.4);border-radius:0 6px 6px 0;">${pain}</p>
+
+            <!-- Proof -->
+            <p style="font-size:14px;color:rgba(255,255,255,0.65);line-height:1.75;margin:0 0 28px;">${proof}</p>
+
+            <!-- CTA -->
+            <p style="font-size:15px;color:#f1f5f9;line-height:1.75;margin:0 0 28px;font-weight:500;">${cta}</p>
+
+            <!-- Portfolio button -->
+            <table cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
               <tr>
-                <td style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.2);border-left:3px solid #8b5cf6;border-radius:8px;padding:16px 20px;">
-                  <div style="font-size:10px;color:#a78bfa;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:8px;">Oportunidad identificada</div>
-                  <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">${topVector.title}</div>
-                  <div style="font-size:13px;color:rgba(255,255,255,0.55);line-height:1.6;">${topVector.description}</div>
-                </td>
-              </tr>
-            </table>` : ''}
-            ${approach ? `<p style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.7;margin:0 0 18px;">${approach}</p>` : ''}
-            <p style="font-size:14px;color:rgba(255,255,255,0.75);line-height:1.7;margin:0 0 24px;">¿Tendría 20 minutos esta semana para una llamada exploratoria?</p>
-            <table cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-              <tr>
-                <td style="background:rgba(139,92,246,0.2);border:1px solid rgba(139,92,246,0.5);border-radius:8px;padding:12px 24px;">
-                  <a href="https://random-lab.es" style="color:#c4b5fd;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:0.08em;">Ver portfolio →</a>
+                <td style="border:1px solid rgba(139,92,246,0.4);border-radius:7px;padding:10px 22px;background:rgba(139,92,246,0.1);">
+                  <a href="https://random-lab.es" style="color:#c4b5fd;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:0.06em;">Ver portfolio →</a>
                 </td>
               </tr>
             </table>
           </td>
         </tr>
-        <!-- Footer -->
+
+        <!-- Signature -->
         <tr>
-          <td style="padding:18px 32px;border-top:1px solid rgba(255,255,255,0.07);background:rgba(0,0,0,0.2);">
-            <div style="font-size:12px;color:rgba(255,255,255,0.5);">Pedro Nassiff · <a href="https://random-lab.es" style="color:#8b5cf6;text-decoration:none;">random-lab.es</a></div>
-            <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:4px;letter-spacing:0.05em;">RANDOM LAB · CREATIVE TECH CONSULTANCY</div>
+          <td style="padding:16px 32px 20px;">
+            <p style="font-size:13px;color:rgba(255,255,255,0.4);margin:0;line-height:1.6;">
+              Pedro Nassiff · <a href="https://random-lab.es" style="color:#8b5cf6;text-decoration:none;">random-lab.es</a>
+            </p>
           </td>
         </tr>
+
+        <!-- Divider -->
+        <tr><td style="height:1px;background:rgba(255,255,255,0.05);"></td></tr>
+
+        <!-- PS — second most-read part of cold emails -->
+        <tr>
+          <td style="padding:16px 32px 24px;background:rgba(0,0,0,0.15);">
+            <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:0;line-height:1.6;font-style:italic;">${ps}</p>
+          </td>
+        </tr>
+
       </table>
     </td></tr>
   </table>
 </body>
 </html>`
 
-  return { text, html, subject: `Propuesta Random Lab × ${contact.company}` }
+  return { text, html, subject }
 }
 
 function buildDMTemplate(contact, analysis) {
@@ -270,7 +347,7 @@ Pedro · Random Lab`
 }
 
 // ── PitchModal ────────────────────────────────────────────────────────────────
-function PitchModal({ contact, analysis, onClose }) {
+function PitchModal({ contact, analysis, scrapedEmails = [], onClose }) {
   const [tab, setTab]               = useState('email')  // 'email' | 'dm'
   const [toEmail, setToEmail]       = useState(contact.email || '')
   const [subject, setSubject]       = useState('')
@@ -279,6 +356,8 @@ function PitchModal({ contact, analysis, onClose }) {
   const [dmText, setDmText]         = useState('')
   const [sending, setSending]       = useState(false)
   const [sendError, setSendError]   = useState(null)
+  const [lang, setLang]             = useState('es')
+  const [translating, setTranslating] = useState(false)
   const _pitchKey = `pitch_sent_${contact.id}`
   const [sent, setSent]               = useState(() => { try { const c = JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`)); return !!c?.trackingId } catch { return false } })
   const [trackingId, setTrackingId]   = useState(() => { try { const c = JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`)); return c?.trackingId || null } catch { return null } })
@@ -286,10 +365,29 @@ function PitchModal({ contact, analysis, onClose }) {
   const [sentAt, setSentAt]           = useState(() => { try { const c = JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`)); return c?.sentAt || null } catch { return null } })
   const [trackingLocal, setTrackingLocal] = useState(() => { try { const c = JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`)); return c?.trackingLocal ?? true } catch { return true } })
   const [pixelUrl, setPixelUrl]           = useState(() => { try { const c = JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`)); return c?.pixelUrl || null } catch { return null } })
+  const [sentSubject, setSentSubject]     = useState(() => { try { const c = JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`)); return c?.sentSubject || '' } catch { return '' } })
+  const [sentBodyText, setSentBodyText]   = useState(() => { try { const c = JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`)); return c?.sentBodyText || '' } catch { return '' } })
+  const [showSentEmail, setShowSentEmail] = useState(false)
   const [tunnelUrl, setTunnelUrl]         = useState(() => { try { return localStorage.getItem('pitch_tunnel_url') || '' } catch { return '' } })
   const [stats, setStats]             = useState(null)
   const [statsLoading, setStatsLoading] = useState(false)
   const [copied, setCopied]           = useState(false)
+
+  // Auto-fetch tunnel URL from backend on mount (populated by init-backend.sh)
+  useEffect(() => {
+    const fetchTunnel = async () => {
+      try {
+        const res = await fetch(`${API}/prospecting/pitch/tunnel-status`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.public_url && !data.is_local) {
+          setTunnelUrl(data.public_url)
+          try { localStorage.setItem('pitch_tunnel_url', data.public_url) } catch {}
+        }
+      } catch {}
+    }
+    fetchTunnel()
+  }, [])
 
   useEffect(() => {
     const email = buildEmailTemplate(contact, analysis)
@@ -334,11 +432,38 @@ function PitchModal({ contact, analysis, onClose }) {
       const isLocal = res.tracking_local ?? true
       setTrackingLocal(isLocal)
       setPixelUrl(res.pixel_url || null)
-      try { localStorage.setItem(_pitchKey, JSON.stringify({ trackingId: res.tracking_id, sentTo: toEmail.trim(), sentAt: now, trackingLocal: isLocal, pixelUrl: res.pixel_url || null })) } catch {}
+      setSentSubject(subject)
+      setSentBodyText(bodyText)
+      try { localStorage.setItem(_pitchKey, JSON.stringify({ trackingId: res.tracking_id, sentTo: toEmail.trim(), sentAt: now, trackingLocal: isLocal, pixelUrl: res.pixel_url || null, sentSubject: subject, sentBodyText: bodyText })) } catch {}
     } catch (err) {
       setSendError(err.message)
     } finally {
       setSending(false)
+    }
+  }
+
+  const changeLang = async (newLang) => {
+    if (newLang === lang) return
+    if (newLang === 'es' && lang !== 'es') {
+      // re-generate from template to restore Spanish original
+      const email = buildEmailTemplate(contact, analysis)
+      setSubject(email.subject)
+      setBodyHtml(email.html)
+      setBodyText(email.text)
+      setLang('es')
+      return
+    }
+    setTranslating(true)
+    try {
+      const translated = await apiTranslatePitch({ subject, text: bodyText, html: bodyHtml, lang: newLang })
+      setSubject(translated.subject)
+      setBodyText(translated.text)
+      setBodyHtml(translated.html)
+      setLang(newLang)
+    } catch (err) {
+      setSendError(`Error al traducir: ${err.message}`)
+    } finally {
+      setTranslating(false)
     }
   }
 
@@ -355,10 +480,10 @@ function PitchModal({ contact, analysis, onClose }) {
     zIndex: 1200, padding: 16, backdropFilter: 'blur(8px)',
   }
   const modalStyle = {
-    background: '#080b15', border: '1px solid rgba(139,92,246,0.3)',
-    borderRadius: 14, width: '100%', maxWidth: 800,
-    maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-    overflow: 'hidden', boxShadow: '0 0 80px rgba(139,92,246,0.2)',
+    background: '#080b15', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 14, width: '100%', maxWidth: 960,
+    maxHeight: '94vh', display: 'flex', flexDirection: 'column',
+    overflow: 'hidden', boxShadow: 'none',
   }
   const inputStyle = {
     width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
@@ -456,48 +581,21 @@ function PitchModal({ contact, analysis, onClose }) {
                     )}
                   </div>
 
-                  {/* Tunnel URL — always editable */}
+                  {/* Tunnel status — compact, no manual input needed */}
                   <div style={{
-                    padding: '10px 14px', borderRadius: 8,
-                    background: trackingLocal ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${trackingLocal ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                    fontSize: '0.58rem', fontFamily: 'monospace',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 12px', borderRadius: 7,
+                    background: trackingLocal ? 'rgba(251,191,36,0.06)' : 'rgba(34,197,94,0.05)',
+                    border: `1px solid ${trackingLocal ? 'rgba(251,191,36,0.2)' : 'rgba(34,197,94,0.2)'}`,
+                    fontSize: '0.55rem', fontFamily: 'monospace',
                   }}>
-                    <div style={{ fontWeight: 700, marginBottom: 6, color: trackingLocal ? '#fde68a' : 'rgba(255,255,255,0.4)' }}>
-                      {trackingLocal ? '⚠ Tracking inactivo — pegá la URL del túnel' : '🌐 URL del túnel cloudflare'}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input
-                        value={tunnelUrl}
-                        onChange={e => {
-                          setTunnelUrl(e.target.value)
-                          try { localStorage.setItem('pitch_tunnel_url', e.target.value) } catch {}
-                        }}
-                        placeholder="https://xxxx.trycloudflare.com"
-                        style={{
-                          flex: 1, background: 'rgba(0,0,0,0.3)',
-                          border: `1px solid ${trackingLocal ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                          borderRadius: 5, padding: '5px 9px',
-                          color: trackingLocal ? '#fde68a' : 'rgba(255,255,255,0.6)',
-                          fontSize: '0.6rem', fontFamily: 'monospace', outline: 'none',
-                        }}
-                      />
-                      {tunnelUrl && <span style={{ color: '#86efac', fontSize: '0.7rem', lineHeight: '28px' }}>✓</span>}
-                    </div>
-                    {trackingLocal && (
-                      <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.52rem', marginTop: 5 }}>
-                        <code style={{ color: '#a5b4fc' }}>./init-tunner-cloudflare.sh</code> → copiá la URL que aparece → pegala arriba → re-enviá
-                      </div>
-                    )}
+                    <span style={{ fontSize: '0.65rem' }}>{trackingLocal ? '⚠' : '🌐'}</span>
+                    <span style={{ color: trackingLocal ? '#fde68a' : '#86efac', flex: 1 }}>
+                      {trackingLocal
+                        ? 'Tracking inactivo — reiniciá el backend (./init-backend.sh)'
+                        : `Tracking activo · ${tunnelUrl}`}
+                    </span>
                   </div>
-
-                  {/* Pixel test link */}
-                  {pixelUrl && (
-                    <div style={{ padding: '8px 12px', borderRadius: 7, background: 'rgba(165,180,252,0.04)', border: '1px solid rgba(165,180,252,0.12)', fontSize: '0.55rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ color: '#a5b4fc' }}>🔗 test pixel:</span>
-                      <a href={pixelUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#a5b4fc', textDecoration: 'underline', wordBreak: 'break-all' }}>{pixelUrl}</a>
-                    </div>
-                  )}
 
                   {/* Opens stats */}
                   <div style={{
@@ -542,13 +640,63 @@ function PitchModal({ contact, analysis, onClose }) {
                     )}
                   </div>
 
-                  <button onClick={() => { setSent(false); setTrackingId(null); setSentTo(''); setSentAt(null); setStats(null); setPixelUrl(null); try { localStorage.removeItem(_pitchKey) } catch {} }} style={{
-                    padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem',
-                    fontFamily: 'monospace', cursor: 'pointer', alignSelf: 'flex-start',
-                  }}>
-                    ← Re-enviar pitch nuevo
-                  </button>
+                  {/* Action row: ver email + re-enviar */}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => setShowSentEmail(v => !v)}
+                      style={{
+                        padding: '6px 12px', borderRadius: 6,
+                        border: `1px solid ${showSentEmail ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                        background: showSentEmail ? 'rgba(139,92,246,0.1)' : 'transparent',
+                        color: showSentEmail ? '#c4b5fd' : 'rgba(255,255,255,0.4)',
+                        fontSize: '0.58rem', fontFamily: 'monospace', cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {showSentEmail ? '▲ Ocultar email' : '📄 Ver email enviado'}
+                    </button>
+                    <button onClick={() => { setSent(false); setTrackingId(null); setSentTo(''); setSentAt(null); setStats(null); setPixelUrl(null); setSentSubject(''); setSentBodyText(''); setShowSentEmail(false); try { localStorage.removeItem(_pitchKey) } catch {} }} style={{
+                      padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: '0.58rem',
+                      fontFamily: 'monospace', cursor: 'pointer',
+                    }}>
+                      ← Re-enviar pitch nuevo
+                    </button>
+                  </div>
+
+                  {/* Sent email preview */}
+                  {showSentEmail && (sentSubject || sentBodyText) && (
+                    <div style={{
+                      borderRadius: 8,
+                      border: '1px solid rgba(139,92,246,0.2)',
+                      background: 'rgba(139,92,246,0.04)',
+                      overflow: 'hidden',
+                    }}>
+                      {/* Subject bar */}
+                      <div style={{
+                        padding: '8px 14px',
+                        borderBottom: '1px solid rgba(139,92,246,0.15)',
+                        background: 'rgba(139,92,246,0.06)',
+                        display: 'flex', alignItems: 'baseline', gap: 8,
+                      }}>
+                        <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.12em', flexShrink: 0 }}>Asunto</span>
+                        <span style={{ fontSize: '0.65rem', color: '#e2e8f0', fontFamily: 'monospace', fontWeight: 700 }}>{sentSubject}</span>
+                      </div>
+                      {/* Body */}
+                      <pre style={{
+                        margin: 0,
+                        padding: '14px 16px',
+                        fontSize: '0.6rem',
+                        fontFamily: 'monospace',
+                        color: 'rgba(255,255,255,0.6)',
+                        lineHeight: 1.7,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        maxHeight: 320,
+                        overflowY: 'auto',
+                      }}>{sentBodyText}</pre>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -557,6 +705,18 @@ function PitchModal({ contact, analysis, onClose }) {
                     <input value={toEmail} onChange={e => setToEmail(e.target.value)}
                       placeholder="contacto@empresa.com"
                       style={inputStyle} />
+                    {scrapedEmails.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 2 }}>
+                        <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', alignSelf: 'center' }}>detectados:</span>
+                        {scrapedEmails.slice(0, 4).map(email => (
+                          <button key={email} onClick={() => setToEmail(email)} style={{
+                            padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(34,197,94,0.3)',
+                            background: 'rgba(34,197,94,0.06)', color: '#86efac',
+                            fontSize: '0.55rem', fontFamily: 'monospace', cursor: 'pointer',
+                          }}>{email}</button>
+                        ))}
+                      </div>
+                    )}
                   </label>
 
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -585,11 +745,37 @@ function PitchModal({ contact, analysis, onClose }) {
                     </div>
                   )}
 
-                  <button onClick={send} disabled={sending} style={{
+                  {/* ── Language selector ── */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>idioma:</span>
+                    {[
+                      { code: 'es', label: '🇪🇸 ES' },
+                      { code: 'en', label: '🇬🇧 EN' },
+                      { code: 'fr', label: '🇫🇷 FR' },
+                      { code: 'ca', label: '🏴󠁥󠁳󠁣󠁴󠁿 CA' },
+                    ].map(({ code, label }) => (
+                      <button key={code} onClick={() => changeLang(code)} disabled={translating}
+                        style={{
+                          padding: '3px 10px', borderRadius: 5, fontFamily: 'monospace', fontSize: '0.6rem',
+                          cursor: translating ? 'not-allowed' : 'pointer',
+                          border: lang === code ? '1px solid rgba(167,139,250,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                          background: lang === code ? 'rgba(167,139,250,0.15)' : 'transparent',
+                          color: lang === code ? '#c4b5fd' : 'rgba(255,255,255,0.35)',
+                          fontWeight: lang === code ? 700 : 400,
+                        }}>
+                        {label}
+                      </button>
+                    ))}
+                    {translating && (
+                      <span style={{ fontSize: '0.55rem', color: '#a78bfa', fontFamily: 'monospace' }}>⟳ traduciendo...</span>
+                    )}
+                  </div>
+
+                  <button onClick={send} disabled={sending || translating} style={{
                     width: '100%', padding: '11px', borderRadius: 9,
-                    border: '1px solid rgba(139,92,246,0.5)', background: sending ? 'rgba(139,92,246,0.08)' : 'rgba(139,92,246,0.18)',
+                    border: '1px solid rgba(139,92,246,0.5)', background: (sending || translating) ? 'rgba(139,92,246,0.08)' : 'rgba(139,92,246,0.18)',
                     color: '#c4b5fd', fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 700,
-                    cursor: sending ? 'not-allowed' : 'pointer', letterSpacing: '0.1em',
+                    cursor: (sending || translating) ? 'not-allowed' : 'pointer', letterSpacing: '0.1em',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}>
                     {sending ? '⟳ ENVIANDO...' : '✉ ENVIAR PITCH EMAIL'}
@@ -713,6 +899,25 @@ function useContacts() {
   return { contacts, loading, apiOnline, moveContact, updateContact, createContact }
 }
 
+// ── useTrackingStats hook — polls /all-stats-by-contact every 30s ─────────────
+function useTrackingStats() {
+  const [stats, setStats] = useState({}) // { [contact_id]: { open_count, last_opened, sent_count } }
+
+  useEffect(() => {
+    const fetch_ = async () => {
+      try {
+        const res = await fetch(`${API}/prospecting/pitch/all-stats-by-contact`)
+        if (res.ok) setStats(await res.json())
+      } catch {}
+    }
+    fetch_()
+    const timer = setInterval(fetch_, 30_000)
+    return () => clearInterval(timer)
+  }, [])
+
+  return stats
+}
+
 // ── Badge ─────────────────────────────────────────────────────────────────────
 function Badge({ label, color, small }) {
   return (
@@ -745,8 +950,25 @@ function AIIcon({ size = 12, color = '#a78bfa' }) {
 }
 
 // ── Contact Card ──────────────────────────────────────────────────────────────
-function ContactCard({ contact, onEdit, onMove }) {
+function ContactCard({ contact, onEdit, onMove, tracking }) {
   const tierColor = TIER_COLORS[contact.tier] || '#6b7280'
+  const openCount  = tracking?.open_count  || 0
+  const lastOpened = tracking?.last_opened || null
+  const sentCount  = tracking?.sent_count  || 0
+  const wasOpened  = openCount > 0
+
+  // Human-friendly relative time (e.g. "hace 2h", "hace 3d")
+  const relativeTime = ts => {
+    if (!ts) return null
+    const diff = Date.now() - new Date(ts).getTime()
+    const mins  = Math.floor(diff / 60_000)
+    const hours = Math.floor(diff / 3_600_000)
+    const days  = Math.floor(diff / 86_400_000)
+    if (mins  < 60)  return `${mins}m`
+    if (hours < 24)  return `${hours}h`
+    return `${days}d`
+  }
+
   const daysSince = contact.last_action
     ? Math.floor((Date.now() - new Date(contact.last_action)) / 86400000)
     : null
@@ -768,8 +990,8 @@ function ContactCard({ contact, onEdit, onMove }) {
       onClick={() => onEdit(contact)}
       title="Click para editar · Arrastrá para mover"
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: `1px solid ${stale ? 'rgba(245,158,11,0.35)' : hasAnalysis ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.08)'}`,
+        background: wasOpened ? 'rgba(34,197,94,0.03)' : 'rgba(255,255,255,0.03)',
+        border: `1px solid ${stale ? 'rgba(245,158,11,0.35)' : wasOpened ? 'rgba(34,197,94,0.25)' : hasAnalysis ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.08)'}`,
         borderLeft: `3px solid ${tierColor}`,
         borderRadius: 8,
         padding: '10px 12px',
@@ -788,6 +1010,45 @@ function ContactCard({ contact, onEdit, onMove }) {
         e.currentTarget.style.boxShadow = 'none'
       }}
     >
+      {/* Email tracking pill — shown only when tracking data exists */}
+      {sentCount > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          marginBottom: 7,
+          padding: '3px 7px',
+          borderRadius: 5,
+          background: wasOpened ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${wasOpened ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`,
+        }}>
+          {/* Dot indicator */}
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+            background: wasOpened ? '#22c55e' : 'rgba(255,255,255,0.2)',
+            boxShadow: wasOpened ? '0 0 5px rgba(34,197,94,0.6)' : 'none',
+          }} />
+          <span style={{
+            fontSize: '0.52rem', fontFamily: 'monospace', fontWeight: 700,
+            color: wasOpened ? '#86efac' : 'rgba(255,255,255,0.25)',
+            letterSpacing: '0.05em',
+            flex: 1,
+          }}>
+            {wasOpened
+              ? openCount === 1 ? '1 apertura' : `${openCount} aperturas`
+              : 'email enviado'}
+          </span>
+          {wasOpened && lastOpened && (
+            <span style={{ fontSize: '0.48rem', fontFamily: 'monospace', color: 'rgba(134,239,172,0.5)' }}>
+              hace {relativeTime(lastOpened)}
+            </span>
+          )}
+          {!wasOpened && (
+            <span style={{ fontSize: '0.48rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.15)' }}>
+              sin aperturas
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Company + tier */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 5 }}>
         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f1f5f9', fontFamily: 'monospace', lineHeight: 1.2, flex: 1 }}>
@@ -895,7 +1156,7 @@ function ContactCard({ contact, onEdit, onMove }) {
 }
 
 // ── Stage Column ──────────────────────────────────────────────────────────────
-function StageColumn({ stage, contacts, onEdit, onMove }) {
+function StageColumn({ stage, contacts, onEdit, onMove, trackingStats }) {
   const [dragOver, setDragOver] = useState(false)
 
   const handleDragOver  = e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(true) }
@@ -953,7 +1214,7 @@ function StageColumn({ stage, contacts, onEdit, onMove }) {
         style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 6px', minHeight: 80 }}
       >
         {contacts.map(c => (
-          <ContactCard key={c.id} contact={c} onEdit={onEdit} onMove={onMove} />
+          <ContactCard key={c.id} contact={c} onEdit={onEdit} onMove={onMove} tracking={trackingStats?.[c.id]} />
         ))}
         {contacts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '0.58rem', color: 'rgba(255,255,255,0.15)', fontFamily: 'monospace' }}>
@@ -1047,8 +1308,23 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
     return null
   })
   const [prompt, setPrompt]                 = useState(buildDefaultPrompt(contact, ''))
+  const [scrapedEmails, setScrapedEmails]   = useState(() => {
+    try {
+      const c = JSON.parse(localStorage.getItem(`scrape_cache_${contact.id}`))
+      if (c && Date.now() - c.ts < 86400000) {
+        if (c.emails && c.emails.length > 0) return c.emails
+        // fallback: extract from cached content for old cache entries without emails field
+        if (c.content) {
+          const found = [...new Set((c.content.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || []))]
+            .filter(e => !/(noreply|no-reply|support|admin|sentry|postmaster|wordpress)/i.test(e))
+          if (found.length > 0) return found.slice(0, 8)
+        }
+      }
+    } catch {}
+    return []
+  })
   const pitchSent = (() => { try { return !!JSON.parse(localStorage.getItem(`pitch_sent_${contact.id}`))?.trackingId } catch { return false } })()
-  const [showPrompt, setShowPrompt]         = useState(false)
+  const [showPrompt, setShowPrompt]         = useState(true)
   const [analyzing, setAnalyzing]           = useState(false)
   const [scraping, setScraping]             = useState(false)
   const [analysis, setAnalysis]             = useState(contact.ai_analysis || null)
@@ -1068,8 +1344,18 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
   }
   const removeUrl = u => setUrls(p => p.filter(x => x !== u))
 
+  const clearScrapeCache = () => {
+    try { localStorage.removeItem(cacheKey) } catch {}
+    setScrapedContent('')
+    setScrapeStatus({})
+    setCacheTs(null)
+    setScrapedEmails([])
+  }
+
   const runScrape = async () => {
     if (urls.length === 0) return
+    // always bust cache before a fresh scrape
+    try { localStorage.removeItem(cacheKey) } catch {}
     setScraping(true); setAiError(null)
     const statuses = {}
     urls.forEach(u => { statuses[u] = { status: 'loading', message: '' } })
@@ -1079,17 +1365,20 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
       const results = data.results || []
       let combined = ''
       const ns = {}
+      const allEmails = []
       results.forEach(r => {
         const isOk = r.status === 'ok'
         ns[r.url] = { status: isOk ? 'ok' : 'error', message: isOk ? '' : r.status }
         if (r.content) combined += `\n\n--- ${r.url} ---\n${r.content.slice(0, 8000)}`
+        if (r.emails) r.emails.forEach(e => { if (!allEmails.includes(e)) allEmails.push(e) })
       })
       setScrapeStatus(ns)
+      setScrapedEmails(allEmails)
       const trimmed = combined.trim()
       setScrapedContent(trimmed)
       const now = Date.now()
       setCacheTs(now)
-      try { localStorage.setItem(cacheKey, JSON.stringify({ content: trimmed, statuses: ns, ts: now })) } catch {}
+      try { localStorage.setItem(cacheKey, JSON.stringify({ content: trimmed, statuses: ns, ts: now, emails: allEmails })) } catch {}
     } catch (err) {
       setAiError(`Error scrapeando: ${err.message}`)
       const fs = {}; urls.forEach(u => { fs[u] = { status: 'error', message: err.message } }); setScrapeStatus(fs)
@@ -1144,10 +1433,10 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
       zIndex: 1100, padding: 16, backdropFilter: 'blur(6px)',
     }}>
       <div style={{
-        background: '#080a12', border: '1px solid rgba(167,139,250,0.2)',
-        borderRadius: 16, width: '100%', maxWidth: 1400,
-        height: '92vh', display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', boxShadow: '0 0 60px rgba(139,92,246,0.15)',
+        background: '#080a12', border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 16, width: '100%', maxWidth: 1600,
+        height: '96vh', display: 'flex', flexDirection: 'column',
+        overflow: 'hidden', boxShadow: 'none',
       }}>
 
         {/* ── Header ── */}
@@ -1198,7 +1487,7 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
 
           {/* ── LEFT: Edit form ── */}
           <div style={{
-            width: 310, flexShrink: 0, overflowY: 'auto',
+            width: 340, flexShrink: 0, overflowY: 'auto',
             padding: '16px 18px', borderRight: '1px solid rgba(255,255,255,0.06)',
             display: 'flex', flexDirection: 'column', gap: 0,
           }}>
@@ -1295,7 +1584,7 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
 
           {/* ── MIDDLE: AI inputs ── */}
           <div style={{
-            width: 300, flexShrink: 0, overflowY: 'auto',
+            width: 480, flexShrink: 0, overflowY: 'auto',
             padding: '16px 18px', borderRight: '1px solid rgba(255,255,255,0.06)',
           }}>
             <div style={{ fontSize: '0.55rem', color: 'rgba(167,139,250,0.6)', fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>
@@ -1358,13 +1647,19 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
               {scrapedContent && (
                 <div style={{ marginTop: 8, fontSize: '0.58rem', fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#22c55e' }}>✓ {scrapedContent.length} chars scrapeados</span>
-                  {cacheTs && (
-                    <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.5rem' }}>
-                      guardado hace {Math.round((Date.now() - cacheTs) / 60000) < 60
-                        ? `${Math.round((Date.now() - cacheTs) / 60000)}m`
-                        : `${Math.round((Date.now() - cacheTs) / 3600000)}h`}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {cacheTs && (
+                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.5rem' }}>
+                        guardado hace {Math.round((Date.now() - cacheTs) / 60000) < 60
+                          ? `${Math.round((Date.now() - cacheTs) / 60000)}m`
+                          : `${Math.round((Date.now() - cacheTs) / 3600000)}h`}
+                      </span>
+                    )}
+                    <button onClick={clearScrapeCache} title="Limpiar caché" style={{
+                      background: 'none', border: 'none', color: 'rgba(239,68,68,0.4)',
+                      cursor: 'pointer', fontSize: '0.6rem', fontFamily: 'monospace', padding: '0 2px',
+                    }}>× caché</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1381,7 +1676,7 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
                 <span>{showPrompt ? '▲' : '▼'}</span>
               </button>
               {showPrompt && (
-                <textarea rows={8} value={prompt} onChange={e => setPrompt(e.target.value)}
+                <textarea rows={20} value={prompt} onChange={e => setPrompt(e.target.value)}
                   style={{ ...aiInputStyle, marginTop: 6 }} />
               )}
             </div>
@@ -1542,6 +1837,7 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
       <PitchModal
         contact={contact}
         analysis={analysis}
+        scrapedEmails={scrapedEmails}
         onClose={() => setShowPitch(false)}
       />
     )}
@@ -1552,6 +1848,7 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 const PlanningProspeccion = () => {
   const { contacts, loading, apiOnline, moveContact, updateContact, createContact } = useContacts()
+  const trackingStats = useTrackingStats()
   const [editTarget,     setEditTarget]     = useState(null)
   const [showNew,        setShowNew]        = useState(false)
   const [tierFilter,     setTierFilter]     = useState(0)
@@ -1664,6 +1961,7 @@ const PlanningProspeccion = () => {
                   contacts={byStage(stage)}
                   onEdit={setEditTarget}
                   onMove={moveContact}
+                  trackingStats={trackingStats}
                 />
               ))}
             </div>

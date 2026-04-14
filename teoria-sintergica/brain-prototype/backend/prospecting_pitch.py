@@ -52,12 +52,22 @@ def _get_public_url() -> tuple[str, bool]:
     Returns (public_url, is_local).
     Priority:
       1. APP_URL env var if it's not localhost
-      2. Auto-detect running ngrok tunnel via localhost:4040 API
-      3. Auto-detect cloudflared via localhost:4040 (same API shape)
+      2. /tmp/cloudflare_tunnel_url — written by init-backend.sh / init-tunner-cloudflare.sh
+      3. Auto-detect running ngrok tunnel via localhost:4040 API
       4. Fallback to APP_URL (localhost) → is_local=True
     """
     if _APP_URL_ENV and "localhost" not in _APP_URL_ENV and "127.0.0.1" not in _APP_URL_ENV:
         return _APP_URL_ENV.rstrip("/"), False
+
+    # Check file written by cloudflared wrapper
+    tunnel_file = Path("/tmp/cloudflare_tunnel_url")
+    if tunnel_file.exists():
+        try:
+            url = tunnel_file.read_text().strip()
+            if url.startswith("https://") and "trycloudflare.com" in url:
+                return url.rstrip("/"), False
+        except Exception:
+            pass
 
     # Try ngrok local API
     for ngrok_port in (4040, 4041, 4042):
@@ -68,7 +78,6 @@ def _get_public_url() -> tuple[str, bool]:
                 pub = tunnel.get("public_url", "")
                 if pub.startswith("https://"):
                     return pub.rstrip("/"), False
-            # fallback to first http if no https
             for tunnel in data.get("tunnels", []):
                 pub = tunnel.get("public_url", "")
                 if pub.startswith("http://"):
@@ -246,6 +255,28 @@ def all_pitch_stats():
         "total_opens":  sum(len(v.get("opens", [])) for v in logs.values()),
         "pitches":      list(logs.values()),
     }
+
+
+@router.get("/all-stats-by-contact")
+def all_stats_by_contact():
+    """Return a map of contact_id -> { open_count, last_opened, sent_count }
+    for efficient kanban badge rendering (single fetch for all cards)."""
+    logs = _load_logs()
+    result: dict[int, dict] = {}
+    for item in logs.values():
+        cid = item.get("contact_id")
+        if cid is None:
+            continue
+        opens      = item.get("opens", [])
+        open_count = len(opens)
+        last_opened = opens[-1]["timestamp"] if opens else None
+        if cid not in result:
+            result[cid] = {"open_count": 0, "last_opened": None, "sent_count": 0}
+        result[cid]["sent_count"]  += 1
+        result[cid]["open_count"]  += open_count
+        if last_opened and (result[cid]["last_opened"] is None or last_opened > result[cid]["last_opened"]):
+            result[cid]["last_opened"] = last_opened
+    return result
 
 
 @router.get("/tunnel-status")
