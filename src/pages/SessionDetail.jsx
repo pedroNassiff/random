@@ -12,7 +12,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Liveline } from 'liveline'
+import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout'
+import 'react-grid-layout/css/styles.css'
 
 const API = import.meta.env.VITE_API_URL || import.meta.env.VITE_BRAIN_API_BASE || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://api.random-lab.es')
 
@@ -139,6 +140,19 @@ const SESSION_NOTES = {
     ],
     conditions: 'Protocolo de 30 min completo, sesión de referencia de alta calidad',
   },
+  37: {
+    observations: [
+      'Sesión de 30 min completos (8546 ventanas)',
+      'Berger excelente: ratio 1.829× — alpha cerrados 1.295 vs abiertos 0.708',
+      'Reactividad cognitiva passed marginal: beta 1.242× — gamma bajó (0.768×)',
+      'calibration_passed: false — revisar colocación del headband en próxima sesión',
+      'Coherencia promedio 0.467, pico 0.546 — moderada, por debajo de sesión 34',
+    ],
+    learnings: [
+      '— completar con observaciones post-sesión —',
+    ],
+    conditions: '13 de abril 2026, 08:19 hs · calidad señal 93.2%',
+  },
   35: {
     observations: [
       'Score B (79.3), 28.6 minutos de datos — 8587 ventanas de métricas',
@@ -169,6 +183,38 @@ const h4Style = {
   fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0',
   margin: '20px 0 8px 0', fontFamily: 'monospace',
 }
+
+// ── Grid layout ───────────────────────────────────────────────────────────────
+const SESSION_LAYOUT_KEY = 'session_detail_layout'
+const SESSION_DEFAULT_LAYOUT = {
+  lg: [
+    { i: 'resumen',    x: 0, y: 0,  w: 12, h: 9,  minW: 6, minH: 5 },
+    { i: 'actividad',  x: 0, y: 9,  w: 12, h: 12, minW: 6, minH: 8 },
+    { i: 'video',      x: 0, y: 21, w: 6,  h: 9,  minW: 4, minH: 5 },
+    { i: 'validacion', x: 6, y: 21, w: 6,  h: 14, minW: 4, minH: 6 },
+    { i: 'protocolo',  x: 0, y: 35, w: 12, h: 20, minW: 6, minH: 8 },
+    { i: 'metadatos',  x: 0, y: 55, w: 6,  h: 7,  minW: 4, minH: 4 },
+    { i: 'notas',      x: 6, y: 55, w: 6,  h: 12, minW: 4, minH: 5 },
+  ],
+  sm: [
+    { i: 'resumen',    x: 0, y: 0,  w: 1, h: 9  },
+    { i: 'actividad',  x: 0, y: 9,  w: 1, h: 12 },
+    { i: 'video',      x: 0, y: 21, w: 1, h: 9  },
+    { i: 'validacion', x: 0, y: 30, w: 1, h: 14 },
+    { i: 'protocolo',  x: 0, y: 44, w: 1, h: 20 },
+    { i: 'metadatos',  x: 0, y: 64, w: 1, h: 7  },
+    { i: 'notas',      x: 0, y: 71, w: 1, h: 12 },
+  ],
+}
+const SESSION_SECTIONS_CONFIG = [
+  { key: 'resumen',    label: 'RESUMEN DE SESIÓN',       accent: '#3b82f6' },
+  { key: 'actividad',  label: 'ACTIVIDAD EEG TEMPORAL',  accent: '#10b981' },
+  { key: 'video',      label: 'VIDEO DE SESIÓN',         accent: '#6366f1' },
+  { key: 'validacion', label: 'VALIDACIÓN CIENTÍFICA',   accent: '#a78bfa' },
+  { key: 'protocolo',  label: 'FASES DEL PROTOCOLO',     accent: '#ef4444' },
+  { key: 'metadatos',  label: 'METADATOS',               accent: '#f59e0b' },
+  { key: 'notas',      label: 'OBSERVACIONES',           accent: '#10b981' },
+]
 
 // ── Small UI ──────────────────────────────────────────────────────────────────
 function Badge({ children, color = '#3b82f6' }) {
@@ -244,14 +290,14 @@ function useSessionTimeSeries(recordingId) {
     if (!recordingId) return
     fetch(`${API}/sessions/${recordingId}/metrics`)
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && Array.isArray(d)) setMetrics(d) })
+      .then(d => { if (d && Array.isArray(d.metrics)) setMetrics(d.metrics) })
       .catch(() => {})
   }, [recordingId])
 
   return metrics
 }
 
-// ── Section: Time-series live charts ─────────────────────────────────────────
+// ── Section: Time-series EEG charts ──────────────────────────────────────────
 function SectionTimeSeries({ metrics }) {
   if (!metrics || metrics.length < 3) {
     return (
@@ -263,76 +309,81 @@ function SectionTimeSeries({ metrics }) {
     )
   }
 
-  // Build Liveline data from metrics — each metric has a _time (ISO) or index
-  const n = metrics.length
-  const BASE = Date.now() - n * 2000 // 2s per window at 5Hz
-  const toPoint = (m, i, field) => ({
-    time: m._time ? new Date(m._time).getTime() : BASE + i * 2000,
-    value: parseFloat(m[field] ?? 0) || 0,
-  })
+  // Subsample to max 500 points for SVG performance
+  const step = Math.max(1, Math.ceil(metrics.length / 500))
+  const sampled = metrics.filter((_, i) => i % step === 0)
+  const n = sampled.length
+  const totalSecs = metrics.length * 2
 
-  const alphaData   = metrics.map((m, i) => toPoint(m, i, 'alpha'))
-  const thetaData   = metrics.map((m, i) => toPoint(m, i, 'theta'))
-  const cohData     = metrics.map((m, i) => toPoint(m, i, 'coherence'))
-  const windowSecs  = n * 2
+  const W = 560, H = 110, PL = 8, PT = 10, PB = 22, PR = 8
+  const iW = W - PL - PR
+  const iH = H - PT - PB
 
-  const bandSeries = [
-    { label: 'α alpha',  color: BAND_COLORS.alpha, data: alphaData },
-    { label: 'θ theta',  color: BAND_COLORS.theta, data: thetaData },
-  ]
+  const toX = i => PL + (i / Math.max(n - 1, 1)) * iW
+  const mkYFn = (min, max) => v => PT + iH - ((v - min) / (max - min || 0.001)) * iH
+  const polyPts = (arr, yFn) => arr.map((v, i) => `${toX(i)},${yFn(v)}`).join(' ')
+  const areaPts = (arr, yFn) => `${polyPts(arr, yFn)} ${toX(n - 1)},${PT + iH} ${PL},${PT + iH}`
 
-  const latestAlpha = alphaData[alphaData.length - 1]?.value ?? 0
-  const latestCoh   = cohData[cohData.length - 1]?.value ?? 0
+  const alpha = sampled.map(m => parseFloat(m.alpha ?? 0) || 0)
+  const theta = sampled.map(m => parseFloat(m.theta ?? 0) || 0)
+  const coh   = sampled.map(m => parseFloat(m.coherence ?? 0) || 0)
 
-  const fmtTime = t => {
-    const s = Math.round((t - (metrics[0]?._time ? new Date(metrics[0]._time).getTime() : BASE)) / 1000)
+  const allBand = [...alpha, ...theta]
+  const bMin = Math.min(...allBand), bMax = Math.max(...allBand)
+  const cMin = Math.min(...coh),     cMax = Math.max(...coh)
+  const bandY = mkYFn(bMin, bMax)
+  const cohY  = mkYFn(cMin, cMax)
+
+  const fmtTime = i => {
+    const s = Math.round((i / Math.max(n - 1, 1)) * totalSecs)
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   }
+  const timeTicks = [0, Math.floor(n * 0.25), Math.floor(n * 0.5), Math.floor(n * 0.75), n - 1]
+
+  const renderChart = (title, series) => (
+    <div>
+      <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginBottom: 4 }}>{title}</p>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%' }}>
+        {[0.25, 0.5, 0.75].map(r => (
+          <line key={r} x1={PL} y1={PT + iH * (1 - r)} x2={W - PR} y2={PT + iH * (1 - r)}
+            stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+        ))}
+        {series.map((s, si) => (
+          <g key={si}>
+            {s.fill && <polygon points={areaPts(s.data, s.yFn)} fill={s.color} opacity="0.12" />}
+            <polyline points={polyPts(s.data, s.yFn)} fill="none" stroke={s.color} strokeWidth="1.5" strokeLinejoin="round" />
+          </g>
+        ))}
+        {timeTicks.map(i => (
+          <text key={i} x={toX(i)} y={H - 4} fontSize="7" fill="rgba(255,255,255,0.3)" textAnchor="middle" fontFamily="monospace">
+            {fmtTime(i)}
+          </text>
+        ))}
+      </svg>
+    </div>
+  )
 
   return (
     <Card title="Actividad durante la sesión" accent="#10b981">
       <p style={pStyle}>
-        Evolución temporal de las métricas EEG a lo largo de la sesión. Cada punto 
-        representa una ventana de 2 segundos procesada en tiempo real.
+        Evolución temporal de las métricas EEG · {metrics.length} ventanas · {Math.round(totalSecs / 60)}m de sesión
       </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, margin: '16px 0' }}>
-        <div>
-          <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginBottom: 6 }}>
-            Alpha (α) + Theta (θ) · {n} ventanas
-          </p>
-          <div style={{ height: 200 }}>
-            <Liveline
-              series={bandSeries}
-              theme="dark"
-              window={windowSecs}
-              formatValue={v => (v * 100).toFixed(1) + '%'}
-              formatTime={fmtTime}
-              badge={false}
-              scrub
-            />
-          </div>
-        </div>
-        <div>
-          <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginBottom: 6 }}>
-            Coherencia PLV
-          </p>
-          <div style={{ height: 200 }}>
-            <Liveline
-              data={cohData}
-              value={latestCoh}
-              color="#10b981"
-              theme="dark"
-              showValue
-              window={windowSecs}
-              formatValue={v => v.toFixed(3)}
-              formatTime={fmtTime}
-              badge={false}
-              scrub
-              exaggerate
-            />
-          </div>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 12 }}>
+        {renderChart(`α + θ · ${metrics.length} ventanas`, [
+          { data: alpha, color: BAND_COLORS.alpha, yFn: bandY, fill: true },
+          { data: theta, color: BAND_COLORS.theta, yFn: bandY, fill: false },
+        ])}
+        {renderChart('Coherencia PLV', [
+          { data: coh, color: '#10b981', yFn: cohY, fill: true },
+        ])}
+      </div>
+      <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+        {[[BAND_COLORS.alpha, 'α alpha'], [BAND_COLORS.theta, 'θ theta'], ['#10b981', 'coherencia PLV']].map(([c, l]) => (
+          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+            <span style={{ width: 16, height: 2, background: c, display: 'inline-block', borderRadius: 1 }} />
+            {l}
+          </span>
+        ))}
       </div>
     </Card>
   )
@@ -555,7 +606,19 @@ function SectionValidation({ data }) {
 // ── Section: Protocol Phases ──────────────────────────────────────────────────
 function SectionProtocol({ data }) {
   const events = data?.protocol_log?.events || []
-  if (!events.length) return null
+  if (!events.length) return (
+    <Card title="Fases del protocolo" accent="#ef4444">
+      <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 8, background: 'rgba(239,68,68,0.04)', border: '1px dashed rgba(239,68,68,0.2)' }}>
+        <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>📋</div>
+        <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', margin: 0 }}>
+          No hay eventos de protocolo registrados para esta sesión
+        </p>
+        <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', marginTop: 8 }}>
+          Los eventos se loguean automáticamente cuando la sesión se corre con el app de protocolo Python
+        </p>
+      </div>
+    </Card>
+  )
 
   // Group events into phases
   const phases = []
@@ -639,7 +702,19 @@ function SectionProtocol({ data }) {
 // ── Section: Notes ────────────────────────────────────────────────────────────
 function SectionNotes({ sessionId }) {
   const notes = SESSION_NOTES[sessionId]
-  if (!notes) return null
+  if (!notes) return (
+    <Card title="Observaciones y aprendizajes" accent="#10b981">
+      <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 8, background: 'rgba(16,185,129,0.04)', border: '1px dashed rgba(16,185,129,0.2)' }}>
+        <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>📝</div>
+        <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', margin: 0 }}>
+          No hay observaciones para esta sesión
+        </p>
+        <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', marginTop: 8 }}>
+          Agregá una entrada en <code style={{ color: '#10b981' }}>SESSION_NOTES[{sessionId}]</code> en SessionDetail.jsx
+        </p>
+      </div>
+    </Card>
+  )
 
   return (
     <Card title="Observaciones y aprendizajes" accent="#10b981">
@@ -680,7 +755,19 @@ function SectionNotes({ sessionId }) {
 // ── Section: Protocol Metadata ────────────────────────────────────────────────
 function SectionMetadata({ data }) {
   const meta = data?.protocol_log?.metadata || {}
-  if (!Object.keys(meta).length) return null
+  if (!Object.keys(meta).length) return (
+    <Card title="Metadatos de sesión" accent="#f59e0b">
+      <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 8, background: 'rgba(245,158,11,0.04)', border: '1px dashed rgba(245,158,11,0.2)' }}>
+        <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>🗃️</div>
+        <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', margin: 0 }}>
+          No hay metadatos de protocolo registrados
+        </p>
+        <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', marginTop: 8 }}>
+          Sueño, cafeína, estado subjetivo — se registran al iniciar el protocolo
+        </p>
+      </div>
+    </Card>
+  )
 
   const fields = [
     { key: 'name', label: 'Nombre sesión', format: v => v },
@@ -720,6 +807,43 @@ export default function SessionDetail() {
   const navigate = useNavigate()
   const { data, loading, error, reload } = useSessionData(sessionId)
   const metrics = useSessionTimeSeries(data?.recording?.id)
+  const { containerRef: gridRef, width: gridWidth } = useContainerWidth()
+
+  const [layouts, setLayouts] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SESSION_LAYOUT_KEY)
+      if (!saved) return SESSION_DEFAULT_LAYOUT
+      const parsed = JSON.parse(saved)
+      if (!parsed.lg || parsed.lg.length !== SESSION_DEFAULT_LAYOUT.lg.length) {
+        localStorage.removeItem(SESSION_LAYOUT_KEY)
+        return SESSION_DEFAULT_LAYOUT
+      }
+      return parsed
+    } catch { return SESSION_DEFAULT_LAYOUT }
+  })
+
+  const handleLayoutChange = useCallback((_, allLayouts) => {
+    setLayouts(allLayouts)
+    localStorage.setItem(SESSION_LAYOUT_KEY, JSON.stringify(allLayouts))
+  }, [])
+
+  const resetLayout = () => {
+    setLayouts(SESSION_DEFAULT_LAYOUT)
+    localStorage.removeItem(SESSION_LAYOUT_KEY)
+  }
+
+  const renderSection = useCallback((key) => {
+    switch (key) {
+      case 'resumen':    return <SectionOverview data={data} sessionId={sessionId} />
+      case 'actividad':  return <SectionTimeSeries metrics={metrics} />
+      case 'video':      return <SectionVideo sessionId={Number(sessionId)} />
+      case 'validacion': return <SectionValidation data={data} />
+      case 'protocolo':  return <SectionProtocol data={data} />
+      case 'metadatos':  return <SectionMetadata data={data} />
+      case 'notas':      return <SectionNotes sessionId={Number(sessionId)} />
+      default:           return null
+    }
+  }, [data, metrics, sessionId])
 
   if (loading) {
     return (
@@ -821,12 +945,25 @@ export default function SessionDetail() {
               → Sesión #{id}
             </button>
           ))}
+          <button
+            onClick={resetLayout}
+            style={{
+              display: 'block', marginTop: 10, background: 'none',
+              border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)',
+              fontSize: '0.58rem', cursor: 'pointer', fontFamily: 'monospace',
+              padding: '3px 8px', borderRadius: 4, width: '100%', transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+          >
+            ↺ reset layout
+          </button>
         </div>
       </nav>
 
       {/* ─── Main content ─── */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', maxWidth: 900, margin: '0 auto' }}>
-        <header style={{ marginBottom: 32 }}>
+      <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '32px 24px 32px 32px' }}>
+        <header style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#e2e8f0', fontFamily: 'monospace', margin: 0 }}>
             Sesión #{sessionId} — Análisis completo
           </h1>
@@ -835,13 +972,48 @@ export default function SessionDetail() {
           </p>
         </header>
 
-        <div id="section-resumen"><SectionOverview data={data} sessionId={sessionId} /></div>
-        <div id="section-actividad"><SectionTimeSeries metrics={metrics} /></div>
-        <div id="section-video"><SectionVideo sessionId={Number(sessionId)} /></div>
-        <div id="section-validacion"><SectionValidation data={data} /></div>
-        <div id="section-protocolo"><SectionProtocol data={data} /></div>
-        <div id="section-metadatos"><SectionMetadata data={data} /></div>
-        <div id="section-notas"><SectionNotes sessionId={Number(sessionId)} /></div>
+        <div ref={gridRef}>
+          <ResponsiveGridLayout
+            width={gridWidth}
+            layouts={layouts}
+            onLayoutChange={handleLayoutChange}
+            breakpoints={{ lg: 1100, sm: 0 }}
+            cols={{ lg: 12, sm: 1 }}
+            rowHeight={40}
+            draggableHandle=".doc-drag-handle"
+            margin={[16, 16]}
+            containerPadding={[0, 0]}
+            useCSSTransforms
+          >
+            {SESSION_SECTIONS_CONFIG.map(({ key, label, accent }) => (
+              <div
+                key={key}
+                id={`section-${key}`}
+                style={{
+                  display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                  background: 'rgba(15, 15, 25, 0.85)',
+                  border: `1px solid ${accent}33`, borderRadius: 12,
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <div
+                  className="doc-drag-handle"
+                  style={{
+                    padding: '7px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: `${accent}10`, borderBottom: `1px solid ${accent}22`,
+                    cursor: 'grab', userSelect: 'none', flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontSize: '0.65rem', color: `${accent}dd`, fontFamily: 'monospace', fontWeight: 600 }}>{label}</span>
+                  <span style={{ color: `${accent}55`, fontSize: '0.9rem' }}>⠿</span>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {renderSection(key)}
+                </div>
+              </div>
+            ))}
+          </ResponsiveGridLayout>
+        </div>
 
         <footer style={{
           textAlign: 'center', padding: '40px 0 60px',

@@ -32,6 +32,27 @@ body {
     scrollbar-width: none;
 }
 
+/* Custom dark scrollbar — applies to all scrollable elements */
+*::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+*::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+}
+*::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 10px;
+}
+*::-webkit-scrollbar-thumb:hover {
+    background: rgba(167,139,250,0.35);
+}
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) rgba(255,255,255,0.03);
+}
+
 /* 🎭 GLITCH EFFECT - Tipo 404 Error */
 @keyframes glitch-anim-1 {
     0% {

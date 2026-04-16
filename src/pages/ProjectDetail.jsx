@@ -177,6 +177,28 @@ const ProjectDetail = () => {
               </div>
             </div>
           )}
+
+          {/* CTA Documentación — solo si el proyecto tiene doc */}
+          {project.docLink && (
+            <div className="mt-8 md:mt-10 pt-10 border-t border-white/10">
+              <p className="text-xs font-mono text-gray-500 uppercase tracking-[0.25em] mb-4">Documentación del proyecto</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                <p className="text-gray-400 text-sm max-w-md leading-relaxed">
+                  Explorá el research completo: objetivos, marco teórico, arquitectura, sesiones de datos y roadmap.
+                </p>
+                <GlitchButton
+                  variant="secondary"
+                  onClick={() => {
+                    trackClick('doc_cta_click', project.id);
+                    navigate(project.docLink);
+                  }}
+                  className="flex items-center gap-3 font-mono tracking-widest uppercase text-sm"
+                >
+                  VER DOCS
+                </GlitchButton>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

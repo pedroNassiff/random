@@ -503,12 +503,14 @@ function SectionValidation({ validations }) {
 
   const filtered = React.useMemo(() => {
     if (!validations) return []
-    if (filter === 'all') return validations
-    return validations.filter(v => {
-      const q = v.quality_score || {}
-      const usable = q.passes_quality_threshold ?? v.validation?.summary?.usable_for_training ?? false
-      return filter === 'usable' ? usable : !usable
-    })
+    const base = filter === 'all'
+      ? [...validations]
+      : validations.filter(v => {
+          const q = v.quality_score || {}
+          const usable = q.passes_quality_threshold ?? v.validation?.summary?.usable_for_training ?? false
+          return filter === 'usable' ? usable : !usable
+        })
+    return base.sort((a, b) => (b.session_id || 0) - (a.session_id || 0))
   }, [validations, filter])
 
   return (
@@ -801,11 +803,13 @@ function SectionProgress({ validations }) {
   )
 
   const filteredDetail = React.useMemo(() => {
-    if (filter === 'all') return sorted
-    return sorted.filter(v => {
-      const usable = v.quality_score?.passes_quality_threshold ?? v.validation?.summary?.usable_for_training ?? false
-      return filter === 'usable' ? usable : !usable
-    })
+    const base = filter === 'all'
+      ? [...sorted]
+      : sorted.filter(v => {
+          const usable = v.quality_score?.passes_quality_threshold ?? v.validation?.summary?.usable_for_training ?? false
+          return filter === 'usable' ? usable : !usable
+        })
+    return base.reverse()
   }, [sorted, filter])
 
   if (!validations || validations.length === 0) return null

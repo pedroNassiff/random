@@ -76,11 +76,12 @@ export const projects = [
     technologies: 'React, Three.js, PyTorch VAE, Muse 2 EEG, WebSockets, PhysioNet',
     link: '/project/hermes',
     labLink: '/lab/brain',
+    docLink: '/lab/brain/doc',
     images: [
-      { src: hermesDashboard, size: 'large' },
-      { src: hermesDashboard, size: 'medium' },
-      { src: hermesDashboard, size: 'medium' },
-      { src: hermesDashboard, size: 'full' }
+      // { src: hermesDashboard, size: 'large' },
+      // { src: hermesDashboard, size: 'medium' },
+      // { src: hermesDashboard, size: 'medium' },
+      // { src: hermesDashboard, size: 'full' }
     ]
   },
   {
