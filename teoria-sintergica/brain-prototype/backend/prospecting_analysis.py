@@ -23,6 +23,9 @@ import anthropic
 
 load_dotenv()
 
+from database.prospecting_db import init_db, contact_update
+init_db()
+
 router = APIRouter(prefix="/prospecting", tags=["prospecting"])
 
 # ── Tier config ───────────────────────────────────────────────────────────────
@@ -39,6 +42,7 @@ TIER_MAX_TOKENS = {
 class ScrapeRequest(BaseModel):
     urls: list[str]
     max_subpages: int = 8  # sub-pages to crawl per site root
+    contact_id: Optional[int] = None  # if set, save content to DB
 
 class ScrapeResult(BaseModel):
     url: str
@@ -870,6 +874,15 @@ async def scrape_urls(request: ScrapeRequest):
                 tasks.append(scrape_url(url, client))
         results = await asyncio.gather(*tasks)
 
+    # Persist scraped content to DB if contact_id is provided
+    if getattr(request, 'contact_id', None):
+        from datetime import datetime as _dt
+        combined = "\n\n".join(r.content for r in results if r.content)
+        contact_update(request.contact_id, {
+            "scraped_content": combined,
+            "scrape_ts": _dt.now().isoformat(),
+        })
+
     return ScrapeResponse(results=list(results))
 
 
@@ -920,6 +933,9 @@ El JSON debe ser parseado directamente con json.loads(). Si no podés analizar a
                 status_code=422,
                 detail=f"El modelo no devolvió JSON válido: {str(e)[:200]}\nRaw: {raw[:300]}"
             )
+
+        if request.contact_id:
+            contact_update(request.contact_id, {"ai_analysis": analysis})
 
         return AnalyzeResponse(
             analysis=analysis,

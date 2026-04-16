@@ -8,7 +8,6 @@ Handles:
 """
 
 import os
-import json
 import uuid
 import smtplib
 import email.utils
@@ -24,12 +23,15 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+from database.prospecting_db import (
+    init_db, log_create, log_get, log_append_open,
+    logs_by_contact, logs_all,
+)
+
 load_dotenv()
+init_db()  # ensure tables exist
 
 router = APIRouter(prefix="/prospecting/pitch", tags=["prospecting-pitch"])
-
-LOGS_FILE = Path(__file__).parent / "data" / "pitch_logs.json"
-LOGS_FILE.parent.mkdir(exist_ok=True)
 
 # ── 1×1 transparent GIF bytes ──────────────────────────────────────────────────
 PIXEL_GIF = (
@@ -86,20 +88,6 @@ def _get_public_url() -> tuple[str, bool]:
             pass
 
     return _APP_URL_ENV.rstrip("/"), True
-
-
-# ── Persistence helpers ────────────────────────────────────────────────────────
-def _load_logs() -> dict:
-    if LOGS_FILE.exists():
-        try:
-            return json.loads(LOGS_FILE.read_text())
-        except Exception:
-            pass
-    return {}
-
-
-def _save_logs(logs: dict):
-    LOGS_FILE.write_text(json.dumps(logs, indent=2, default=str))
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
@@ -160,20 +148,16 @@ def send_pitch(req: SendPitchRequest):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"SMTP error: {str(e)}")
 
-    # Persist log entry
-    logs = _load_logs()
-    logs[tracking_id] = {
-        "tracking_id": tracking_id,
-        "contact_id":  req.contact_id,
-        "company":     req.company,
-        "to_email":    req.to_email,
-        "subject":     req.subject,
-        "pitch_type":  req.pitch_type,
-        "sent_at":     datetime.now().isoformat(),
-        "opens":       [],   # [{ timestamp, ip, user_agent }]
-        "clicks":      [],
-    }
-    _save_logs(logs)
+    # Persist log entry in SQLite
+    log_create(
+        tracking_id=tracking_id,
+        contact_id=req.contact_id,
+        company=req.company or "",
+        to_email=req.to_email,
+        subject=req.subject,
+        pitch_type=req.pitch_type,
+        sent_at=datetime.now().isoformat(),
+    )
 
     return {
         "status":      "sent",
@@ -191,29 +175,25 @@ def track_open(tracking_id: str, request: Request):
     Returns a 1×1 transparent GIF and records the open event.
     Deduplicates multiple requests within 5 seconds (email clients often fire 2×).
     """
-    logs = _load_logs()
-    if tracking_id in logs:
+    log = log_get(tracking_id)
+    if log is not None:
         now = datetime.now()
-        opens = logs[tracking_id].get("opens", [])
-        # Deduplicate: skip if last open from same IP was less than 5 seconds ago
-        ip = request.client.host if request.client else "unknown"
+        ip  = request.client.host if request.client else "unknown"
+        opens = log.get("opens", [])
         recent = [o for o in opens if o.get("ip") == ip]
         if recent:
             last_ts = datetime.fromisoformat(recent[-1]["timestamp"])
             if (now - last_ts).total_seconds() < 5:
-                # duplicate request from email client — skip
                 return Response(
                     content=PIXEL_GIF,
                     media_type="image/gif",
                     headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"},
                 )
-        opens.append({
+        log_append_open(tracking_id, {
             "timestamp":  now.isoformat(),
             "ip":         ip,
             "user_agent": request.headers.get("user-agent", ""),
         })
-        logs[tracking_id]["opens"] = opens
-        _save_logs(logs)
 
     return Response(
         content=PIXEL_GIF,
@@ -228,14 +208,11 @@ def track_open(tracking_id: str, request: Request):
 @router.get("/stats/{contact_id}")
 def pitch_stats(contact_id: int):
     """Return all pitch logs + open events for a given contact."""
-    logs  = _load_logs()
-    items = [v for v in logs.values() if v.get("contact_id") == contact_id]
-    items.sort(key=lambda x: x.get("sent_at", ""), reverse=True)
-
+    items = logs_by_contact(contact_id)
     return {
         "contact_id": contact_id,
         "total_sent": len(items),
-        "pitches":    [
+        "pitches": [
             {
                 **item,
                 "open_count":  len(item.get("opens", [])),
@@ -249,11 +226,11 @@ def pitch_stats(contact_id: int):
 @router.get("/all-stats")
 def all_pitch_stats():
     """Return aggregated stats for all contacts (for dashboard)."""
-    logs = _load_logs()
+    all_logs = logs_all()
     return {
-        "total_sent":   len(logs),
-        "total_opens":  sum(len(v.get("opens", [])) for v in logs.values()),
-        "pitches":      list(logs.values()),
+        "total_sent":   len(all_logs),
+        "total_opens":  sum(len(v.get("opens", [])) for v in all_logs),
+        "pitches":      all_logs,
     }
 
 
@@ -261,14 +238,14 @@ def all_pitch_stats():
 def all_stats_by_contact():
     """Return a map of contact_id -> { open_count, last_opened, sent_count }
     for efficient kanban badge rendering (single fetch for all cards)."""
-    logs = _load_logs()
+    all_logs = logs_all()
     result: dict[int, dict] = {}
-    for item in logs.values():
+    for item in all_logs:
         cid = item.get("contact_id")
         if cid is None:
             continue
-        opens      = item.get("opens", [])
-        open_count = len(opens)
+        opens       = item.get("opens", [])
+        open_count  = len(opens)
         last_opened = opens[-1]["timestamp"] if opens else None
         if cid not in result:
             result[cid] = {"open_count": 0, "last_opened": None, "sent_count": 0}

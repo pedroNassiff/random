@@ -1,23 +1,26 @@
 """
 Prospecting CRM Router — /prospecting
 
-Simple JSON-file-backed endpoints for B2B outreach tracking.
-No DB migration needed: data lives in data/prospecting.json
+SQLite-backed endpoints for B2B outreach tracking.
+Storage lives in database/prospecting.db (auto-migrated from JSON on first run).
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
-from pathlib import Path
 from datetime import datetime
-import json
+
+from database.prospecting_db import (
+    init_db, contacts_list, contact_get, contact_create,
+    contact_update, contact_delete, contacts_reset,
+)
 
 router = APIRouter(prefix="/prospecting", tags=["prospecting"])
 
-DATA_FILE = Path(__file__).parent / "data" / "prospecting.json"
-DATA_FILE.parent.mkdir(exist_ok=True)
+# Ensure DB + tables exist (idempotent)
+init_db()
 
-# ── Seed data — 20 companies ──────────────────────────────────────────────────
+# ── Seed data — 20 companies (used only for /reset) ──────────────────────────
 INITIAL_CONTACTS = [
     # TIER 1 — Barcelona creative studios
     {"id": 1,  "company": "Domestic Data Streamers", "tier": 1, "location": "Barcelona", "focus": "Data visualization, permanent installations, art + data", "linkedin_url": "linkedin.com/company/domestic-data-streamers", "website": "domesticstreamers.com", "decision_maker": "Pau Garcia / Laia Bonet (founders)", "why": "Arte + data viz — stack Three.js/WebGL directo", "stage": "identificado", "follow_up_count": 0, "notes": "Ya aplicaste. Re-engage con approach warm-up.", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
@@ -36,7 +39,7 @@ INITIAL_CONTACTS = [
     {"id": 12, "company": "Vasava", "tier": 3, "location": "Barcelona", "focus": "Creative studio, illustration, digital experiences, branding", "linkedin_url": "linkedin.com/company/vasava", "website": "vasava.es", "decision_maker": "Bruno Sellés / Director Creativo", "why": "Digital experiences, branding interactivo", "stage": "identificado", "follow_up_count": 0, "notes": "", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
     {"id": 13, "company": "Field.io", "tier": 3, "location": "UK (internacional)", "focus": "Data visualization high-end, generative design", "linkedin_url": "linkedin.com/company/field-io", "website": "field.io", "decision_maker": "Vera-Maria Glahn / Marcus Wendt", "why": "Data viz de alto nivel, Three.js/WebGL heavy", "stage": "identificado", "follow_up_count": 0, "notes": "", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
     {"id": 14, "company": "Random Studio", "tier": 3, "location": "Amsterdam (internacional)", "focus": "Digital experiences for brands, interactive installations, WebGL", "linkedin_url": "linkedin.com/company/random-studio", "website": "random.studio", "decision_maker": "Ronen Tanchum (founder/creative director)", "why": "Interactive installations, WebGL — naming similar al lab!", "stage": "identificado", "follow_up_count": 0, "notes": "", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
-    {"id": 15, "company": "The Studio (Google CL)", "tier": 3, "location": "Internacional", "focus": "Experimental projects, big-budget interactive", "linkedin_url": "linkedin.com/company/google-creative-lab", "website": "creativelab5.com", "decision_maker": "Creative Technologist hiring", "why": "Big budget, experimental — referencia para portfoio", "stage": "identificado", "follow_up_count": 0, "notes": "", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
+    {"id": 15, "company": "The Studio (Google CL)", "tier": 3, "location": "Internacional", "focus": "Experimental projects, big-budget interactive", "linkedin_url": "linkedin.com/company/google-creative-lab", "website": "creativelab5.com", "decision_maker": "Creative Technologist hiring", "why": "Big budget, experimental — referencia para portfolio", "stage": "identificado", "follow_up_count": 0, "notes": "", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
     # TIER 4 — Freelancers / red / eventos
     {"id": 16, "company": "OFFF Festival", "tier": 4, "location": "Barcelona", "focus": "Creative community — speakers, studios, network", "linkedin_url": "linkedin.com/company/offf", "website": "offf.barcelona", "decision_maker": "Organización / speakers del festival", "why": "Community network — conectar con speakers", "stage": "identificado", "follow_up_count": 0, "notes": "Estrategia: buscar speakers pasados en LinkedIn", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
     {"id": 17, "company": "Sónar+D", "tier": 4, "location": "Barcelona", "focus": "Creativity + Technology conference", "linkedin_url": "linkedin.com/company/sonar-festival", "website": "sonar.es/srd", "decision_maker": "Exhibitors / speakers", "why": "Studios asisten — networking directo en junio", "stage": "identificado", "follow_up_count": 0, "notes": "Buscar lista de exhibitors 2025", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
@@ -44,26 +47,6 @@ INITIAL_CONTACTS = [
     {"id": 19, "company": "Creative Coding BCN", "tier": 4, "location": "Barcelona", "focus": "Comunidad creative coding — meetup mensual", "linkedin_url": "", "website": "meetup.com/creative-coding-barcelona", "decision_maker": "Freelancers y studios locales", "why": "Tu expertise exacto — networking cara a cara", "stage": "identificado", "follow_up_count": 0, "notes": "Asistir al próximo meetup físicamente", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
     {"id": 20, "company": "Three.js Meetup BCN", "tier": 4, "location": "Barcelona", "focus": "Three.js community, generative art, WebGL", "linkedin_url": "", "website": "meetup.com", "decision_maker": "Freelancers y devs creativos", "why": "Tu expertise exacto — networking directo", "stage": "identificado", "follow_up_count": 0, "notes": "Buscar en Meetup.com si existe o crear uno", "last_action": None, "next_action": None, "responded": False, "created_at": datetime.now().isoformat()},
 ]
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def _load() -> List[dict]:
-    if DATA_FILE.exists():
-        try:
-            return json.loads(DATA_FILE.read_text())
-        except Exception:
-            pass
-    # Seed on first load
-    _save(INITIAL_CONTACTS)
-    return INITIAL_CONTACTS
-
-
-def _save(contacts: List[dict]):
-    DATA_FILE.write_text(json.dumps(contacts, indent=2, default=str))
-
-
-def _next_id(contacts: List[dict]) -> int:
-    return max((c["id"] for c in contacts), default=0) + 1
-
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
 class ContactCreate(BaseModel):
@@ -96,54 +79,42 @@ class ContactUpdate(BaseModel):
     next_action: Optional[str] = None
     responded: Optional[bool] = None
     ai_analysis: Optional[dict] = None
+    scraped_content: Optional[str] = None
+    scrape_ts: Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @router.get("/contacts")
 def list_contacts():
-    return {"status": "success", "contacts": _load()}
+    return {"status": "success", "contacts": contacts_list()}
 
 
 @router.post("/contacts")
 def create_contact(body: ContactCreate):
-    contacts = _load()
-    new_contact = {
-        "id": _next_id(contacts),
-        "follow_up_count": 0,
-        "responded": False,
-        "last_action": None,
-        "created_at": datetime.now().isoformat(),
-        **body.model_dump(),
-    }
-    contacts.append(new_contact)
-    _save(contacts)
+    data = {"follow_up_count": 0, "responded": False, "last_action": None,
+            "created_at": datetime.now().isoformat(), **body.model_dump()}
+    new_contact = contact_create(data)
     return {"status": "success", "contact": new_contact}
 
 
 @router.put("/contacts/{contact_id}")
 def update_contact(contact_id: int, body: ContactUpdate):
-    contacts = _load()
-    idx = next((i for i, c in enumerate(contacts) if c["id"] == contact_id), None)
-    if idx is None:
-        raise HTTPException(status_code=404, detail="Contact not found")
     update_data = {k: v for k, v in body.model_dump().items() if v is not None}
-    contacts[idx].update(update_data)
-    _save(contacts)
-    return {"status": "success", "contact": contacts[idx]}
+    updated = contact_update(contact_id, update_data)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    return {"status": "success", "contact": updated}
 
 
 @router.delete("/contacts/{contact_id}")
 def delete_contact(contact_id: int):
-    contacts = _load()
-    new_list = [c for c in contacts if c["id"] != contact_id]
-    if len(new_list) == len(contacts):
+    if not contact_delete(contact_id):
         raise HTTPException(status_code=404, detail="Contact not found")
-    _save(new_list)
     return {"status": "success"}
 
 
 @router.post("/reset")
 def reset_contacts():
     """Restore initial 20 companies. Destructive."""
-    _save(INITIAL_CONTACTS)
+    contacts_reset(INITIAL_CONTACTS)
     return {"status": "success", "count": len(INITIAL_CONTACTS)}

@@ -6,6 +6,7 @@
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import Navbar from '../components/Navbar'
+import ProspectGroupModal from '../components/ProspectGroupModal'
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
 const LS_KEY = 'prospeccion_board_fallback_v1'
@@ -150,11 +151,11 @@ async function apiUpdate(id, data) {
   return res.json()
 }
 
-async function apiScrape(urls) {
+async function apiScrape(urls, contact_id = null) {
   const res = await fetch(`${API}/prospecting/scrape`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ urls }),
+    body: JSON.stringify({ urls, ...(contact_id ? { contact_id } : {}) }),
   })
   if (!res.ok) throw new Error(`Scraping error: ${res.status}`)
   return res.json() // { results: [{ url, content, status }] }
@@ -1361,7 +1362,7 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
     urls.forEach(u => { statuses[u] = { status: 'loading', message: '' } })
     setScrapeStatus({ ...statuses })
     try {
-      const data = await apiScrape(urls)
+      const data = await apiScrape(urls, contact.id)
       const results = data.results || []
       let combined = ''
       const ns = {}
@@ -1851,6 +1852,7 @@ const PlanningProspeccion = () => {
   const trackingStats = useTrackingStats()
   const [editTarget,     setEditTarget]     = useState(null)
   const [showNew,        setShowNew]        = useState(false)
+  const [showGroupModal, setShowGroupModal] = useState(false)
   const [tierFilter,     setTierFilter]     = useState(0)
 
   const visible = contacts.filter(c => tierFilter === 0 || c.tier === tierFilter)
@@ -1940,7 +1942,22 @@ const PlanningProspeccion = () => {
               </button>
             ))}
             </div>
-            <GlitchNewButton onClick={() => setShowNew(true)} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <GlitchNewButton onClick={() => setShowNew(true)} />
+              <button
+                onClick={() => setShowGroupModal(true)}
+                style={{
+                  padding: '5px 14px', borderRadius: 7,
+                  border: '1px solid rgba(34,197,94,0.45)',
+                  background: 'rgba(34,197,94,0.08)',
+                  color: '#86efac',
+                  fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 700,
+                  cursor: 'pointer', letterSpacing: '0.1em',
+                  whiteSpace: 'nowrap',
+                }}>
+                ✦ NUEVO GRUPO IA
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -2005,8 +2022,35 @@ const PlanningProspeccion = () => {
         <ContactModal
           contact={NEW_CONTACT_TEMPLATE}
           isNew
-          onSave={async (_, data) => { await createContact(data); setShowNew(false) }}
+          onSave={async (_, data) => {
+            // AI analysis results (only ai_analysis key) must not trigger createContact —
+            // the contact doesn't exist yet and ContactCreate doesn't accept that field.
+            const keys = Object.keys(data || {})
+            if (keys.length === 1 && keys[0] === 'ai_analysis') return
+            await createContact(data)
+            setShowNew(false)
+          }}
           onClose={() => setShowNew(false)}
+        />
+      )}
+
+      {/* Prospect group generation modal */}
+      {showGroupModal && (
+        <ProspectGroupModal
+          onClose={() => setShowGroupModal(false)}
+          onGroupSaved={async (data) => {
+            // Refresh contacts from backend after saving group
+            if (data?.created_contacts?.length > 0) {
+              try {
+                const fresh = await (await fetch(`${API}/prospecting/contacts`)).json()
+                const list  = Array.isArray(fresh) ? fresh : (fresh.contacts ?? [])
+                // Trigger a reload by updating the local storage key — useContacts re-read
+                try { localStorage.setItem(LS_KEY, JSON.stringify(list)) } catch {}
+                // Force re-mount by navigating within the page — simplest: reload
+                window.location.reload()
+              } catch {}
+            }
+          }}
         />
       )}
     </div>

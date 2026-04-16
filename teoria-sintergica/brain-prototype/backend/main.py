@@ -40,6 +40,7 @@ from prospecting_router import router as prospecting_router
 
 from prospecting_analysis import router as analysis_router
 from prospecting_pitch import router as pitch_router
+from prospecting_groups import router as groups_router
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -196,6 +197,7 @@ app.include_router(automation_router)
 # Include prospecting CRM router
 app.include_router(prospecting_router)
 app.include_router(pitch_router)
+app.include_router(groups_router)
 
 # ============================================
 # Copilot Labs Endpoint

@@ -6,5 +6,5 @@ dist/
 .env
 **/.env
 
-docs/*
+docs/outputs-promts/
 outputs-promts/*
