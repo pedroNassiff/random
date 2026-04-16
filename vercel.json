@@ -12,6 +12,14 @@
       "destination": "https://api.random-lab.es/automation/:path*"
     },
     {
+      "source": "/prospecting/:path*",
+      "destination": "https://api.random-lab.es/prospecting/:path*"
+    },
+    {
+      "source": "/tracking/:path*",
+      "destination": "https://api.random-lab.es/tracking/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
