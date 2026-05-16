@@ -172,7 +172,26 @@ function Sidebar({ sessions, loading, error, selected, onSelect, onReload }) {
 }
 
 // ── BandTimechart (SVG) ───────────────────────────────────────────────────────
-function BandTimechart({ band, metrics }) {
+function formatTimeTick(sec) {
+  if (sec < 60) return `${sec}s`
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return s === 0 ? `${m}m` : `${m}m${String(s).padStart(2, '0')}`
+}
+
+// Fases del protocolo de validación (30 min / 1800 s)
+const PROTOCOL_PHASES = [
+  { t: 0,    short: 'OA',   name: 'Baseline ojos abiertos' },
+  { t: 120,  short: 'OC',   name: 'Baseline ojos cerrados' },
+  { t: 240,  short: 'Sha',  name: 'Shamatha' },
+  { t: 540,  short: 'Med',  name: 'Meditación libre' },
+  { t: 1140, short: 'Cog',  name: 'Tarea cognitiva' },
+  { t: 1200, short: 'Rec',  name: 'Recovery' },
+  { t: 1380, short: 'Prof', name: 'Profundización' },
+  { t: 1680, short: 'Cie',  name: 'Cierre' },
+]
+
+function BandTimechart({ band, metrics, durationSeconds }) {
   const color = BAND_COLORS[band]
   const vals  = metrics.map(m => m[band] ?? 0)
   const max   = Math.max(...vals, 0.001)
@@ -180,6 +199,15 @@ function BandTimechart({ band, metrics }) {
   const pts = vals.map((v, i) => `${(i / (vals.length - 1 || 1)) * W},${H - (v / max) * H * 0.9}`)
   const poly = pts.join(' ')
   const area = `${pts.join(' ')} ${W},${H} 0,${H}`
+
+  // Detectar sesión de protocolo completo (≥ 25 min)
+  const isProtocol = durationSeconds != null && durationSeconds >= 1500
+  const protocolTicks = isProtocol
+    ? PROTOCOL_PHASES.map(p => ({ ...p, frac: p.t / durationSeconds })).filter(p => p.frac <= 1.005)
+    : null
+
+  const TICK_COUNT = 5
+  const equalTicks = Array.from({ length: TICK_COUNT + 1 }, (_, i) => i / TICK_COUNT)
 
   return (
     <div>
@@ -194,9 +222,65 @@ function BandTimechart({ band, metrics }) {
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
+        {isProtocol
+          ? protocolTicks.filter(p => p.frac > 0.001 && p.frac < 0.999).map((p, i) => (
+              <line key={i}
+                x1={p.frac * W} y1={0} x2={p.frac * W} y2={H}
+                stroke="#f87171" strokeOpacity="0.55" strokeWidth="1.5"
+                strokeDasharray="4,3"
+              />
+            ))
+          : equalTicks.slice(1, -1).map((frac, i) => (
+              <line key={i}
+                x1={frac * W} y1={0} x2={frac * W} y2={H}
+                stroke="white" strokeOpacity="0.07" strokeWidth="0.8"
+                strokeDasharray="3,3"
+              />
+            ))
+        }
         <polygon points={area} fill={`url(#g-${band})`} />
-        <polyline points={poly} fill="none" stroke={color} strokeWidth="1.5" />
+        <polyline points={poly} fill="none" stroke={color} strokeWidth="0.9" />
       </svg>
+
+      {isProtocol ? (
+        // Etiquetas de fases del protocolo con posicionamiento absoluto
+        <div className="relative h-9 mt-1">
+          {protocolTicks.map((p, i) => {
+            const isLeft  = p.frac < 0.03
+            const isRight = p.frac > 0.97
+            // Cog (i=4, t=1140) y Rec (i=5, t=1200) están muy juntos → escalonar
+            const staggerDown = i === 5
+            return (
+              <div key={i} style={{
+                position: 'absolute',
+                left: `${p.frac * 100}%`,
+                top: staggerDown ? 14 : 0,
+                transform: isRight ? 'translateX(-100%)' : isLeft ? 'none' : 'translateX(-50%)',
+                display: 'flex', flexDirection: 'column',
+                alignItems: isLeft ? 'flex-start' : isRight ? 'flex-end' : 'center',
+              }}>
+                <span className="text-[9px] font-mono font-semibold leading-none" style={{ color: '#f87171cc' }}>{p.short}</span>
+                <span className="text-[8px] font-mono leading-none mt-px" style={{ color: '#f8717180' }}>{formatTimeTick(p.t)}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        // Etiquetas equidistantes genéricas
+        <div className="flex justify-between mt-0.5">
+          {equalTicks.map((frac, i) => {
+            const label = durationSeconds
+              ? formatTimeTick(Math.round(frac * durationSeconds))
+              : `${Math.round(frac * 100)}%`
+            const align = i === 0 ? 'text-left' : i === TICK_COUNT ? 'text-right' : 'text-center'
+            return (
+              <span key={i} className={`text-[8px] font-mono text-white/20 w-8 ${align} flex-shrink-0`}>
+                {label}
+              </span>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -267,7 +351,7 @@ function TabBandas({ rec, metrics }) {
       <StateTimeline metrics={metrics} />
 
       <div className="space-y-4">
-        {BANDS.map(b => <BandTimechart key={b} band={b} metrics={metrics} />)}
+        {BANDS.map(b => <BandTimechart key={b} band={b} metrics={metrics} durationSeconds={rec.duration_seconds} />)}
       </div>
     </div>
   )

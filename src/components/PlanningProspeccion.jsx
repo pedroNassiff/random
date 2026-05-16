@@ -7,6 +7,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import Navbar from '../components/Navbar'
 import ProspectGroupModal from '../components/ProspectGroupModal'
+import { auditApi } from '../services/auditApi'
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
 const LS_KEY = 'prospeccion_board_fallback_v1'
@@ -121,6 +122,7 @@ const NEW_CONTACT_TEMPLATE = {
   why: '', stage: 'identificado', notes: '',
   follow_up_count: 0, responded: false,
   last_action: null, next_action: null, ai_analysis: null,
+  audit_type: null,
 }
 
 // ── API helpers ───────────────────────────────────────────────────────────────
@@ -975,6 +977,7 @@ function ContactCard({ contact, onEdit, onMove, tracking }) {
     : null
   const stale = contact.stage !== 'cerrado' && contact.stage !== 'descartado' && daysSince !== null && daysSince > 10
   const hasAnalysis = contact.ai_analysis && contact.ai_analysis.score != null
+  const [auditLaunching, setAuditLaunching] = useState(false)
 
   const handleDragStart = e => {
     e.dataTransfer.setData('text/plain', JSON.stringify({ contactId: contact.id, fromStage: contact.stage }))
@@ -1121,36 +1124,65 @@ function ContactCard({ contact, onEdit, onMove, tracking }) {
         {contact.follow_up_count > 0 && <Badge label={`FU×${contact.follow_up_count}`} color="#f59e0b" small />}
         {stale && <Badge label={`${daysSince}d`} color="#f59e0b" small />}
         {!stale && daysSince !== null && daysSince <= 3 && <Badge label={`${daysSince}d`} color="#6b7280" small />}
+        {contact.audit_type === 'tech_health_audit' && <Badge label="⬡ AUDIT" color="#22d3ee" small />}
 
-        {/* AI Analysis button */}
-        <button
-          onClick={e => { e.stopPropagation(); onEdit(contact) }}
-          title={hasAnalysis ? 'Re-analizar con IA' : 'Analizar con IA'}
-          style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            padding: '2px 7px',
-            borderRadius: 4,
-            border: hasAnalysis ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(167,139,250,0.2)',
-            background: hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)',
-            color: hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-            fontSize: '0.52rem',
-            fontFamily: 'monospace',
-            letterSpacing: '0.05em',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167,139,250,0.22)'; e.currentTarget.style.color = '#c4b5fd' }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)'
-            e.currentTarget.style.color = hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)'
-          }}
-        >
-          <AIIcon size={8} color="currentColor" />
-          {hasAnalysis ? 'RE-ANALIZAR' : 'ANALIZAR'}
-        </button>
+        {/* Action buttons */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Audit launch button — only when a website is known */}
+          {contact.website && (
+            <button
+              onClick={async e => {
+                e.stopPropagation()
+                setAuditLaunching(true)
+                try {
+                  await auditApi.launchAudit({ root_url: contact.website, sku: 'health_check', contact_id: contact.id })
+                } catch {}
+                setAuditLaunching(false)
+                window.open('/audit', '_blank')
+              }}
+              disabled={auditLaunching}
+              title="Lanzar Technical Health Audit"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3,
+                padding: '2px 7px', borderRadius: 4,
+                border: '1px solid rgba(34,211,238,0.25)',
+                background: 'rgba(34,211,238,0.06)',
+                color: 'rgba(34,211,238,0.7)',
+                cursor: auditLaunching ? 'wait' : 'pointer',
+                transition: 'all 0.15s',
+                fontSize: '0.52rem', fontFamily: 'monospace', letterSpacing: '0.05em',
+                opacity: auditLaunching ? 0.6 : 1,
+              }}
+              onMouseEnter={e => { if (!auditLaunching) { e.currentTarget.style.background = 'rgba(34,211,238,0.15)'; e.currentTarget.style.color = '#22d3ee' } }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(34,211,238,0.06)'; e.currentTarget.style.color = 'rgba(34,211,238,0.7)' }}
+            >
+              ⬡ {auditLaunching ? '…' : 'AUDIT'}
+            </button>
+          )}
+
+          {/* AI Analysis button */}
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(contact) }}
+            title={hasAnalysis ? 'Re-analizar con IA' : 'Analizar con IA'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 3,
+              padding: '2px 7px', borderRadius: 4,
+              border: hasAnalysis ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(167,139,250,0.2)',
+              background: hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)',
+              color: hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)',
+              cursor: 'pointer', transition: 'all 0.15s',
+              fontSize: '0.52rem', fontFamily: 'monospace', letterSpacing: '0.05em',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167,139,250,0.22)'; e.currentTarget.style.color = '#c4b5fd' }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)'
+              e.currentTarget.style.color = hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)'
+            }}
+          >
+            <AIIcon size={8} color="currentColor" />
+            {hasAnalysis ? 'RE-ANALIZAR' : 'ANALIZAR'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -1555,9 +1587,20 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
               <textarea rows={3} value={form.notes ?? ''} onChange={e => set('notes', e.target.value)} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} />
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
               <input type="checkbox" checked={!!form.responded} onChange={e => set('responded', e.target.checked)} style={{ accentColor: '#10b981', width: 13, height: 13 }} />
               <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>Respondió</span>
+            </label>
+
+            {/* Audit type toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={form.audit_type === 'tech_health_audit'}
+                onChange={e => set('audit_type', e.target.checked ? 'tech_health_audit' : null)}
+                style={{ accentColor: '#22d3ee', width: 13, height: 13 }}
+              />
+              <span style={{ fontSize: '0.65rem', color: 'rgba(34,211,238,0.7)', fontFamily: 'monospace' }}>⬡ Tech Health Audit</span>
             </label>
 
             <button

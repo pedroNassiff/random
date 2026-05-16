@@ -50,15 +50,14 @@ CREATE TABLE IF NOT EXISTS contacts (
 
 CREATE TABLE IF NOT EXISTS pitch_logs (
     tracking_id TEXT PRIMARY KEY,
-    contact_id  INTEGER NOT NULL,
+    contact_id  INTEGER,
     company     TEXT    NOT NULL DEFAULT '',
     to_email    TEXT    NOT NULL DEFAULT '',
     subject     TEXT    NOT NULL DEFAULT '',
     pitch_type  TEXT    NOT NULL DEFAULT 'email',
     sent_at     TEXT    NOT NULL,
     opens       TEXT    NOT NULL DEFAULT '[]',  -- JSON array
-    clicks      TEXT    NOT NULL DEFAULT '[]',  -- JSON array
-    FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+    clicks      TEXT    NOT NULL DEFAULT '[]'   -- JSON array
 );
 
 CREATE INDEX IF NOT EXISTS idx_pitch_logs_contact ON pitch_logs(contact_id);
@@ -165,7 +164,40 @@ def _migrate_from_json(c: sqlite3.Connection):
         except Exception as e:
             print(f"[prospecting_db] contacts migration error: {e}")
 
-    # ── pitch logs ──
+    # ── pitch_logs schema migration: drop NOT NULL + FK on contact_id ──
+    try:
+        col_info = c.execute("PRAGMA table_info(pitch_logs)").fetchall()
+        contact_col = next((r for r in col_info if r["name"] == "contact_id"), None)
+        # notnull=1 means the old schema — migrate to nullable
+        if contact_col and contact_col["notnull"] == 1:
+            c.executescript("""
+                PRAGMA foreign_keys = OFF;
+                CREATE TABLE pitch_logs_new (
+                    tracking_id TEXT PRIMARY KEY,
+                    contact_id  INTEGER,
+                    company     TEXT NOT NULL DEFAULT '',
+                    to_email    TEXT NOT NULL DEFAULT '',
+                    subject     TEXT NOT NULL DEFAULT '',
+                    pitch_type  TEXT NOT NULL DEFAULT 'email',
+                    sent_at     TEXT NOT NULL,
+                    opens       TEXT NOT NULL DEFAULT '[]',
+                    clicks      TEXT NOT NULL DEFAULT '[]'
+                );
+                INSERT INTO pitch_logs_new SELECT
+                    tracking_id, contact_id, company, to_email,
+                    subject, pitch_type, sent_at, opens, clicks
+                FROM pitch_logs;
+                DROP TABLE pitch_logs;
+                ALTER TABLE pitch_logs_new RENAME TO pitch_logs;
+                CREATE INDEX IF NOT EXISTS idx_pitch_logs_contact ON pitch_logs(contact_id);
+                PRAGMA foreign_keys = ON;
+            """)
+            c.commit()
+            print("[prospecting_db] pitch_logs migrated: contact_id is now nullable")
+    except Exception as e:
+        print(f"[prospecting_db] pitch_logs schema migration error: {e}")
+
+    # ── pitch logs legacy JSON ──
     log_count = c.execute("SELECT COUNT(*) FROM pitch_logs").fetchone()[0]
     if log_count == 0 and LEGACY_LOGS.exists():
         try:
@@ -348,8 +380,10 @@ def contacts_reset(seed: list[dict]):
 # PITCH LOGS API
 # ══════════════════════════════════════════════════════════════════════════════
 
-def log_create(tracking_id: str, contact_id: int, company: str,
+def log_create(tracking_id: str, contact_id, company: str,
                to_email: str, subject: str, pitch_type: str, sent_at: str):
+    # contact_id may be None when sending from audit without a linked contact
+    contact_id = int(contact_id) if contact_id else None
     with _lock:
         c = _conn()
         c.execute("""
