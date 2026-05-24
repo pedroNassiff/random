@@ -28,6 +28,12 @@ import hcgHome from '../img/hcg/home.png';
 import ndsHome from '../img/nds/home.png';
 import { Water } from 'three/examples/jsm/Addons.js';
 
+// Service images
+import serv1 from '../img/servicios/serv1.png';
+import serv2 from '../img/servicios/serv2.png';
+import serv3 from '../img/servicios/serv3.png';
+import serv4 from '../img/servicios/serv4.png';
+
 import MatrixRain from '../components/MatrixRain';
 import GlitchCard from '../components/GlitchCard';
 
@@ -557,7 +563,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {(() => {
             const theme = '#E85A4F';
             return (
-              <GlitchCard color={theme}>
+              <GlitchCard color={theme} image={serv1}>
                 <div className="flex items-start justify-between">
                   <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>01</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>WEB</span>
@@ -578,7 +584,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {(() => {
             const theme = '#C9BFA8';
             return (
-              <GlitchCard color={theme}>
+              <GlitchCard color={theme} image={serv2}>
                 <div className="flex items-start justify-between">
                   <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>02</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>CLOUD</span>
@@ -599,7 +605,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {(() => {
             const theme = '#6EC6CC';
             return (
-              <GlitchCard color={theme}>
+              <GlitchCard color={theme} image={serv3}>
                 <div className="flex items-start justify-between">
                   <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>03</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>AI</span>
@@ -620,7 +626,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           {(() => {
             const theme = '#C8A96E';
             return (
-              <GlitchCard color={theme}>
+              <GlitchCard color={theme} image={serv4}>
                 <div className="flex items-start justify-between">
                   <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>04</span>
                   <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>3D</span>
