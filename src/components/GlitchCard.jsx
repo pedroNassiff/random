@@ -1,4 +1,57 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react'
+
+// Context so AsciiText children can know when the card is hovered
+export const GlitchCardContext = createContext({ hovered: false })
+
+// ── Text scramble effect ────────────────────────────────────────────────────
+const SCRAMBLE_CHARS = '!<>-\_/[]{}=+*^?#@$%&;:'
+
+/**
+ * AsciiText — wraps any text and scrambles it on GlitchCard hover.
+ * Uses context, so it must be rendered inside a GlitchCard.
+ *
+ * Props:
+ *   tag       — HTML tag to render (default 'span')
+ *   className — forwarded to the tag
+ *   style     — forwarded to the tag
+ *   children  — must be a plain string
+ */
+export function AsciiText({ children, className, style, tag: Tag = 'span' }) {
+  const { hovered } = useContext(GlitchCardContext)
+  const original   = typeof children === 'string' ? children : String(children ?? '')
+  const [display, setDisplay] = useState(original)
+  const ivRef      = useRef(null)
+  const frameRef   = useRef(0)
+
+  useEffect(() => {
+    clearInterval(ivRef.current)
+    if (hovered) {
+      frameRef.current = 0
+      // resolve ~20 ticks total regardless of text length → ~800ms
+      const charsPerTick = Math.max(1, Math.ceil(original.length / 20))
+      ivRef.current = setInterval(() => {
+        frameRef.current++
+        const resolved = Math.min(original.length, frameRef.current * charsPerTick)
+        if (resolved >= original.length) {
+          setDisplay(original)
+          clearInterval(ivRef.current)
+          return
+        }
+        const result = original.split('').map((ch, i) => {
+          if (ch === ' ' || ch === '\n') return ch
+          if (i < resolved) return ch
+          return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)]
+        }).join('')
+        setDisplay(result)
+      }, 40)
+    } else {
+      setDisplay(original)
+    }
+    return () => clearInterval(ivRef.current)
+  }, [hovered, original])
+
+  return <Tag className={className} style={style}>{display}</Tag>
+}
 
 // ── ASCII constants (same params as AsciiParticleCard) ──────────────────────
 const RAMP  = ' .:-=+*#%@'
@@ -85,6 +138,7 @@ export default function GlitchCard({ color = '#ffffff', image, children, classNa
   const [shakeX, setShakeX] = useState(0)
   const [clipSlice, setClipSlice] = useState(null)
   const [asciiVisible, setAsciiVisible] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)  // for context / AsciiText
   const hovered      = useRef(false)
   const timerRef     = useRef(null)
   // ASCII refs
@@ -177,11 +231,13 @@ export default function GlitchCard({ color = '#ffffff', image, children, classNa
 
   const onEnter = useCallback(() => {
     hovered.current = true
+    setIsHovered(true)
     if (image) { setAsciiVisible(true); if (!rafRef.current) startAsciiLoop() }
   }, [image, startAsciiLoop])
 
   const onLeave = useCallback(() => {
     hovered.current = false
+    setIsHovered(false)
     if (image) { setAsciiVisible(false); cursorRef.current = { x: -1, y: -1 } }
   }, [image])
 
@@ -196,6 +252,7 @@ export default function GlitchCard({ color = '#ffffff', image, children, classNa
   }, [image])
 
   return (
+    <GlitchCardContext.Provider value={{ hovered: isHovered }}>
     <>
       <style>{`
         @keyframes svc-scan {
@@ -292,5 +349,6 @@ export default function GlitchCard({ color = '#ffffff', image, children, classNa
         </div>
       </div>
     </>
+    </GlitchCardContext.Provider>
   )
 }
