@@ -92,7 +92,7 @@ def _get_public_url() -> tuple[str, bool]:
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
 class SendPitchRequest(BaseModel):
-    contact_id: int
+    contact_id: Optional[int] = None
     to_email: str
     subject: str
     body_html: str          # full HTML body (frontend renders template)
@@ -139,19 +139,27 @@ def send_pitch(req: SendPitchRequest):
     msg.attach(MIMEText(tracked_html,  "html",  "utf-8"))
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM, [req.to_email], msg.as_string())
+        if SMTP_PORT == 465:
+            # SSL directo (puerto 465)
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+                server.ehlo()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_FROM, [req.to_email], msg.as_string())
+        else:
+            # STARTTLS (puerto 587)
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_FROM, [req.to_email], msg.as_string())
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"SMTP error: {str(e)}")
 
     # Persist log entry in SQLite
     log_create(
         tracking_id=tracking_id,
-        contact_id=req.contact_id,
+        contact_id=req.contact_id if req.contact_id else None,
         company=req.company or "",
         to_email=req.to_email,
         subject=req.subject,

@@ -34,3 +34,17 @@ npm run dev
 ```
 
 Abre `http://localhost:5173`. Usa los botones **RELAX / FOCUS** arriba a la derecha para experimentar la simulación.
+
+
+- Motivaciones para afrontar un nuevo reto profesional:
+    - soy una persona que le gustan los desafios, crecer profesional y personalmente y aprender constantemente
+- Razones para dejar tu actual (o último) puesto-compañía:
+    he finalizado y entregado el proyecto para hub city guides, me han propuesto bolsa de horas para mantentenimiento pero no me cuadraba economicamente 
+-Salario bruto/año actual (o último):
+    55.000
+- Expectativas económicas para este nuevo reto (bruto/año):
+    55.000 / 60.000
+- Tiempo mínimo que necesitarías para incorporación en caso de acuerdo: 
+    18 de mayo en adelante
+-¿Tienes nacionalidad española o permiso de trabajo en vigor para ser contratado en España laboralmente a tiempo completo sin restricciones?
+    Si, tengo permiso de trabajo en vigor para ser contratado en España laboralmente a tiempo completo sin restricciones

@@ -7,6 +7,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import Navbar from '../components/Navbar'
 import ProspectGroupModal from '../components/ProspectGroupModal'
+import { auditApi } from '../services/auditApi'
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
 const LS_KEY = 'prospeccion_board_fallback_v1'
@@ -75,6 +76,75 @@ Respondé ÚNICAMENTE con este JSON (sin markdown, sin backticks, sin texto extr
 }
 `.trim()
 
+// ── Proposal prompt (segunda etapa — usa el analysis como contexto) ──────────
+const buildProposalPrompt = (contact, analysis) => `
+Sos Pedro Nassiff, CTO de Random Lab. Acabas de analizar a ${contact.company} y detectaste oportunidades concretas. Ahora tenés una reunión inminente con ellos.
+
+Generá un documento de propuesta comercial interno que te sirva de base para el pitch verbal. No es un PDF para el cliente — es tu guía de conversación, con la seguridad de saber exactamente qué vas a ofrecer, por qué funciona y cuánto tiempo toma.
+
+CONTEXTO DE LA EMPRESA:
+- Empresa: ${contact.company}
+- Decision maker: ${contact.decision_maker || 'N/A'}
+- Notas: ${contact.notes || 'N/A'}
+
+ANÁLISIS IA PREVIO:
+- Score: ${analysis.score}/100 (${analysis.fit_category} fit)
+- Resumen: ${analysis.summary || ''}
+- Vectores de entrada: ${JSON.stringify(analysis.entry_vectors?.slice(0, 3) || [])}
+- Pain points: ${JSON.stringify(analysis.pain_points || [])}
+- Approach recomendado: ${analysis.recommended_approach || ''}
+
+SOBRE RANDOM LAB (lo que tenés para vender):
+Consultora técnica especializada en:
+- Modernización legacy (PHP/monolitos → FastAPI/NestJS/microservicios)  
+- Integración IA: embeddings, búsqueda semántica, visión computacional (GPT-4o), modelos custom
+- Desarrollo 3D/WebGL/Three.js, experiencias interactivas
+- Pipelines de datos en tiempo real: GPS (Kalman filtering, DBSCAN, OSRM), EEG/IoT
+- Automatización de procesos y ETL a escala
+- CRMs y dashboards internos con IA integrada
+
+CASOS QUE TENEMOS (para usar como proof points):
+1. Calavera Sur (e-commerce textil): Sistema de búsqueda semántica con pgvector + OpenAI embeddings sobre 8K+ productos. Visión computacional con GPT-4o para tagging automático de catálogo. Integrado en legacy PHP sin downtime. 3 semanas de implementación.
+2. Hub City Guides (marketplace GPS): Pipeline de procesamiento GPS con Kalman filtering + DBSCAN para detección de paradas. OSRM map matching con reducción de errores del 85%. NestJS + Python + PostgreSQL + GCP. CI/CD propio con GitHub Actions self-hosted.
+3. NDS / Ford Motor (3 años): ETL para datos de manufactura de múltiples departamentos. Anomaly detection con IA sobre circuitos eléctricos vehiculares. Dashboards que reconciliaron datos de calidad y costos de producción en plantas de Ford.
+4. Random Lab CRM interno: Herramienta B2B con kanban, análisis de prospectos con Claude API, scraping web, tracking de pitches con pixel de apertura.
+
+INSTRUCCIONES:
+Genera un documento de propuesta estructurado y específico para ${contact.company}. Sé concreto — no genérico. Usá los casos de éxito donde sean relevantes. Incluí estimaciones de tiempo realistas.
+
+Respondé ÚNICAMENTE con este JSON (sin markdown, sin backticks, sin texto extra):
+{
+  "title": "<título corto de la propuesta — máx 8 palabras>",
+  "executive_problem": "<el problema específico de ${contact.company} en 2-3 oraciones — como si ellos lo vivieran>",
+  "why_now": "<por qué es el momento ideal para resolver esto — timing de mercado, presión competitiva, deuda técnica acumulada>",
+  "solution_vectors": [
+    {
+      "name": "<nombre del servicio/solución>",
+      "what_we_do": "<qué hacemos exactamente — no qué tecnología usamos, sino qué problema resolvemos>",
+      "how": "<cómo lo implementamos — metodología, fases, tecnología clave>",
+      "timeline_weeks": <número de semanas realista>,
+      "proof_case": "<caso de éxito similar con resultado concreto — de los casos de Random Lab si aplica>",
+      "failure_without": "<qué pasa si NO lo resuelven — el coste del status quo, específico>"
+    }
+  ],
+  "scope": {
+    "included": ["<qué está incluido en el alcance>"],
+    "not_included": ["<qué NO está incluido — expectativas claras>"],
+    "assumptions": ["<supuestos necesarios para que funcione>"]
+  },
+  "timeline_summary": "<descripción del timeline total: fases, hitos clave, entregables por etapa>",
+  "total_weeks_min": <semanas mínimas>,
+  "total_weeks_max": <semanas máximas>,
+  "confidence_level": "<high|mid|low — qué tan seguros estamos de poder ejecutar esto>",
+  "confidence_reasoning": "<por qué tenemos esa confianza — o qué incertidumbre existe>",
+  "key_questions": ["<pregunta que necesitás responder en la reunión para afinar la propuesta>"],
+  "opening_sentence": "<la primera oración que vas a decir en la reunión para abrir el tema del problema>",
+  "objection_price": "<cómo responderías si dicen que es caro>",
+  "objection_time": "<cómo responderías si dicen que no es el momento>",
+  "next_step": "<el próximo paso concreto que proponés al cierre de la reunión>"
+}
+`.trim()
+
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGES = [
   { id: 'identificado', label: 'Identificado',  short: 'ID',    color: '#6b7280', desc: 'En lista, sin acción' },
@@ -121,6 +191,7 @@ const NEW_CONTACT_TEMPLATE = {
   why: '', stage: 'identificado', notes: '',
   follow_up_count: 0, responded: false,
   last_action: null, next_action: null, ai_analysis: null,
+  audit_type: null,
 }
 
 // ── API helpers ───────────────────────────────────────────────────────────────
@@ -198,6 +269,23 @@ async function apiTranslatePitch({ subject, text, html, lang }) {
   })
   if (!res.ok) throw new Error('Translation error')
   return res.json()
+}
+
+async function apiGenerateProposal(contact, analysis) {
+  const prompt = buildProposalPrompt(contact, analysis)
+  const res = await fetch(`${API}/prospecting/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      company: contact.company || contact.name || 'Prospecto',
+      custom_prompt: prompt,
+      model: TIER_MODEL[CURRENT_TIER],
+      // no contact_id — prevents overwriting the existing ai_analysis
+    }),
+  })
+  if (!res.ok) throw new Error(`Proposal error: ${res.status}`)
+  const data = await res.json()
+  return data.analysis ?? data
 }
 
 // ── Pitch template builders ───────────────────────────────────────────────────
@@ -346,6 +434,385 @@ Trabajo con Three.js/WebGL + IA en instalaciones y experiencias interactivas. ${
 
 Pedro · Random Lab`
 }
+
+// ── ProposalModal ─────────────────────────────────────────────────────────────
+function ProposalModal({ contact, analysis, onClose }) {
+  // If contact already has a saved proposal, show it immediately (no re-fetch)
+  const [proposal, setProposal]   = useState(contact.ai_proposal || null)
+  const [loading, setLoading]     = useState(!contact.ai_proposal)
+  const [error, setError]         = useState(null)
+  const [copied, setCopied]       = useState(false)
+  const [tab, setTab]             = useState('proposal') // 'proposal' | 'chat'
+
+  // Chat state — initialize from saved history
+  const [chatMessages, setChatMessages] = useState(contact.ai_proposal_chat || [])
+  const [chatInput, setChatInput]       = useState('')
+  const [chatLoading, setChatLoading]   = useState(false)
+  const chatEndRef = useRef(null)
+
+  // Generate + save on first open
+  useEffect(() => {
+    if (contact.ai_proposal) return // already have it
+    let cancelled = false
+    setLoading(true)
+    apiGenerateProposal(contact, analysis)
+      .then(async p => {
+        if (cancelled) return
+        setProposal(p)
+        // Persist to DB so it survives page close
+        try {
+          await fetch(`${API}/prospecting/contacts/${contact.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ai_proposal: p }),
+          })
+        } catch (_) { /* non-fatal */ }
+      })
+      .catch(e => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Scroll chat to bottom
+  useEffect(() => {
+    if (tab === 'chat') chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, tab])
+
+  const confidenceColor = { high: '#22c55e', mid: '#f59e0b', low: '#ef4444' }
+  const confidenceLabel = { high: 'Alta confianza', mid: 'Confianza media', low: 'Confianza baja' }
+
+  const copyAll = () => {
+    if (!proposal) return
+    const text = [
+      `PROPUESTA: ${proposal.title}`,
+      `\n## PROBLEMA\n${proposal.executive_problem}`,
+      `\n## POR QUÉ AHORA\n${proposal.why_now}`,
+      ...(proposal.solution_vectors || []).map((v, i) =>
+        `\n## SOLUCIÓN ${i + 1}: ${v.name}\n• Qué hacemos: ${v.what_we_do}\n• Cómo: ${v.how}\n• Timeline: ${v.timeline_weeks} semanas\n• Caso de éxito: ${v.proof_case}\n• Sin resolver: ${v.failure_without}`
+      ),
+      `\n## ALCANCE\nIncluido: ${(proposal.scope?.included || []).join(', ')}\nNo incluido: ${(proposal.scope?.not_included || []).join(', ')}`,
+      `\n## TIMELINE\n${proposal.timeline_summary} (${proposal.total_weeks_min}–${proposal.total_weeks_max} semanas)`,
+      `\n## APERTURA\n"${proposal.opening_sentence}"`,
+      `\n## OBJECCIONES\nPrecio: ${proposal.objection_price}\nTiempo: ${proposal.objection_time}`,
+      `\n## PRÓXIMO PASO\n${proposal.next_step}`,
+      `\n## PREGUNTAS CLAVE\n${(proposal.key_questions || []).map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
+    ].join('\n')
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
+
+  const saveChatHistory = async (messages) => {
+    try {
+      await fetch(`${API}/prospecting/contacts/${contact.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ai_proposal_chat: messages }),
+      })
+    } catch (_) { /* non-fatal */ }
+  }
+
+  const sendChat = async () => {
+    const msg = chatInput.trim()
+    if (!msg || chatLoading) return
+    const newMessages = [...chatMessages, { role: 'user', content: msg }]
+    setChatMessages(newMessages)
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      const res = await fetch(`${API}/prospecting/proposal-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages,
+          proposal,
+          analysis,
+          contact_company: contact.company,
+        }),
+      })
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.detail || `Chat error ${res.status}`)
+      }
+      const data = await res.json()
+      const finalMessages = [...newMessages, { role: 'assistant', content: data.reply }]
+      setChatMessages(finalMessages)
+      saveChatHistory(finalMessages)
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `❌ ${e.message}` }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: 16, backdropFilter: 'blur(8px)' }}
+    >
+      <div style={{ background: '#060810', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, width: '100%', maxWidth: 860, maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(20,184,166,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: '0.5rem', color: '#14b8a6', fontFamily: 'monospace', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 2 }}>
+              Propuesta comercial · Segunda etapa
+              {contact.ai_proposal && <span style={{ marginLeft: 8, color: '#22c55e', opacity: 0.8 }}>· guardada</span>}
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f1f5f9', fontFamily: 'monospace' }}>{contact.company}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {proposal && tab === 'proposal' && (
+              <button onClick={copyAll} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(20,184,166,0.3)', background: copied ? 'rgba(20,184,166,0.15)' : 'transparent', color: copied ? '#5eead4' : 'rgba(20,184,166,0.7)', fontSize: '0.58rem', fontFamily: 'monospace', cursor: 'pointer' }}>
+                {copied ? '✓ copiado' : '⎘ copiar todo'}
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: '1.3rem', cursor: 'pointer', padding: '2px 8px', lineHeight: 1 }}>×</button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+          {[
+            { id: 'proposal', label: '▤ Propuesta' },
+            { id: 'chat',     label: `✦ Copilot${chatMessages.length > 0 ? ` (${Math.ceil(chatMessages.length / 2)})` : ''}` },
+          ].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding: '9px 18px', fontSize: '0.6rem', fontFamily: 'monospace', cursor: 'pointer',
+              background: 'transparent', border: 'none', letterSpacing: '0.08em',
+              color: tab === t.id ? '#5eead4' : 'rgba(255,255,255,0.3)',
+              borderBottom: `2px solid ${tab === t.id ? '#14b8a6' : 'transparent'}`,
+              transition: 'all 0.12s',
+            }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── PROPOSAL TAB ── */}
+        {tab === 'proposal' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+            {loading && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, gap: 14 }}>
+                <div style={{ width: 28, height: 28, border: '2px solid rgba(20,184,166,0.2)', borderTop: '2px solid #14b8a6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Generando propuesta con IA…</div>
+                <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.15)', fontFamily: 'monospace' }}>usando el análisis previo como contexto</div>
+              </div>
+            )}
+            {error && (
+              <div style={{ padding: '14px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: '0.65rem', fontFamily: 'monospace' }}>
+                ❌ {error}
+              </div>
+            )}
+            {proposal && !loading && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Title + confidence */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9', fontFamily: 'monospace', lineHeight: 1.3 }}>{proposal.title}</h2>
+                  {proposal.confidence_level && (
+                    <div style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 5, background: (confidenceColor[proposal.confidence_level] || '#6b7280') + '15', border: `1px solid ${(confidenceColor[proposal.confidence_level] || '#6b7280')}35`, fontSize: '0.55rem', fontFamily: 'monospace', color: confidenceColor[proposal.confidence_level] || '#6b7280', whiteSpace: 'nowrap' }}>
+                      {confidenceLabel[proposal.confidence_level] || proposal.confidence_level}
+                    </div>
+                  )}
+                </div>
+                {/* Opening sentence */}
+                {proposal.opening_sentence && (
+                  <div style={{ padding: '12px 16px', borderRadius: 8, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', borderLeft: '3px solid #fbbf24' }}>
+                    <div style={{ fontSize: '0.5rem', color: '#fbbf24', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>✦ Apertura — primera oración</div>
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.8)', fontFamily: 'monospace', lineHeight: 1.6, fontStyle: 'italic' }}>"{proposal.opening_sentence}"</p>
+                  </div>
+                )}
+                {/* Problem */}
+                {proposal.executive_problem && (
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    <div style={{ fontSize: '0.5rem', color: '#f87171', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>⚡ El problema</div>
+                    <p style={{ margin: 0, fontSize: '0.68rem', color: 'rgba(255,255,255,0.65)', fontFamily: 'monospace', lineHeight: 1.65 }}>{proposal.executive_problem}</p>
+                    {proposal.why_now && (
+                      <p style={{ margin: '8px 0 0', fontSize: '0.62rem', color: 'rgba(239,68,68,0.55)', fontFamily: 'monospace', lineHeight: 1.5, borderTop: '1px solid rgba(239,68,68,0.1)', paddingTop: 8 }}>
+                        <span style={{ color: '#f87171' }}>Por qué ahora:</span> {proposal.why_now}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {/* Solution vectors */}
+                {proposal.solution_vectors?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Vectores de solución ({proposal.solution_vectors.length})</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {proposal.solution_vectors.map((v, i) => (
+                        <div key={i} style={{ borderRadius: 9, border: '1px solid rgba(20,184,166,0.2)', overflow: 'hidden' }}>
+                          <div style={{ padding: '10px 14px', background: 'rgba(20,184,166,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5eead4', fontFamily: 'monospace' }}>{v.name}</span>
+                            {v.timeline_weeks && <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, padding: '2px 7px' }}>~{v.timeline_weeks}w</span>}
+                          </div>
+                          <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                              <div>
+                                <div style={{ fontSize: '0.48rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Qué hacemos</div>
+                                <p style={{ margin: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', lineHeight: 1.5 }}>{v.what_we_do}</p>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.48rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Cómo</div>
+                                <p style={{ margin: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', lineHeight: 1.5 }}>{v.how}</p>
+                              </div>
+                            </div>
+                            {v.proof_case && <div style={{ padding: '7px 10px', borderRadius: 5, background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)' }}><div style={{ fontSize: '0.48rem', color: '#86efac', fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>✓ Caso de éxito</div><p style={{ margin: 0, fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', lineHeight: 1.5 }}>{v.proof_case}</p></div>}
+                            {v.failure_without && <div style={{ padding: '7px 10px', borderRadius: 5, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)' }}><div style={{ fontSize: '0.48rem', color: '#f87171', fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>✗ Sin resolver</div><p style={{ margin: 0, fontSize: '0.6rem', color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', lineHeight: 1.5 }}>{v.failure_without}</p></div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Scope + Timeline */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {proposal.scope && (
+                    <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Alcance</div>
+                      {proposal.scope.included?.length > 0 && <div style={{ marginBottom: 8 }}><div style={{ fontSize: '0.48rem', color: '#86efac', fontFamily: 'monospace', marginBottom: 4 }}>✓ Incluido</div>{proposal.scope.included.map((item, i) => <div key={i} style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', lineHeight: 1.5, paddingLeft: 8 }}>• {item}</div>)}</div>}
+                      {proposal.scope.not_included?.length > 0 && <div><div style={{ fontSize: '0.48rem', color: '#f87171', fontFamily: 'monospace', marginBottom: 4 }}>✗ No incluido</div>{proposal.scope.not_included.map((item, i) => <div key={i} style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace', lineHeight: 1.5, paddingLeft: 8 }}>• {item}</div>)}</div>}
+                    </div>
+                  )}
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.15)' }}>
+                    <div style={{ fontSize: '0.5rem', color: '#a78bfa', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Timeline</div>
+                    {proposal.total_weeks_min != null && <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#c4b5fd', fontFamily: 'monospace', lineHeight: 1, marginBottom: 6 }}>{proposal.total_weeks_min === proposal.total_weeks_max ? `${proposal.total_weeks_min}w` : `${proposal.total_weeks_min}–${proposal.total_weeks_max}w`}</div>}
+                    {proposal.timeline_summary && <p style={{ margin: 0, fontSize: '0.58rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', lineHeight: 1.5 }}>{proposal.timeline_summary}</p>}
+                    {proposal.confidence_reasoning && <p style={{ margin: '8px 0 0', fontSize: '0.55rem', color: 'rgba(167,139,250,0.5)', fontFamily: 'monospace', lineHeight: 1.5, borderTop: '1px solid rgba(167,139,250,0.1)', paddingTop: 7 }}>{proposal.confidence_reasoning}</p>}
+                  </div>
+                </div>
+                {/* Objections */}
+                {(proposal.objection_price || proposal.objection_time) && (
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.12)' }}>
+                    <div style={{ fontSize: '0.5rem', color: '#fbbf24', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Manejo de objeciones</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {proposal.objection_price && <div><div style={{ fontSize: '0.52rem', color: 'rgba(251,191,36,0.6)', fontFamily: 'monospace', marginBottom: 3 }}>💬 "Es caro" →</div><p style={{ margin: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace', lineHeight: 1.55, paddingLeft: 10 }}>{proposal.objection_price}</p></div>}
+                      {proposal.objection_time && <div style={{ borderTop: proposal.objection_price ? '1px solid rgba(251,191,36,0.08)' : 'none', paddingTop: proposal.objection_price ? 8 : 0 }}><div style={{ fontSize: '0.52rem', color: 'rgba(251,191,36,0.6)', fontFamily: 'monospace', marginBottom: 3 }}>💬 "No es el momento" →</div><p style={{ margin: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace', lineHeight: 1.55, paddingLeft: 10 }}>{proposal.objection_time}</p></div>}
+                    </div>
+                  </div>
+                )}
+                {/* Key questions */}
+                {proposal.key_questions?.length > 0 && (
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                    <div style={{ fontSize: '0.5rem', color: '#60a5fa', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>? Preguntas clave para la reunión</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {proposal.key_questions.map((q, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.6rem', color: '#60a5fa', fontFamily: 'monospace', flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
+                          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace', lineHeight: 1.5 }}>{q}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Next step */}
+                {proposal.next_step && (
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(20,184,166,0.07)', border: '1px solid rgba(20,184,166,0.25)', borderLeft: '3px solid #14b8a6' }}>
+                    <div style={{ fontSize: '0.5rem', color: '#14b8a6', fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>▶ Próximo paso al cerrar la reunión</div>
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: '#5eead4', fontFamily: 'monospace', lineHeight: 1.6, fontWeight: 600 }}>{proposal.next_step}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── CHAT TAB ── */}
+        {tab === 'chat' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {!proposal && !loading && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', fontFamily: 'monospace' }}>
+                Generá la propuesta primero para habilitar el chat
+              </div>
+            )}
+            {(proposal || loading) && (
+              <>
+                {/* Messages */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {chatMessages.length === 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                      <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                        Sugerencias para arrancar
+                      </div>
+                      {[
+                        '¿Cómo manejo si dicen que el precio es muy alto?',
+                        '¿Qué digo si preguntan en qué se diferencian de otras herramientas?',
+                        'Dame la frase exacta para cerrar y proponer el siguiente paso',
+                        '¿Cómo adapto el pitch si el foco es reducir costos, no escalar?',
+                      ].map((s, i) => (
+                        <button key={i} onClick={() => setChatInput(s)} style={{
+                          textAlign: 'left', padding: '8px 12px', borderRadius: 7,
+                          border: '1px solid rgba(20,184,166,0.15)', background: 'rgba(20,184,166,0.04)',
+                          color: 'rgba(255,255,255,0.45)', fontSize: '0.62rem', fontFamily: 'monospace',
+                          cursor: 'pointer', lineHeight: 1.4,
+                        }}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {chatMessages.map((m, i) => (
+                    <div key={i} style={{
+                      display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start', gap: 3,
+                    }}>
+                      <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        {m.role === 'user' ? 'vos' : '✦ copilot'}
+                      </div>
+                      <div style={{
+                        maxWidth: '82%', padding: '9px 13px', borderRadius: 9,
+                        background: m.role === 'user' ? 'rgba(20,184,166,0.12)' : 'rgba(255,255,255,0.04)',
+                        border: m.role === 'user' ? '1px solid rgba(20,184,166,0.25)' : '1px solid rgba(255,255,255,0.07)',
+                        fontSize: '0.65rem', color: m.role === 'user' ? '#5eead4' : 'rgba(255,255,255,0.7)',
+                        fontFamily: 'monospace', lineHeight: 1.6, whiteSpace: 'pre-wrap',
+                      }}>
+                        {m.content}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px' }}>
+                      <div style={{ width: 14, height: 14, border: '1.5px solid rgba(20,184,166,0.2)', borderTop: '1.5px solid #14b8a6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>pensando…</span>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+                {/* Input */}
+                <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <textarea
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
+                    placeholder="Preguntá sobre la propuesta, pedí frases, manejá objeciones…"
+                    rows={2}
+                    style={{
+                      flex: 1, padding: '8px 12px', borderRadius: 8, resize: 'none',
+                      border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)',
+                      color: '#f1f5f9', fontSize: '0.65rem', fontFamily: 'monospace', lineHeight: 1.5,
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={sendChat}
+                    disabled={!chatInput.trim() || chatLoading || !proposal}
+                    style={{
+                      padding: '8px 16px', borderRadius: 8, alignSelf: 'flex-end',
+                      border: '1px solid rgba(20,184,166,0.35)', background: 'rgba(20,184,166,0.1)',
+                      color: (!chatInput.trim() || chatLoading || !proposal) ? 'rgba(20,184,166,0.3)' : '#5eead4',
+                      fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 700,
+                      cursor: (!chatInput.trim() || chatLoading || !proposal) ? 'default' : 'pointer',
+                    }}
+                  >
+                    ↑ enviar
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
 
 // ── PitchModal ────────────────────────────────────────────────────────────────
 function PitchModal({ contact, analysis, scrapedEmails = [], onClose }) {
@@ -975,6 +1442,7 @@ function ContactCard({ contact, onEdit, onMove, tracking }) {
     : null
   const stale = contact.stage !== 'cerrado' && contact.stage !== 'descartado' && daysSince !== null && daysSince > 10
   const hasAnalysis = contact.ai_analysis && contact.ai_analysis.score != null
+  const [auditLaunching, setAuditLaunching] = useState(false)
 
   const handleDragStart = e => {
     e.dataTransfer.setData('text/plain', JSON.stringify({ contactId: contact.id, fromStage: contact.stage }))
@@ -1121,36 +1589,65 @@ function ContactCard({ contact, onEdit, onMove, tracking }) {
         {contact.follow_up_count > 0 && <Badge label={`FU×${contact.follow_up_count}`} color="#f59e0b" small />}
         {stale && <Badge label={`${daysSince}d`} color="#f59e0b" small />}
         {!stale && daysSince !== null && daysSince <= 3 && <Badge label={`${daysSince}d`} color="#6b7280" small />}
+        {contact.audit_type === 'tech_health_audit' && <Badge label="⬡ AUDIT" color="#22d3ee" small />}
 
-        {/* AI Analysis button */}
-        <button
-          onClick={e => { e.stopPropagation(); onEdit(contact) }}
-          title={hasAnalysis ? 'Re-analizar con IA' : 'Analizar con IA'}
-          style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            padding: '2px 7px',
-            borderRadius: 4,
-            border: hasAnalysis ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(167,139,250,0.2)',
-            background: hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)',
-            color: hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-            fontSize: '0.52rem',
-            fontFamily: 'monospace',
-            letterSpacing: '0.05em',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167,139,250,0.22)'; e.currentTarget.style.color = '#c4b5fd' }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)'
-            e.currentTarget.style.color = hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)'
-          }}
-        >
-          <AIIcon size={8} color="currentColor" />
-          {hasAnalysis ? 'RE-ANALIZAR' : 'ANALIZAR'}
-        </button>
+        {/* Action buttons */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Audit launch button — only when a website is known */}
+          {contact.website && (
+            <button
+              onClick={async e => {
+                e.stopPropagation()
+                setAuditLaunching(true)
+                try {
+                  await auditApi.launchAudit({ root_url: contact.website, sku: 'health_check', contact_id: contact.id })
+                } catch {}
+                setAuditLaunching(false)
+                window.open('/audit', '_blank')
+              }}
+              disabled={auditLaunching}
+              title="Lanzar Technical Health Audit"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3,
+                padding: '2px 7px', borderRadius: 4,
+                border: '1px solid rgba(34,211,238,0.25)',
+                background: 'rgba(34,211,238,0.06)',
+                color: 'rgba(34,211,238,0.7)',
+                cursor: auditLaunching ? 'wait' : 'pointer',
+                transition: 'all 0.15s',
+                fontSize: '0.52rem', fontFamily: 'monospace', letterSpacing: '0.05em',
+                opacity: auditLaunching ? 0.6 : 1,
+              }}
+              onMouseEnter={e => { if (!auditLaunching) { e.currentTarget.style.background = 'rgba(34,211,238,0.15)'; e.currentTarget.style.color = '#22d3ee' } }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(34,211,238,0.06)'; e.currentTarget.style.color = 'rgba(34,211,238,0.7)' }}
+            >
+              ⬡ {auditLaunching ? '…' : 'AUDIT'}
+            </button>
+          )}
+
+          {/* AI Analysis button */}
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(contact) }}
+            title={hasAnalysis ? 'Re-analizar con IA' : 'Analizar con IA'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 3,
+              padding: '2px 7px', borderRadius: 4,
+              border: hasAnalysis ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(167,139,250,0.2)',
+              background: hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)',
+              color: hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)',
+              cursor: 'pointer', transition: 'all 0.15s',
+              fontSize: '0.52rem', fontFamily: 'monospace', letterSpacing: '0.05em',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167,139,250,0.22)'; e.currentTarget.style.color = '#c4b5fd' }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = hasAnalysis ? 'rgba(167,139,250,0.12)' : 'rgba(167,139,250,0.06)'
+              e.currentTarget.style.color = hasAnalysis ? '#c4b5fd' : 'rgba(167,139,250,0.6)'
+            }}
+          >
+            <AIIcon size={8} color="currentColor" />
+            {hasAnalysis ? 'RE-ANALIZAR' : 'ANALIZAR'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -1332,6 +1829,7 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
   const [aiError, setAiError]               = useState(null)
   const [remaining, setRemaining]           = useState(usageLeft())
   const [showPitch, setShowPitch]           = useState(false)
+  const [showProposal, setShowProposal]     = useState(false)
 
   useEffect(() => {
     setPrompt(buildDefaultPrompt({ ...contact, notes }, scrapedContent))
@@ -1555,9 +2053,20 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
               <textarea rows={3} value={form.notes ?? ''} onChange={e => set('notes', e.target.value)} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} />
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
               <input type="checkbox" checked={!!form.responded} onChange={e => set('responded', e.target.checked)} style={{ accentColor: '#10b981', width: 13, height: 13 }} />
               <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>Respondió</span>
+            </label>
+
+            {/* Audit type toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={form.audit_type === 'tech_health_audit'}
+                onChange={e => set('audit_type', e.target.checked ? 'tech_health_audit' : null)}
+                style={{ accentColor: '#22d3ee', width: 13, height: 13 }}
+              />
+              <span style={{ fontSize: '0.65rem', color: 'rgba(34,211,238,0.7)', fontFamily: 'monospace' }}>⬡ Tech Health Audit</span>
             </label>
 
             <button
@@ -1826,6 +2335,23 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
                     <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>"{analysis.pitch_angle}"</p>
                   </div>
                 )}
+
+                {/* Generar / Ver Propuesta */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12, marginTop: 4 }}>
+                  <button
+                    onClick={() => setShowProposal(true)}
+                    style={{
+                      width: '100%', padding: '10px 16px', borderRadius: 7,
+                      background: contact.ai_proposal ? 'rgba(20,184,166,0.13)' : 'rgba(20,184,166,0.08)',
+                      border: `1px solid ${contact.ai_proposal ? 'rgba(20,184,166,0.55)' : 'rgba(20,184,166,0.35)'}`,
+                      color: '#5eead4', fontSize: '0.65rem', fontFamily: 'monospace',
+                      fontWeight: 700, cursor: 'pointer', letterSpacing: '0.08em',
+                      textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    }}
+                  >
+                    {contact.ai_proposal ? '◈ Ver Propuesta Comercial' : '▶ Generar Propuesta Comercial'}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1842,6 +2368,13 @@ function ContactModal({ contact, onSave, onClose, isNew = false }) {
         onClose={() => setShowPitch(false)}
       />
     )}
+    {showProposal && (
+      <ProposalModal
+        contact={contact}
+        analysis={analysis}
+        onClose={() => setShowProposal(false)}
+      />
+    )}
     </>
   )
 }
@@ -1854,8 +2387,19 @@ const PlanningProspeccion = () => {
   const [showNew,        setShowNew]        = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [tierFilter,     setTierFilter]     = useState(0)
+  const [search,         setSearch]         = useState('')
 
-  const visible = contacts.filter(c => tierFilter === 0 || c.tier === tierFilter)
+  const searchQ = search.trim().toLowerCase()
+  const visible = contacts.filter(c => {
+    if (tierFilter !== 0 && c.tier !== tierFilter) return false
+    if (!searchQ) return true
+    return (
+      c.name?.toLowerCase().includes(searchQ) ||
+      c.company?.toLowerCase().includes(searchQ) ||
+      c.role?.toLowerCase().includes(searchQ) ||
+      c.notes?.toLowerCase().includes(searchQ)
+    )
+  })
   const byStage = stage => visible.filter(c => c.stage === stage.id)
 
   const total        = contacts.length
@@ -1926,9 +2470,29 @@ const PlanningProspeccion = () => {
             })}
           </div>
 
-          {/* Tier filter + New button */}
+          {/* Tier filter + Search + New button */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Search */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <span style={{ position: 'absolute', left: 9, fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)', pointerEvents: 'none' }}>⌕</span>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="buscar prospecto…"
+                style={{
+                  paddingLeft: 26, paddingRight: search ? 26 : 10, paddingTop: 5, paddingBottom: 5,
+                  width: 190, borderRadius: 7,
+                  border: `1px solid ${search ? 'rgba(20,184,166,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                  background: search ? 'rgba(20,184,166,0.05)' : 'rgba(255,255,255,0.03)',
+                  color: '#f1f5f9', fontSize: '0.65rem', fontFamily: 'monospace',
+                  outline: 'none', transition: 'border-color 0.15s',
+                }}
+              />
+              {search && (
+                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1, padding: 0 }}>×</button>
+              )}
+            </div>
             <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', marginRight: 4 }}>TIER</span>
             {[0, 1, 2, 3, 4].map(t => (
               <button key={t} onClick={() => setTierFilter(t)} style={{

@@ -54,6 +54,18 @@ class EEGRecording:
     avg_delta: float = None
     peak_coherence: float = None
 
+    # Per-channel alpha averages (normalized 0-1, from eeg_band_power — migration 002)
+    alpha_tp9_avg: float = None
+    alpha_af7_avg: float = None
+    alpha_af8_avg: float = None
+    alpha_tp10_avg: float = None
+    # Derived FAA / asymmetry aggregates
+    faa_mean: float = None
+    faa_baseline_closed: float = None
+    posterior_asymmetry_mean: float = None
+    # 0 = no per-channel data (pre-migration), 1 = current schema
+    per_channel_version: int = 0
+
 
 class PostgresClient:
     """
@@ -194,9 +206,17 @@ class PostgresClient:
                     avg_beta = $10,
                     avg_gamma = $11,
                     avg_delta = $12,
-                    peak_coherence = $13
-                WHERE id = $14
-            ''', 
+                    peak_coherence = $13,
+                    alpha_tp9_avg = $14,
+                    alpha_af7_avg = $15,
+                    alpha_af8_avg = $16,
+                    alpha_tp10_avg = $17,
+                    faa_mean = $18,
+                    faa_baseline_closed = $19,
+                    posterior_asymmetry_mean = $20,
+                    per_channel_version = $21
+                WHERE id = $22
+            ''',
                 ended_at, duration, calibration_passed, avg_signal_quality,
                 sample_count, metrics_count,
                 aggregated_metrics.get('avg_coherence'),
@@ -206,6 +226,14 @@ class PostgresClient:
                 aggregated_metrics.get('avg_gamma'),
                 aggregated_metrics.get('avg_delta'),
                 aggregated_metrics.get('peak_coherence'),
+                aggregated_metrics.get('alpha_tp9_avg'),
+                aggregated_metrics.get('alpha_af7_avg'),
+                aggregated_metrics.get('alpha_af8_avg'),
+                aggregated_metrics.get('alpha_tp10_avg'),
+                aggregated_metrics.get('faa_mean'),
+                aggregated_metrics.get('faa_baseline_closed'),
+                aggregated_metrics.get('posterior_asymmetry_mean'),
+                aggregated_metrics.get('per_channel_version', 0),
                 recording_id
             )
             
@@ -259,7 +287,18 @@ class PostgresClient:
                 'DELETE FROM eeg_recordings WHERE id = $1', recording_id
             )
             return 'DELETE 1' in result
-    
+
+
+class PostgresClientSync:
+    """
+    Sync (psycopg2) PostgreSQL client for brain prototype.
+    Used in threads and non-async contexts (RecorderV2, scripts).
+    """
+
+    def __init__(self):
+        self._conn = None
+        self._connected = False
+
     def _row_to_recording(self, row) -> EEGRecording:
         """Convert database row to EEGRecording dataclass."""
         return EEGRecording(
@@ -287,33 +326,16 @@ class PostgresClient:
             avg_beta=row['avg_beta'],
             avg_gamma=row['avg_gamma'],
             avg_delta=row['avg_delta'],
-            peak_coherence=row['peak_coherence']
+            peak_coherence=row['peak_coherence'],
+            alpha_tp9_avg=row.get('alpha_tp9_avg') if isinstance(row, dict) else row['alpha_tp9_avg'],
+            alpha_af7_avg=row.get('alpha_af7_avg') if isinstance(row, dict) else row['alpha_af7_avg'],
+            alpha_af8_avg=row.get('alpha_af8_avg') if isinstance(row, dict) else row['alpha_af8_avg'],
+            alpha_tp10_avg=row.get('alpha_tp10_avg') if isinstance(row, dict) else row['alpha_tp10_avg'],
+            faa_mean=row.get('faa_mean') if isinstance(row, dict) else row['faa_mean'],
+            faa_baseline_closed=row.get('faa_baseline_closed') if isinstance(row, dict) else row['faa_baseline_closed'],
+            posterior_asymmetry_mean=row.get('posterior_asymmetry_mean') if isinstance(row, dict) else row['posterior_asymmetry_mean'],
+            per_channel_version=row.get('per_channel_version', 0) if isinstance(row, dict) else (row['per_channel_version'] or 0),
         )
-
-
-# ==================== SYNC WRAPPER ====================
-# For use in non-async contexts (like the recorder thread)
-
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-_executor = ThreadPoolExecutor(max_workers=2)
-
-
-import psycopg2
-from psycopg2.extras import RealDictCursor
-
-
-class PostgresClientSync:
-    """
-    Synchronous PostgreSQL client using psycopg2.
-    
-    Used in threaded contexts like the SessionRecorder.
-    """
-    
-    def __init__(self):
-        self._conn = None
-        self._connected = False
     
     def connect(self):
         """Connect to PostgreSQL synchronously."""
@@ -418,7 +440,17 @@ class PostgresClientSync:
         avg_gamma = to_native(avg_gamma)
         avg_delta = to_native(avg_delta)
         peak_coherence = to_native(peak_coherence)
-        
+
+        # Per-channel aggregates (from migration 002)
+        alpha_tp9_avg = to_native(aggregated_metrics.get('alpha_tp9_avg')) if aggregated_metrics else None
+        alpha_af7_avg = to_native(aggregated_metrics.get('alpha_af7_avg')) if aggregated_metrics else None
+        alpha_af8_avg = to_native(aggregated_metrics.get('alpha_af8_avg')) if aggregated_metrics else None
+        alpha_tp10_avg = to_native(aggregated_metrics.get('alpha_tp10_avg')) if aggregated_metrics else None
+        faa_mean = to_native(aggregated_metrics.get('faa_mean')) if aggregated_metrics else None
+        faa_baseline_closed = to_native(aggregated_metrics.get('faa_baseline_closed')) if aggregated_metrics else None
+        posterior_asymmetry_mean = to_native(aggregated_metrics.get('posterior_asymmetry_mean')) if aggregated_metrics else None
+        per_channel_version = int(aggregated_metrics.get('per_channel_version', 0)) if aggregated_metrics else 0
+
         with self._conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 UPDATE eeg_recordings SET
@@ -434,13 +466,24 @@ class PostgresClientSync:
                     avg_beta = %s,
                     avg_gamma = %s,
                     avg_delta = %s,
-                    peak_coherence = %s
+                    peak_coherence = %s,
+                    alpha_tp9_avg = %s,
+                    alpha_af7_avg = %s,
+                    alpha_af8_avg = %s,
+                    alpha_tp10_avg = %s,
+                    faa_mean = %s,
+                    faa_baseline_closed = %s,
+                    posterior_asymmetry_mean = %s,
+                    per_channel_version = %s
                 WHERE id = %s
                 RETURNING *
             """, (
                 duration_seconds, sample_count, metrics_count, calibration_passed,
                 avg_signal_quality, avg_coherence, avg_alpha, avg_theta, avg_beta,
-                avg_gamma, avg_delta, peak_coherence, recording_id
+                avg_gamma, avg_delta, peak_coherence,
+                alpha_tp9_avg, alpha_af7_avg, alpha_af8_avg, alpha_tp10_avg,
+                faa_mean, faa_baseline_closed, posterior_asymmetry_mean, per_channel_version,
+                recording_id
             ))
             self._conn.commit()
             row = cur.fetchone()
@@ -503,7 +546,15 @@ class PostgresClientSync:
             avg_beta=row.get('avg_beta'),
             avg_gamma=row.get('avg_gamma'),
             avg_delta=row.get('avg_delta'),
-            peak_coherence=row.get('peak_coherence')
+            peak_coherence=row.get('peak_coherence'),
+            alpha_tp9_avg=row.get('alpha_tp9_avg'),
+            alpha_af7_avg=row.get('alpha_af7_avg'),
+            alpha_af8_avg=row.get('alpha_af8_avg'),
+            alpha_tp10_avg=row.get('alpha_tp10_avg'),
+            faa_mean=row.get('faa_mean'),
+            faa_baseline_closed=row.get('faa_baseline_closed'),
+            posterior_asymmetry_mean=row.get('posterior_asymmetry_mean'),
+            per_channel_version=row.get('per_channel_version', 0) or 0,
         )
 
 

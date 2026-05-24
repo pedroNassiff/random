@@ -34,6 +34,7 @@ from automation.service import AutomationService
 
 # AI Copilot
 from ai.copilot_labs_service import CopilotLabsService
+from ai.sanji_copilot_service import SanjiCopilotService
 from recording.validation_protocol import ValidationProtocol
 from recording.validation import run_all_tests, SessionQualityScore
 from prospecting_router import router as prospecting_router
@@ -41,6 +42,7 @@ from prospecting_router import router as prospecting_router
 from prospecting_analysis import router as analysis_router
 from prospecting_pitch import router as pitch_router
 from prospecting_groups import router as groups_router
+from audit.router import router as audit_router
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -175,6 +177,9 @@ async def startup():
     app.state.copilot_service = CopilotLabsService()
     print("✅ Copilot Labs service initialized")
 
+    app.state.sanji_copilot = SanjiCopilotService()
+    print("✅ Sanji Copilot service initialized")
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -185,6 +190,9 @@ async def shutdown():
 
     if hasattr(app.state, "copilot_service"):
         await app.state.copilot_service.aclose()
+
+    if hasattr(app.state, "sanji_copilot"):
+        await app.state.sanji_copilot.aclose()
 
 # Include analytics router
 app.include_router(analytics_router)
@@ -198,6 +206,9 @@ app.include_router(automation_router)
 app.include_router(prospecting_router)
 app.include_router(pitch_router)
 app.include_router(groups_router)
+
+# Audit Express
+app.include_router(audit_router)
 
 # ============================================
 # Copilot Labs Endpoint
@@ -236,12 +247,31 @@ async def copilot_labs_chat(request: CopilotChatRequest):
         )
 
 
+# ============================================
+# Sanji Copilot Endpoint
+# ============================================
+
+@app.post("/api/copilot/sanji/chat")
+async def sanji_copilot_chat(request: Request):
+    """
+    Copiloto clínico para SANJI-RX.
+    Body: { message, history_context, conversation_history }
+    """
+    body = await request.json()
+    service: SanjiCopilotService = app.state.sanji_copilot
+    result = await service.chat(
+        message=body.get("message", ""),
+        history_context=body.get("history_context"),
+        conversation_history=body.get("conversation_history"),
+    )
+    return result
+
+
 @app.post("/api/tts")
 async def text_to_speech(request: Request):
     """
     Convierte texto a voz con ElevenLabs (Rachel, ES).
-    Devuelve audio/mpeg stream listo para reproducir en el frontend.
-    
+    Devuelve audio/mpeg stream listo para reproducir en el frontend.    
     Body JSON: { "text": "...", "voice_id": "..." (opcional) }
     """
     import os, httpx
@@ -1457,6 +1487,11 @@ async def get_session_eeg(session_id: int, start: float = 0, end: float = None):
 async def get_session_metrics(session_id: int):
     """
     Obtiene todas las métricas de una sesión (InfluxDB).
+
+    Response includes:
+    - metrics: existing time-series array (unchanged, backward compat)
+    - per_channel: per-channel band power object or null if not available
+    - per_channel_version: 0 = no per-channel data, 1 = current schema
     """
     try:
         influx = get_influx_client()
@@ -1464,10 +1499,34 @@ async def get_session_metrics(session_id: int):
         if not metrics:
             # fallback to SQLite for legacy sessions
             metrics = session_db.get_metrics(session_id)
-        return {"status": "success", "metrics": metrics, "count": len(metrics)}
+
+        # Attempt to load per-channel band power time series
+        per_channel = None
+        per_channel_version = 0
+        try:
+            per_channel = influx.get_per_channel_metrics(session_id)
+            if per_channel is not None:
+                per_channel_version = 1
+        except Exception as e_pc:
+            pass  # Non-fatal: per_channel stays None
+
+        return {
+            "status": "success",
+            "metrics": metrics,
+            "count": len(metrics),
+            "per_channel": per_channel,
+            "per_channel_version": per_channel_version,
+        }
     except Exception as e:
         metrics = session_db.get_metrics(session_id)
-        return {"status": "success", "metrics": metrics, "count": len(metrics), "source": "sqlite"}
+        return {
+            "status": "success",
+            "metrics": metrics,
+            "count": len(metrics),
+            "per_channel": None,
+            "per_channel_version": 0,
+            "source": "sqlite",
+        }
 
 @app.get("/sessions/{session_id}/events")
 async def get_session_events(session_id: int):
@@ -1505,12 +1564,14 @@ async def delete_session(session_id: int):
 class ProtocolStartRequest(BaseModel):
     name: Optional[str] = ""
     metadata: Optional[dict] = None
+    quick: bool = False
 
 @app.post("/protocol/start")
 async def protocol_start(request: ProtocolStartRequest):
     """
     Inicia el protocolo de validación científica.
     Requiere Muse 2 conectado y streameando.
+    quick=True usa QUICK_VALIDATION_PHASES (~3.5 min, 3 fases).
     """
     # Vincular recorder si hay Muse activo
     if muse_connector.is_streaming and session_recorder is None:
@@ -1522,6 +1583,7 @@ async def protocol_start(request: ProtocolStartRequest):
     result = validation_protocol.start(
         name=request.name or "",
         metadata=request.metadata,
+        quick=request.quick,
     )
     return result
 

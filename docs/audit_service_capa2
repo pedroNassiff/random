@@ -1,0 +1,839 @@
+# Audit Capa 2 — Playbook Random Lab
+
+> **Random Lab** · Metodología de auditoría activa autorizada
+> Versión 0.2 · Owner: Pedro
+> Status: Playbook genérico aplicable a cualquier cliente con consent firmado
+> Aplica a: e-commerce, marketplaces, SaaS B2B, plataformas de ticketing
+
+---
+
+## 0. Cómo se usa este playbook
+
+Este documento es la metodología estándar de Random Lab para auditorías Capa 2. Cada engagement concreto genera un **anexo específico por cliente** que define:
+
+- Scope acordado (dominios, subdominios, exclusiones)
+- Entorno disponible (staging sí/no, ventana sobre prod)
+- Cuentas de testing
+- Contactos de emergencia
+- Fechas y cronograma
+- Variaciones específicas sobre el playbook estándar
+
+El playbook NO se modifica por cliente. Las variaciones se documentan en el anexo.
+
+---
+
+## 1. Pre-requisitos antes de cualquier ejecución
+
+Tres bloques de pre-requisitos. Si alguno queda abierto, **NO se procede**.
+
+### 1.1 Documentación legal
+
+- [ ] **Consent base firmado** que autorice auditoría de seguridad.
+- [ ] **Addendum específico** firmado que liste técnicas autorizadas y excluidas (ver sección 12 para plantilla).
+- [ ] **NDA bidireccional** vigente.
+- [ ] **Documento de scope** firmado por ambas partes.
+- [ ] **Seguro de RC profesional** de Random Lab vigente para el periodo del audit.
+
+### 1.2 Configuración del entorno
+
+- [ ] **Staging disponible** (preferido) **O ventana acordada sobre prod**.
+- [ ] **Cuentas de testing** creadas por el cliente con datos sintéticos:
+  - Customer estándar
+  - Customer "víctima" para tests cross-account (IDOR/BOLA)
+  - Admin (solo si scope incluye privilege escalation)
+- [ ] **Stripe / payment gateway en test mode** confirmado por el cliente.
+- [ ] **IP whitelisting** de Random Lab en WAF/Cloudflare del cliente.
+- [ ] **Backup reciente** (<24h) confirmado por el cliente.
+- [ ] **Quotas de logging y BD** revisadas — el audit genera volumen inusual.
+
+### 1.3 Comunicación y emergencias
+
+- [ ] **Canal de comunicación en vivo** (Slack compartido / WhatsApp / teléfono) 24/7 durante ventanas de testing activo.
+- [ ] **Contacto técnico primario + backup** documentados.
+- [ ] **Procedimiento de escalación** si se cae algo o se encuentra crítico.
+- [ ] **Kill switch técnico** deployed y testeado (ver 1.4).
+
+### 1.4 Kill switch técnico (obligatorio)
+
+Implementación interna de Random Lab que aplica a todos los audits Capa 2:
+
+```python
+# audit/capa2/safety.py
+
+class CircuitBreaker:
+    """
+    Monitorea salud del target durante el audit.
+    Detiene automáticamente si:
+    - Response time > 2x baseline durante 30s consecutivos
+    - Error rate > 5% en últimos 100 requests
+    - Cualquier 5xx en endpoints críticos pre-marcados
+    - Kill switch manual activado
+    """
+```
+
+- Variable de entorno `AUDIT_KILL_SWITCH=true` detiene todos los probes activos.
+- Endpoint `POST /audit/runs/{id}/emergency-stop` mata procesos hijos.
+- Rate limiting global hardcoded por entorno (ver sección 6).
+- Logging persistente de cada request (para forense post-incidente).
+
+---
+
+## 2. Filosofía: fases con gates
+
+El audit se ejecuta en **fases secuenciales con gates explícitos**. Cada fase tiene:
+
+1. **Pre-check automatizado**: verifica que las condiciones para esta fase específica estén cubiertas.
+2. **Ejecución** con rate limiting y observación en vivo.
+3. **Post-check**: revisión humana de findings antes de avanzar.
+4. **Gate**: decisión documentada de avanzar / iterar / detener.
+
+Si una fase encuentra algo crítico, **se reporta inmediatamente al cliente** y se decide si seguir o pausar para fix.
+
+```
+Fase 2.0 — Setup & verificación
+   ↓ [gate: pre-checks OK]
+Fase 2.1 — Reconocimiento autenticado pasivo
+   ↓ [gate: review findings]
+Fase 2.2 — Mapeo de superficie de ataque
+   ↓ [gate: review + decisión prod/staging]
+Fase 2.3 — Testing activo no destructivo
+   ↓ [gate: review + decisión escalada]
+Fase 2.4 — Testing activo profundo  ←  SOLO si hay staging o si es prod necesitamos confirmar en avanzar!
+   ↓ [gate: consolidación]
+Fase 2.5 — Reporting y handoff
+   ↓
+Re-test a 30 días (incluido)
+```
+
+### Modos del audit
+
+Según disponibilidad de staging, el audit corre en uno de dos modos:
+
+| Modo | Fases ejecutadas | Resultado de findings críticos |
+|---|---|---|
+| **Full** (con staging) | 2.0 → 2.5 incluyendo 2.4 | Confirmados con evidencia |
+| **Detection-only** (sin staging) | 2.0 → 2.5 sin 2.4 | Reportados con alta probabilidad e impacto estimado |
+
+El modo se define en el anexo del cliente al firmar el scope.
+
+---
+
+## 3. Fase 2.0 — Setup y verificación
+
+### 3.1 Pre-flight automatizado
+
+Script que corre antes de cualquier testing activo. Si algún check falla, el orquestador rechaza ejecutar.
+
+```python
+# audit/capa2/preflight.py
+
+CHECKS = [
+    "consent_documents_signed_and_filed",
+    "scope_doc_present_and_signed",
+    "emergency_contacts_configured",
+    "kill_switch_endpoint_responsive",
+    "rate_limiter_configured_for_environment",
+    "auth_sessions_valid",
+    "ip_whitelisted_in_wAf",
+    "logging_to_persistent_storage_verified",
+    "backup_confirmed_recent_by_client",
+    "baseline_metrics_captured",
+]
+```
+
+### 3.2 Baseline pre-audit
+
+Capturar antes de cualquier testing activo:
+
+- **Snapshot de respuestas conocidas-buenas** en endpoints clave (`/`, `/shop`, `/producto/X`, `/api/products`).
+- **Tiempo de respuesta promedio** por endpoint (para detectar degradación).
+- **Volumen de datos en endpoints** (para detectar exfiltración accidental).
+- **Cookies/tokens emitidos en flow estándar** (para detectar cambios anómalos).
+
+Esto se guarda en `baseline_metrics` del `AuditRun` y se usa para el circuit breaker.
+
+### 3.3 Setup de cuentas de testing
+
+Coordinación con el cliente:
+
+```
+audit-customer-A@random-lab.es    → cuenta cliente estándar
+audit-customer-B@random-lab.es    → cuenta "víctima" para IDOR
+audit-admin@random-lab.es         → cuenta admin (si aplica)
+```
+
+Cada cuenta:
+- Email real para recibir notificaciones del sitio.
+- Datos sintéticos (nombres ficticios, direcciones de Random Lab).
+- Tarjeta de Stripe **test mode** verificada.
+- Marcadas en BD del cliente como cuentas de testing (campo opcional para limpiar al final).
+
+### 3.4 Auth sessions con Playwright
+
+Una sesión válida por cada cuenta de test, guardada para reusar entre probes:
+
+```python
+@dataclass
+class AuthSession:
+    label: str                       # 'customer_a', 'customer_b', 'admin'
+    storage_state_path: str          # Playwright storage_state JSON
+    captured_at: datetime
+    expires_at: datetime
+    test_user_email: str             # para audit log
+    refresh_strategy: str            # 'cookies_only' | 'full_login_replay'
+```
+
+La sesión se refresca automáticamente cuando se aproxima a expiración.
+
+---
+
+## 4. Fase 2.1 — Reconocimiento autenticado pasivo
+
+**Objetivo**: ver la app desde adentro como un usuario real, sin tocar nada.
+
+**Riesgo operacional**: bajo. Equivale a actividad normal de un cliente.
+
+**Entorno**: prod OK.
+
+### 4.1 Probes Fase 2.1
+
+| Probe | Qué hace | Cuentas usadas |
+|---|---|---|
+| `authenticated_crawler` | Login + navegación de áreas privadas, captura URLs descubiertas | A |
+| `network_analysis_authed` | Mismo que pasivo Capa 1 pero logueado — APIs internas, headers de auth | A |
+| `session_management` | Analiza cookies de sesión: HttpOnly, Secure, SameSite, lifetime, regeneración tras login | A |
+| `auth_flow_review` | Captura flow completo de signup/login/password reset: HTTPS, leak de info en errores, rate limiting visible | nueva cuenta |
+| `csrf_token_analysis` | Verifica presencia y rotación de tokens CSRF en endpoints state-changing | A |
+| `cross_account_basic` | Compara qué ve A vs B en endpoints comunes (sin modificar nada) | A + B |
+
+### 4.2 Findings típicos esperados
+
+- Cookies de sesión sin `Secure` flag
+- Cookies sin `SameSite=Lax/Strict`
+- Tokens en localStorage en lugar de httpOnly cookies
+- APIs internas sin documentar expuestas en el panel
+- Mensajes de error que filtran info (`"usuario no existe"` vs `"credenciales inválidas"`)
+- Password reset que filtra existencia de email
+- Lifetime de sesión excesivo
+- Tokens JWT con claims interesantes mal validados
+- Endpoints internos que no aparecen en sitemap
+
+### 4.3 Gate post-Fase 2.1
+
+Revisión manual de findings. Si todo OK → Fase 2.2. Si algo crítico → reporte inmediato al cliente y decisión.
+
+---
+
+## 5. Fase 2.2 — Mapeo de superficie de ataque
+
+**Objetivo**: enumerar TODOS los endpoints, parámetros, formularios. No tocar todavía.
+
+**Riesgo operacional**: bajo con rate limiting estricto.
+
+**Entorno**: prod con rate limit estricto.
+
+### 5.1 Probes Fase 2.2
+
+| Probe | Qué hace | Tool sugerida |
+|---|---|---|
+| `endpoint_discovery` | Crawling profundo + análisis de JS bundles para extraer rutas de API | Playwright + análisis estático |
+| `parameter_extraction` | Para cada endpoint, lista parámetros conocidos (de forms, de calls observadas) | Parser propio sobre logs de Fase 2.1 |
+| `js_secret_scan` | Busca secretos en JS público (API keys hardcoded, endpoints internos comentados) | TruffleHog / regex propios |
+| `robots_sitemap_review` | Parsea robots.txt y sitemap.xml buscando paths sensibles indexados | Request + análisis |
+| `subdomain_alive_check` | De subdominios de CT logs (Fase 1), cuáles responden | Request HTTP simple |
+| `api_documentation_leak` | Busca `/swagger`, `/api-docs`, `/openapi.json`, `/.well-known/*` | Request directo |
+| `cors_policy_analysis` | Verifica políticas CORS en APIs | Request con Origin variado |
+
+### 5.2 Lo que NO se hace en Fase 2.2
+
+- **No fuzzing de directorios con wordlists grandes**. Satura logs y dispara WAFs. Si necesario, se hace en Fase 2.3 con wordlist chica y rate bajo.
+- **No port scanning agresivo**. Si necesario conocer puertos, se le pregunta al cliente directamente.
+
+### 5.3 Output esperado
+
+Mapa estructurado de:
+- URLs por área funcional (público, customer, admin, API)
+- Parámetros por endpoint con su tipo esperado
+- Headers que la app envía y espera
+- Tokens / esquema de auth en uso
+- Endpoints candidatos a testing posterior
+
+### 5.4 Gate post-Fase 2.2 — Decisión crítica
+
+Antes de pasar a Fase 2.3, se categoriza cada endpoint:
+
+| Categoría | Endpoints | Dónde se testea |
+|---|---|---|
+| **Lectura no sensitive** | Búsqueda, listados, detalle público | Prod con rate limit |
+| **Lectura sensitive** | Cuenta propia, pedidos propios | Prod con cuenta de test |
+| **Escritura no destructiva** | Comentarios, wishlists, settings de cuenta | Prod con limpieza posterior |
+| **Escritura destructiva** | Compras, cancelaciones, cambios masivos | **Solo staging** o ventana acordada |
+| **Endpoints admin** | Panel administrativo | **Solo staging** o cuenta admin de test si scope lo cubre |
+| **Endpoints de payment** | Checkout, refunds | **Stripe test mode obligatorio** + ventana acordada |
+
+El cliente firma el plan específico antes de Fase 2.3.
+
+---
+
+## 6. Fase 2.3 — Testing activo no destructivo
+
+**Objetivo**: validar vulnerabilidades del OWASP Top 10 sin causar daño.
+
+**Riesgo operacional**: medio. Se mitiga con rate limiting, circuit breaker y filosofía "detection-only".
+
+**Entorno**: mixto. Definido por gate post-2.2.
+
+### 6.1 Filosofía "detection, not exploitation"
+
+**Regla de oro de Random Lab**: en Fase 2.3 detectamos vulnerabilidades, no las explotamos a fondo.
+
+- **SQLi**: enviar `'` y `1=1--` para detectar comportamiento anómalo. NO intentar `UNION SELECT` para extraer datos.
+- **XSS**: enviar `<script>console.log("audit-marker")</script>` y verificar si se ejecuta. NO intentar exfiltrar cookies a servidor externo.
+- **IDOR**: cambiar ID en URL y verificar si recibe 200 con datos ajenos. NO descargar masivamente datos de otros usuarios.
+- **Command injection**: probar `; sleep 5` y medir tiempo de respuesta. NO intentar reverse shells.
+- **SSRF**: probar `http://127.0.0.1` y verificar diferencia de respuesta. NO intentar acceso a metadata cloud.
+- **File upload**: subir archivo con extensión válida pero contenido marcador (no malicioso). NO subir webshells.
+
+Esto se documenta en cada probe activo:
+
+```python
+class SQLiSafeProbe(ProbeBase):
+    """
+    SAFE SQLi detection. Detection-only, no data extraction.
+    Si se confirma vulnerabilidad, se reporta para fix.
+    Explotación profunda confirmatoria solo en Fase 2.4 sobre staging.
+    """
+    layer = Layer.ACTIVE_LAYER_2_SAFE
+```
+
+### 6.2 Categorías OWASP Top 10 cubiertas
+
+Referencia: OWASP Top 10 web 2021.
+
+| OWASP | Probe Fase 2.3 | Approach |
+|---|---|---|
+| A01 Broken Access Control | `idor_horizontal`, `idor_vertical` | Auth con cuenta A, intentar acceder a recursos de cuenta B |
+| A02 Cryptographic Failures | `jwt_analysis`, `token_entropy` | Validación de JWT (alg=none, weak signing), entropía de tokens |
+| A03 Injection | `sqli_safe`, `xss_safe`, `cmd_injection_safe` | Payloads de detección, no de explotación |
+| A04 Insecure Design | Review manual con findings de 2.1/2.2 | Documentación |
+| A05 Security Misconfiguration | `misconfig_check` | Default credentials, debug endpoints, headers, CORS |
+| A06 Vulnerable Components | `dependency_check` | Versiones públicas + cross-ref CVE |
+| A07 Auth Failures | `auth_weakness_check` | Password policy, rate limiting de login, account lockout |
+| A08 Software Integrity | Review manual | SRI tags, supply chain |
+| A09 Logging Failures | Validación con cliente | "¿Se loguea evento X?" |
+| A10 SSRF | `ssrf_safe_probe` | Solo en endpoints que aceptan URLs como input |
+
+### 6.3 Configuración crítica de rate limiting
+
+```python
+# audit/capa2/config.py
+
+RATE_LIMITS = {
+    "production": {
+        "max_rps_per_endpoint": 2,
+        "max_concurrent_probes": 1,
+        "pause_between_probes_s": 5,
+        "circuit_breaker_response_time_multiplier": 2.0,
+        "circuit_breaker_error_rate_pct": 5,
+    },
+    "staging": {
+        "max_rps_per_endpoint": 10,
+        "max_concurrent_probes": 3,
+        "pause_between_probes_s": 1,
+        "circuit_breaker_response_time_multiplier": 5.0,
+        "circuit_breaker_error_rate_pct": 20,
+    },
+}
+```
+
+Hardcoded, no configurable por args del probe. Es restricción del framework.
+
+### 6.4 Tooling estándar Random Lab
+
+| Herramienta | Uso | Modo |
+|---|---|---|
+| **Burp Suite Community** | Proxy manual para inspección y replay | Manual |
+| **OWASP ZAP** | Spider + active scan con políticas custom (NO `Aggressive`) | Automatizado |
+| **sqlmap** | Solo en endpoints flagueados por safe_probe | `--level=1 --risk=1`, NO `--dbs`/`--dump` |
+| **Nuclei** | Templates curados, exclude `dos`, `intrusive` | Automatizado |
+| **ffuf** | Fuzzing dirigido con wordlist mediana, rate limited | Manual con review |
+| **JWT Tool** | Análisis de JWT (alg confusion, weak signing) | Manual |
+| **TruffleHog** | Secretos en código público | Automatizado |
+
+### 6.5 Probes destructivos sin staging
+
+Cuando no hay staging, ciertos probes operan en **modo detection-only reforzado**:
+
+| Probe | Modo con staging | Modo sin staging |
+|---|---|---|
+| `idor_horizontal` | Hasta 10 recursos verificados | Máx 2 recursos verificados, marker en evidence |
+| `sqli_safe` | Detección + sqlmap `--level=1` | Solo detección manual con 3 payloads |
+| `xss_safe` | Detección + verificación de ejecución | Solo detección de reflexión |
+| `file_upload` | Upload de marker + verificación | Skipped — reportado como "requiere staging" |
+| `mass_assignment` | Test con extra fields | Skipped o test con campo no destructivo |
+| `race_conditions` | Test paralelo con cleanup | Skipped — reportado como "requiere staging" |
+
+Esta tabla se aplica automáticamente en función de `AuditRun.environment` y `AuditRun.has_staging`.
+
+### 6.6 Cleanup post-Fase 2.3
+
+Para todo lo que se haya creado en prod durante el testing:
+
+- Listado completo de IDs creados (comentarios, cuentas, wishlists, etc.).
+- Script de cleanup ejecutado al final de la fase.
+- Verificación con el cliente de que no quedaron remanentes.
+- Si el cliente prefiere mantenerlos para audit interno, se documenta.
+
+### 6.7 Gate post-Fase 2.3
+
+Revisión completa con el cliente. Decisión sobre Fase 2.4:
+
+- Si hay staging → ejecutar Fase 2.4 para confirmar findings críticos.
+- Si NO hay staging → saltar a Fase 2.5 con findings de Fase 2.3 reportados como "alta probabilidad / requiere staging para confirmación profunda".
+
+---
+
+## 7. Fase 2.4 — Testing activo profundo (solo staging)
+
+**Objetivo**: confirmar el impacto real de los findings críticos de Fase 2.3.
+
+**Riesgo operacional**: alto. **Por eso requiere staging obligatorio**.
+
+**Entorno**: **staging exclusivamente**. Si el cliente no tiene staging, esta fase se omite.
+
+### 7.1 Qué se hace acá
+
+Lo que NO se hizo en 2.3 por seguridad operacional:
+
+- Si hay SQLi confirmado → confirmar con `--dbs` (NO `--dump` masivo)
+- Si hay IDOR → enumerar rango de IDs para estimar exposición real
+- Si hay file upload sin validación → verificar ejecución de archivos subidos (marker, no payload real)
+- Si hay SSRF → confirmar acceso a metadata endpoints internos
+- Si hay deserialización → verificar RCE con marker (no shell)
+- Race conditions con cleanup
+- Mass assignment con campos sensibles
+
+### 7.2 Reglas de oro
+
+- **Sobre datos sintéticos siempre**, nunca producción.
+- **Documentación exhaustiva** de cada acción (timestamp, comando, output).
+- **Snapshot pre/post** del staging para rollback.
+- **Notificación inmediata** al cliente si se confirma algo crítico.
+- **Sin extracción de datos masiva**, ni siquiera en staging — solo lo necesario para confirmar la vulnerabilidad.
+
+### 7.3 Propuesta al cliente sin staging
+
+Si el cliente no tiene staging, Random Lab propone como **next step post-audit**:
+
+- Diseño e implementación de staging mínimo viable.
+- Anonimización del dataset (nombres, emails, direcciones, teléfonos).
+- Stripe en test mode separado.
+- Sin envío real de emails (mailcatcher).
+- Audit retainer continuous: re-test de Fase 2.4 cuando el staging esté listo.
+
+Esto se vende como producto separado, no incluido en el Audit Express Capa 2 inicial.
+
+---
+
+## 8. Fase 2.5 — Reporting y handoff
+
+### 8.1 Estructura del report Capa 2
+
+Documento PDF + anexos:
+
+```
+1. Executive Summary (1 página)
+   - N findings críticos, M altos, X medios
+   - Riesgo agregado (CVSS o rúbrica custom)
+   - Top 3 acciones inmediatas
+
+2. Metodología
+   - Scope ejecutado vs scope acordado
+   - Técnicas aplicadas
+   - Entornos (qué se hizo en prod, qué en staging si aplica)
+   - Modo de ejecución (Full / Detection-only)
+   - Ventana temporal
+
+3. Findings por categoría OWASP
+   Cada finding con:
+   - Título descriptivo
+   - Categoría OWASP
+   - CWE + CVSS 3.1 score
+   - Descripción del problema
+   - Impacto técnico y de negocio
+   - Evidencia (sanitizada — sin payloads reutilizables)
+   - Estado: "Confirmado" vs "Alta probabilidad - requiere staging"
+   - Remediation con código de ejemplo
+   - Referencias
+
+4. Recomendaciones estratégicas
+   - Más allá de fixes puntuales
+   - SDLC, dependencias, monitoring, WAF
+   - Sugerencia de implementar staging si no lo tienen
+   - Sugerencia de retainer Continuous Security
+
+5. Re-test plan
+   - Cómo el cliente verifica que cada fix funcionó
+   - Re-test gratuito incluido (30 días post-report)
+
+6. Anexos
+   - Logs de ejecución
+   - Lista completa de endpoints testeados
+   - Versionado de herramientas usadas
+   - Lista de items creados durante testing y cleanup ejecutado
+```
+
+### 8.2 Diferenciación: confirmed vs probable
+
+Cada finding tiene estado:
+
+- **Confirmed**: validado con evidencia directa de explotabilidad (típicamente requiere Fase 2.4).
+- **High probability**: detectado en Fase 2.3 con evidencia suficiente para fix, pero confirmación profunda requeriría Fase 2.4.
+- **Suspected**: signals indirectos, fix recomendado preventivo.
+
+Este label es transparente con el cliente y refleja qué tan completo fue el audit.
+
+### 8.3 Sesión de handoff
+
+90 minutos de call con cliente:
+- Walk-through del report
+- Demo de findings críticos en vivo (sobre staging si existe)
+- Preguntas técnicas del equipo del cliente
+- Plan de fixes priorizados con effort estimado
+- Discusión de next steps (staging, retainer)
+
+### 8.4 Re-test a 30 días
+
+Incluido en el precio del audit:
+- Re-run de probes que tiraron findings críticos y altos
+- Confirmación de fixes
+- Mini-report adicional
+- Update de estado de cada finding (`fixed`, `partial`, `not_fixed`)
+
+---
+
+## 9. Caso de éxito público (post-audit)
+
+Una vez el cliente arregla los findings y autoriza el caso de éxito:
+
+### 9.1 Lo que SÍ se publica
+
+- Tipo de empresa y vertical (sin nombrar)
+- Que se hizo un Audit Capa 2 completo
+- Número de findings por severidad
+- Categorías OWASP cubiertas
+- Metodología y rigor del proceso
+- Que el cliente arregló todo en X semanas
+- Testimonial del cliente (si lo autoriza)
+
+### 9.2 Lo que NO se publica
+
+- Findings específicos identificables
+- Stack interno del cliente más allá de lo público
+- Payloads o técnicas concretas
+- Capturas de pantalla de paneles internos
+- Datos de la BD aunque sean sintéticos
+- Nombres de empleados del cliente
+
+### 9.3 Por qué este límite
+
+Un caso de éxito de pentesting vende por **rigor del proceso, no por morbo de los findings**. Los clientes potenciales serios valoran la confidencialidad. Los que quieren detalles jugosos no son los clientes que querés.
+
+---
+
+## 10. Cronograma estándar
+
+Con Pedro al 50% de capacity sobre el audit:
+
+| Semana | Fase | Tiempo estimado |
+|---|---|---|
+| 1 | 2.0 (setup) + addendum firmado + cuentas testing + baseline | 3-5 días |
+| 1-2 | 2.1 (auth pasivo) — implementar probes + ejecutar + review | 4-6 días |
+| 2-3 | 2.2 (surface mapping) — implementar + ejecutar | 3-5 días |
+| 3 | Gate + diseño de Fase 2.3 con cliente | 1-2 días |
+| 3-5 | 2.3 (active non-destructive) — por categoría OWASP, gates intermedios | 7-10 días |
+| 5-6 | 2.4 (deep, solo si hay staging) | 3-5 días |
+| 6-7 | Reporting + handoff session | 4-5 días |
+| 9-10 | Re-test post-fixes | 2-3 días |
+
+**Total estándar**: 6-10 semanas con dedicación parcial. Comprimible a 4-6 con dedicación full.
+
+**Audit en modo Detection-only (sin staging)**: típicamente -1 semana (saltamos Fase 2.4).
+
+---
+
+## 11. Stack técnico — módulos a implementar
+
+Sobre la arquitectura actual del Audit Express, sumar:
+
+### 11.1 Estructura de módulos
+
+```
+audit/
+├── capa2/
+│   ├── __init__.py
+│   ├── preflight.py            # checks pre-ejecución
+│   ├── safety.py               # circuit breaker + kill switch
+│   ├── rate_limiter.py         # respetado por todo probe activo
+│   ├── auth_sessions.py        # gestión de storage_state Playwright
+│   ├── cleanup.py              # tracking + limpieza de items creados
+│   ├── config.py               # rate limits por entorno
+│   └── probes/
+│       ├── authenticated_crawler.py
+│       ├── session_management.py
+│       ├── csrf_analysis.py
+│       ├── cross_account_basic.py
+│       ├── endpoint_discovery.py
+│       ├── parameter_extraction.py
+│       ├── js_secret_scan.py
+│       ├── cors_policy.py
+│       ├── idor_horizontal.py
+│       ├── idor_vertical.py
+│       ├── sqli_safe.py
+│       ├── xss_safe.py
+│       ├── cmd_injection_safe.py
+│       ├── ssrf_safe.py
+│       ├── jwt_analysis.py
+│       ├── auth_weakness.py
+│       ├── misconfig_check.py
+│       └── dependency_check.py
+```
+
+### 11.2 Enums nuevos
+
+```python
+class Layer(str, Enum):
+    PASSIVE_LAYER_1     = "1_passive"
+    ACTIVE_LAYER_2_SAFE = "2_active_safe"      # Fases 2.1, 2.2, 2.3
+    ACTIVE_LAYER_2_DEEP = "2_active_deep"      # Fase 2.4, solo staging
+
+class Environment(str, Enum):
+    PRODUCTION = "production"
+    STAGING    = "staging"
+
+class FindingStatus(str, Enum):
+    CONFIRMED        = "confirmed"
+    HIGH_PROBABILITY = "high_probability"
+    SUSPECTED        = "suspected"
+```
+
+### 11.3 Schema delta
+
+```sql
+CREATE TABLE auth_sessions (
+    id              TEXT PRIMARY KEY,
+    run_id          TEXT REFERENCES audit_runs(id),
+    label           TEXT NOT NULL,
+    user_email      TEXT NOT NULL,
+    storage_state   TEXT NOT NULL,
+    captured_at     TEXT NOT NULL,
+    expires_at      TEXT NOT NULL
+);
+
+CREATE TABLE active_request_log (
+    id              TEXT PRIMARY KEY,
+    run_id          TEXT REFERENCES audit_runs(id),
+    probe_key       TEXT NOT NULL,
+    timestamp       TEXT NOT NULL,
+    method          TEXT NOT NULL,
+    url             TEXT NOT NULL,
+    request_summary TEXT,
+    response_code   INTEGER,
+    response_time_ms INTEGER,
+    flagged         BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE created_items_log (
+    id              TEXT PRIMARY KEY,
+    run_id          TEXT REFERENCES audit_runs(id),
+    item_type       TEXT NOT NULL,   -- 'comment', 'order', 'account', etc.
+    item_id_in_target TEXT,
+    created_at      TEXT NOT NULL,
+    cleaned_up      BOOLEAN DEFAULT FALSE,
+    cleanup_at      TEXT
+);
+
+ALTER TABLE audit_runs ADD COLUMN environment TEXT DEFAULT 'production';
+ALTER TABLE audit_runs ADD COLUMN has_staging BOOLEAN DEFAULT FALSE;
+ALTER TABLE audit_runs ADD COLUMN execution_mode TEXT DEFAULT 'detection_only';
+ALTER TABLE audit_runs ADD COLUMN consent_doc_path TEXT;
+ALTER TABLE audit_runs ADD COLUMN scope_doc_path TEXT;
+ALTER TABLE audit_runs ADD COLUMN kill_switch_activated INTEGER DEFAULT 0;
+
+ALTER TABLE audit_findings ADD COLUMN status TEXT DEFAULT 'suspected';
+ALTER TABLE audit_findings ADD COLUMN owasp_category TEXT;
+ALTER TABLE audit_findings ADD COLUMN environment_tested TEXT;
+```
+
+### 11.4 Endpoints nuevos
+
+```python
+POST /audit/runs/{run_id}/emergency-stop
+GET  /audit/runs/{run_id}/active-requests-log
+GET  /audit/runs/{run_id}/created-items
+POST /audit/runs/{run_id}/cleanup-items
+GET  /audit/runs/{run_id}/baseline-metrics
+POST /audit/auth-sessions  # crear sesión refrescable
+```
+
+---
+
+## 12. Plantilla de addendum específico
+
+Plantilla genérica que se personaliza por cliente:
+
+```markdown
+# Addendum al Contrato de Auditoría de Seguridad
+
+**Cliente**: [Nombre legal + CIF/NIF]
+**Auditor**: Random Lab (Pedro Nassiff Autónomo / [datos fiscales])
+**Fecha de inicio del audit**: [fecha]
+**Fecha de fin del audit**: [fecha]
+**Documento referencia**: Contrato base de [fecha] entre las partes.
+
+## 1. Scope técnico autorizado
+
+El cliente autoriza expresamente las siguientes técnicas sobre los dominios listados en sección 2:
+
+### 1.1 Técnicas pasivas (Capa 1)
+- Análisis de headers HTTP públicos
+- Análisis TLS / SSL
+- Consulta de registros DNS, SPF, DKIM, DMARC, CT logs
+- Análisis de performance (Core Web Vitals, Lighthouse)
+- Análisis de stack tecnológico observable
+- Búsqueda de secretos en repos públicos
+
+### 1.2 Técnicas activas autorizadas (Capa 2)
+- Reconocimiento autenticado con cuentas de testing provistas por el cliente
+- Mapeo de superficie de ataque (crawling profundo, análisis de JS)
+- Testing de control de acceso (IDOR/BOLA) en modo detection
+- Testing de inyección (SQLi, XSS, command injection) en modo detection
+- Testing de SSRF en modo detection
+- Análisis de JWT y tokens
+- Testing de mecanismos de autenticación
+- Análisis de dependencias y CVEs
+
+### 1.3 Técnicas EXCLUIDAS del scope
+- DoS / DDoS / stress testing
+- Social engineering / phishing al equipo del cliente
+- Testing físico de infraestructura
+- Testing sobre infraestructura de terceros (Stripe, AWS, GCP, proveedores SaaS)
+- Exfiltración masiva de datos reales de clientes
+- Modificación destructiva de datos de producción
+- Acceso a entornos no listados en sección 2
+
+## 2. Dominios y subdominios incluidos
+
+- [dominio1.com] (incluyendo subdominios)
+- [api.dominio1.com]
+- [staging.dominio1.com] (si aplica)
+
+## 3. Dominios EXCLUIDOS
+
+- [si los hay]
+
+## 4. Entornos disponibles
+
+- [ ] Producción (con ventana de testing acordada)
+- [ ] Staging (si disponible)
+- Ventana acordada para testing sobre producción: [horario]
+
+## 5. Modo de ejecución
+
+[ ] Modo Full (cliente tiene staging)
+[ ] Modo Detection-only (cliente no tiene staging)
+
+## 6. Cuentas de testing
+
+El cliente se compromete a proveer:
+- [N] cuentas de customer estándar
+- [N] cuenta de customer "víctima" para tests cross-account
+- [N] cuenta admin (si aplica)
+- Tarjeta de pago en test mode confirmada
+
+## 7. Confidencialidad y propiedad del report
+
+- El report es propiedad conjunta del cliente y Random Lab.
+- Random Lab puede usar versión anonimizada como caso de éxito previa autorización escrita del cliente.
+- El cliente puede compartir el report internamente y con asesores legales/técnicos bajo NDA.
+
+## 8. Limitación de responsabilidad
+
+[Cláusula estándar del contrato base, referenciada]
+
+## 9. Procedimiento de emergencia
+
+Contacto técnico cliente: [nombre, email, teléfono]
+Backup cliente: [nombre, email, teléfono]
+Contacto Random Lab: Pedro Nassiff, [teléfono, email]
+
+Canal de comunicación en vivo durante testing activo: [Slack channel / WhatsApp group]
+
+## 10. Firmas
+
+Por el cliente: ____________________ Fecha: ________
+Por Random Lab: ____________________ Fecha: ________
+```
+
+Este addendum se genera por cliente, se firma digital o impreso, y se archiva en `/contracts/[cliente]/`.
+
+---
+
+## 13. Métricas de éxito del audit
+
+Al finalizar, debemos poder responder con datos:
+
+- **Cobertura**: % del OWASP Top 10 cubierto con probes ejecutados.
+- **Findings**: cantidad por severidad, categoría OWASP, área de la app, estado (confirmed/high_probability/suspected).
+- **Tiempo de fix**: días entre report y verificación de fix por finding.
+- **Impacto evitado**: si aplicable, € en multas/breach cost evitados (con confidence honesto).
+- **Cero incidentes operacionales**: durante el audit no se rompió nada en prod. **Esta es la métrica más importante.**
+- **Cleanup completado**: 100% de items creados durante testing limpiados o documentados.
+
+El "cero incidentes" es el que vale oro para vender el siguiente cliente.
+
+---
+
+## 14. Checklist pre-ejecución (por cliente)
+
+Aplicable a cada engagement. Solo cuando los 13 estén checkeados, se ejecuta la primera línea de Capa 2.
+
+- [ ] Contrato base firmado
+- [ ] Addendum específico firmado (ver sección 12)
+- [ ] NDA bidireccional vigente
+- [ ] Documento de scope firmado
+- [ ] Seguro de RC profesional Random Lab vigente
+- [ ] Cuentas de testing creadas con datos sintéticos
+- [ ] Stripe / payments en test mode confirmado
+- [ ] Staging operativo O ventana acordada para prod
+- [ ] IP de Random Lab whitelisteada en WAF cliente
+- [ ] Contactos de emergencia documentados
+- [ ] Kill switch endpoint deployed y testeado
+- [ ] Rate limiter configurado para entorno
+- [ ] Backup reciente confirmado por cliente
+
+---
+
+## 15. Productos derivados (sales playbook)
+
+Este audit genera tres productos vendibles adicionales al cliente al cerrar:
+
+### 15.1 Staging implementation
+Para clientes sin staging. Random Lab implementa staging mínimo viable + dataset anonimizado + Stripe test mode + mailcatcher.
+**Ticket sugerido**: 3-6k€ según complejidad.
+
+### 15.2 Continuous Security retainer
+Re-runs mensuales/trimestrales del audit. Monitoring de exposición pública continua.
+**Ticket sugerido**: 800-2k€/mes.
+
+### 15.3 Security training para el equipo del cliente
+Workshop de 4-8h sobre los findings encontrados + OWASP Top 10 + secure coding.
+**Ticket sugerido**: 2-4k€ flat.
+
+Estos se proponen en la sesión de handoff (sección 8.3).
+
+---
+
+**FIN del playbook v0.2**
+
+Próxima iteración: a medida que se ejecuten audits reales, este playbook se actualiza con learnings concretos. Cada audit completo es un input para v0.3, v0.4, etc.

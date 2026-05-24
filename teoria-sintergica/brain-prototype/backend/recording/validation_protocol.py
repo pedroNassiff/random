@@ -132,6 +132,44 @@ VALIDATION_PHASES: List[ProtocolPhase] = [
 ]
 
 
+QUICK_VALIDATION_PHASES: List[ProtocolPhase] = [
+    ProtocolPhase(
+        name="baseline_open",
+        label="BASELINE",
+        duration=60,
+        instruction="Ojos abiertos",
+        sub_instruction="Mirá el punto",
+        has_drishti=True,
+        drishti_color="#5DCAA5",
+        audio_freq=528,
+        tts_on_start="Mantené los ojos abiertos. Mirá el punto.",
+    ),
+    ProtocolPhase(
+        name="baseline_closed",
+        label="BASELINE",
+        duration=90,
+        instruction="Cerrá los ojos",
+        sub_instruction="Sin hacer nada",
+        audio_freq=396,
+        bell_on_end=True,
+        tts_on_start="Cerrá los ojos. No hagas nada.",
+        tts_on_end="Podés abrir los ojos.",
+    ),
+    ProtocolPhase(
+        name="recovery",
+        label="RECUPERACIÓN",
+        duration=60,
+        instruction="Volvé al cuerpo",
+        sub_instruction="Abrí los ojos cuando suene la campana",
+        breathing_guide=True,
+        audio_freq=528,
+        bell_on_end=True,
+        tts_on_start="Soltá. Volvé al cuerpo.",
+        tts_on_end="Listo.",
+    ),
+]
+
+
 @dataclass
 class ProtocolMetadata:
     """Metadatos de la sesión para análisis posterior."""
@@ -180,11 +218,12 @@ class ValidationProtocol:
     def total_duration(self) -> int:
         return sum(p.duration for p in self.phases)
 
-    def start(self, name: str = "", metadata: Optional[Dict] = None):
+    def start(self, name: str = "", metadata: Optional[Dict] = None, quick: bool = False):
         """Inicia el protocolo de validación."""
         if self.is_running:
             return {"status": "error", "message": "Protocol already running"}
 
+        self.phases = QUICK_VALIDATION_PHASES if quick else VALIDATION_PHASES
         self.is_running = True
         self.is_paused = False
         self.current_phase_idx = 0

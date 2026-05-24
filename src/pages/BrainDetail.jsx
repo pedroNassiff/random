@@ -24,6 +24,8 @@ import { AudioControl }      from '../lab-core/brain/hud/AudioControl'
 import SessionControl        from '../lab-core/brain/hud/SessionControl'
 import MuseControl           from '../lab-core/brain/hud/MuseControl'
 import ProtocolOverlay       from '../lab-core/brain/hud/ProtocolOverlay'
+import QuickSessionOverlay   from '../lab-core/brain/hud/QuickSessionOverlay'
+import PipelineValidation    from '../lab-core/brain/hud/PipelineValidation'
 
 // Bridge: reads Zustand store every frame and updates brainStateRef for R3F
 function BrainBridge({ brainStateRef }) {
@@ -79,6 +81,8 @@ export default function BrainDetail() {
   const [dataSource, setDataSource] = useState('dataset') // 'dataset' | 'muse'
   const [isMobile, setIsMobile] = useState(false)
   const [showProtocol, setShowProtocol] = useState(false)
+  const [showQuickSession, setShowQuickSession] = useState(false)
+  const [showPipelineValidation, setShowPipelineValidation] = useState(false)
 
   // Real-time EEG data for ADA panel
   const bands           = useBrainStore((s) => s.bands)
@@ -151,6 +155,28 @@ export default function BrainDetail() {
 
         <OrbitControls enableZoom enablePan={false} enableDamping dampingFactor={0.06} minDistance={0.8} maxDistance={5} />
       </Canvas>
+
+      {/* ── Pipeline Validation Modal ── */}
+      {showPipelineValidation && (
+        <PipelineValidation onClose={() => setShowPipelineValidation(false)} />
+      )}
+
+      {/* ── Quick Session Overlay (sobre el Canvas) ── */}
+      {showQuickSession && (
+        <div style={{
+          position: isMobile ? 'fixed' : 'absolute',
+          top: 0, left: 0,
+          width: isMobile ? '100%' : `calc(100% - 310px)`,
+          height: isMobile ? '42vh' : '100vh',
+          zIndex: 50,
+          pointerEvents: 'none',
+        }}>
+          <QuickSessionOverlay
+            onClose={() => setShowQuickSession(false)}
+            onRequestValidation={() => setShowPipelineValidation(true)}
+          />
+        </div>
+      )}
 
       {/* ── Protocol Overlay (sobre el Canvas, pointer-events: none) ── */}
       {showProtocol && (
@@ -290,7 +316,47 @@ export default function BrainDetail() {
             onMouseEnter={e => e.target.style.background = 'rgba(93,202,165,0.15)'}
             onMouseLeave={e => e.target.style.background = 'rgba(93,202,165,0.08)'}
           >
-            🧪 Protocolo de validación
+            Protocolo de validación
+          </button>
+        )}
+        {dataSource === 'muse' && !showProtocol && !showQuickSession && (
+          <button
+            onClick={() => setShowQuickSession(true)}
+            style={{
+              width: '100%', padding: '12px',
+              background: 'rgba(130,130,255,0.06)',
+              border: '1px dashed rgba(130,130,255,0.3)',
+              borderRadius: 8,
+              color: '#818CF8', fontSize: '0.72rem',
+              fontFamily: 'monospace',
+              cursor: isMobile ? 'pointer' : 'none',
+              letterSpacing: '0.08em',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => e.target.style.background = 'rgba(130,130,255,0.13)'}
+            onMouseLeave={e => e.target.style.background = 'rgba(130,130,255,0.06)'}
+          >
+            Calibración rápida
+          </button>
+        )}
+        {dataSource === 'muse' && (
+          <button
+            onClick={() => setShowPipelineValidation(true)}
+            style={{
+              width: '100%', padding: '10px',
+              background: 'transparent',
+              border: '1px solid rgba(130,130,255,0.15)',
+              borderRadius: 8,
+              color: 'rgba(130,130,255,0.5)', fontSize: '0.65rem',
+              fontFamily: 'monospace',
+              cursor: isMobile ? 'pointer' : 'none',
+              letterSpacing: '0.08em',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => e.target.style.color = '#818CF8'}
+            onMouseLeave={e => e.target.style.color = 'rgba(130,130,255,0.5)'}
+          >
+            Validar pipeline
           </button>
         )}
         <StateIndicator />

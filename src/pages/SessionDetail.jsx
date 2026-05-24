@@ -10,7 +10,7 @@
  * - Learning notes & observations
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
@@ -25,6 +25,25 @@ const BAND_COLORS = {
 }
 const GRADE_COLORS = {
   A: '#10b981', B: '#3b82f6', C: '#f59e0b', D: '#f97316', F: '#ef4444',
+}
+
+// Fases del protocolo de validación (30 min / 1800 s)
+const PROTOCOL_PHASES = [
+  { t: 0,    short: 'OA',   name: 'Baseline ojos abiertos' },
+  { t: 120,  short: 'OC',   name: 'Baseline ojos cerrados' },
+  { t: 240,  short: 'Sha',  name: 'Shamatha' },
+  { t: 540,  short: 'Med',  name: 'Meditación libre' },
+  { t: 1140, short: 'Cog',  name: 'Tarea cognitiva' },
+  { t: 1200, short: 'Rec',  name: 'Recovery' },
+  { t: 1380, short: 'Prof', name: 'Profundización' },
+  { t: 1680, short: 'Cie',  name: 'Cierre' },
+]
+
+function formatTimeTick(sec) {
+  if (sec < 60) return `${sec}s`
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return s === 0 ? `${m}m` : `${m}m${String(s).padStart(2, '0')}`
 }
 
 const PHASE_INFO = {
@@ -190,30 +209,36 @@ const SESSION_DEFAULT_LAYOUT = {
   lg: [
     { i: 'resumen',    x: 0, y: 0,  w: 12, h: 9,  minW: 6, minH: 5 },
     { i: 'actividad',  x: 0, y: 9,  w: 12, h: 12, minW: 6, minH: 8 },
-    { i: 'video',      x: 0, y: 21, w: 6,  h: 9,  minW: 4, minH: 5 },
-    { i: 'validacion', x: 6, y: 21, w: 6,  h: 14, minW: 4, minH: 6 },
-    { i: 'protocolo',  x: 0, y: 35, w: 12, h: 20, minW: 6, minH: 8 },
-    { i: 'metadatos',  x: 0, y: 55, w: 6,  h: 7,  minW: 4, minH: 4 },
-    { i: 'notas',      x: 6, y: 55, w: 6,  h: 12, minW: 4, minH: 5 },
+    { i: 'ersp',       x: 0, y: 21, w: 12, h: 17, minW: 6, minH: 10 },
+    { i: 'topomap',    x: 0, y: 38, w: 12, h: 18, minW: 6, minH: 12 },
+    { i: 'video',      x: 0, y: 56, w: 6,  h: 9,  minW: 4, minH: 5 },
+    { i: 'validacion', x: 6, y: 56, w: 6,  h: 14, minW: 4, minH: 6 },
+    { i: 'protocolo',  x: 0, y: 70, w: 12, h: 20, minW: 6, minH: 8 },
+    { i: 'metadatos',  x: 0, y: 90, w: 6,  h: 7,  minW: 4, minH: 4 },
+    { i: 'notas',      x: 6, y: 90, w: 6,  h: 12, minW: 4, minH: 5 },
   ],
   sm: [
     { i: 'resumen',    x: 0, y: 0,  w: 1, h: 9  },
     { i: 'actividad',  x: 0, y: 9,  w: 1, h: 12 },
-    { i: 'video',      x: 0, y: 21, w: 1, h: 9  },
-    { i: 'validacion', x: 0, y: 30, w: 1, h: 14 },
-    { i: 'protocolo',  x: 0, y: 44, w: 1, h: 20 },
-    { i: 'metadatos',  x: 0, y: 64, w: 1, h: 7  },
-    { i: 'notas',      x: 0, y: 71, w: 1, h: 12 },
+    { i: 'ersp',       x: 0, y: 21, w: 1, h: 17 },
+    { i: 'topomap',    x: 0, y: 38, w: 1, h: 18 },
+    { i: 'video',      x: 0, y: 56, w: 1, h: 9  },
+    { i: 'validacion', x: 0, y: 65, w: 1, h: 14 },
+    { i: 'protocolo',  x: 0, y: 79, w: 1, h: 20 },
+    { i: 'metadatos',  x: 0, y: 99, w: 1, h: 7  },
+    { i: 'notas',      x: 0, y: 106, w: 1, h: 12 },
   ],
 }
 const SESSION_SECTIONS_CONFIG = [
-  { key: 'resumen',    label: 'RESUMEN DE SESIÓN',       accent: '#3b82f6' },
-  { key: 'actividad',  label: 'ACTIVIDAD EEG TEMPORAL',  accent: '#10b981' },
-  { key: 'video',      label: 'VIDEO DE SESIÓN',         accent: '#6366f1' },
-  { key: 'validacion', label: 'VALIDACIÓN CIENTÍFICA',   accent: '#a78bfa' },
-  { key: 'protocolo',  label: 'FASES DEL PROTOCOLO',     accent: '#ef4444' },
-  { key: 'metadatos',  label: 'METADATOS',               accent: '#f59e0b' },
-  { key: 'notas',      label: 'OBSERVACIONES',           accent: '#10b981' },
+  { key: 'resumen',    label: 'RESUMEN DE SESIÓN',              accent: '#3b82f6' },
+  { key: 'actividad',  label: 'ACTIVIDAD EEG TEMPORAL',         accent: '#10b981' },
+  { key: 'ersp',       label: 'ERSP — TRANSICIONES DE FASE',    accent: '#6366f1' },
+  { key: 'topomap',    label: 'TOPOGRAPHIC MAPPING',            accent: '#ec4899' },
+  { key: 'video',      label: 'VIDEO DE SESIÓN',                accent: '#6366f1' },
+  { key: 'validacion', label: 'VALIDACIÓN CIENTÍFICA',          accent: '#a78bfa' },
+  { key: 'protocolo',  label: 'FASES DEL PROTOCOLO',            accent: '#ef4444' },
+  { key: 'metadatos',  label: 'METADATOS',                      accent: '#f59e0b' },
+  { key: 'notas',      label: 'OBSERVACIONES',                  accent: '#10b981' },
 ]
 
 // ── Small UI ──────────────────────────────────────────────────────────────────
@@ -298,7 +323,83 @@ function useSessionTimeSeries(recordingId) {
 }
 
 // ── Section: Time-series EEG charts ──────────────────────────────────────────
-function SectionTimeSeries({ metrics }) {
+function SingleBandChart({ label, color, values, durationSeconds, id }) {
+  const n = values.length
+  const max = Math.max(...values, 0.001)
+  const W = 700, H = 52
+  const pts = values.map((v, i) => `${(i / Math.max(n - 1, 1)) * W},${H - (v / max) * H * 0.9}`).join(' ')
+  const area = `${pts} ${W},${H} 0,${H}`
+
+  const isProtocol = durationSeconds != null && durationSeconds >= 1500
+  const protocolTicks = isProtocol
+    ? PROTOCOL_PHASES.map(p => ({ ...p, frac: p.t / durationSeconds })).filter(p => p.frac <= 1.005)
+    : null
+
+  const TICK_COUNT = 5
+  const equalTicks = Array.from({ length: TICK_COUNT + 1 }, (_, i) => i / TICK_COUNT)
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+        <span style={{ fontSize: '0.65rem', fontFamily: 'monospace', color }}>{label}</span>
+        <span style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)' }}>máx {max.toFixed(4)}</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 40, display: 'block' }} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`sg-${id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {isProtocol
+          ? protocolTicks.filter(p => p.frac > 0.001 && p.frac < 0.999).map((p, i) => (
+              <line key={i} x1={p.frac * W} y1={0} x2={p.frac * W} y2={H}
+                stroke="#f87171" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4,3" />
+            ))
+          : equalTicks.slice(1, -1).map((frac, i) => (
+              <line key={i} x1={frac * W} y1={0} x2={frac * W} y2={H}
+                stroke="white" strokeOpacity="0.07" strokeWidth="0.8" strokeDasharray="3,3" />
+            ))
+        }
+        <polygon points={area} fill={`url(#sg-${id})`} />
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="0.9" />
+      </svg>
+      {/* X-axis labels */}
+      {isProtocol ? (
+        <div style={{ position: 'relative', height: 28 }}>
+          {protocolTicks.map((p, i) => {
+            const isLeft  = p.frac < 0.03
+            const isRight = p.frac > 0.97
+            const staggerDown = i === 5
+            return (
+              <div key={i} style={{
+                position: 'absolute',
+                left: `${p.frac * 100}%`,
+                top: staggerDown ? 12 : 0,
+                transform: isRight ? 'translateX(-100%)' : isLeft ? 'none' : 'translateX(-50%)',
+                display: 'flex', flexDirection: 'column',
+                alignItems: isLeft ? 'flex-start' : isRight ? 'flex-end' : 'center',
+              }}>
+                <span style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(248,113,113,0.8)', fontWeight: 600, lineHeight: 1 }}>{p.short}</span>
+                <span style={{ fontSize: '0.55rem', fontFamily: 'monospace', color: 'rgba(248,113,113,0.5)', lineHeight: 1, marginTop: 1 }}>{formatTimeTick(p.t)}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          {equalTicks.map((frac, i) => (
+            <span key={i} style={{ fontSize: '0.55rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)' }}>
+              {durationSeconds ? formatTimeTick(Math.round(frac * durationSeconds)) : `${Math.round(frac * 100)}%`}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SectionTimeSeries({ metrics, durationSeconds }) {
   if (!metrics || metrics.length < 3) {
     return (
       <Card title="Actividad durante la sesión" accent="#10b981">
@@ -309,81 +410,679 @@ function SectionTimeSeries({ metrics }) {
     )
   }
 
-  // Subsample to max 500 points for SVG performance
-  const step = Math.max(1, Math.ceil(metrics.length / 500))
+  // Subsample to max 600 points for SVG performance
+  const step = Math.max(1, Math.ceil(metrics.length / 600))
   const sampled = metrics.filter((_, i) => i % step === 0)
-  const n = sampled.length
-  const totalSecs = metrics.length * 2
+  const dur = durationSeconds ?? metrics.length * 2
 
-  const W = 560, H = 110, PL = 8, PT = 10, PB = 22, PR = 8
-  const iW = W - PL - PR
-  const iH = H - PT - PB
-
-  const toX = i => PL + (i / Math.max(n - 1, 1)) * iW
-  const mkYFn = (min, max) => v => PT + iH - ((v - min) / (max - min || 0.001)) * iH
-  const polyPts = (arr, yFn) => arr.map((v, i) => `${toX(i)},${yFn(v)}`).join(' ')
-  const areaPts = (arr, yFn) => `${polyPts(arr, yFn)} ${toX(n - 1)},${PT + iH} ${PL},${PT + iH}`
-
-  const alpha = sampled.map(m => parseFloat(m.alpha ?? 0) || 0)
-  const theta = sampled.map(m => parseFloat(m.theta ?? 0) || 0)
-  const coh   = sampled.map(m => parseFloat(m.coherence ?? 0) || 0)
-
-  const allBand = [...alpha, ...theta]
-  const bMin = Math.min(...allBand), bMax = Math.max(...allBand)
-  const cMin = Math.min(...coh),     cMax = Math.max(...coh)
-  const bandY = mkYFn(bMin, bMax)
-  const cohY  = mkYFn(cMin, cMax)
-
-  const fmtTime = i => {
-    const s = Math.round((i / Math.max(n - 1, 1)) * totalSecs)
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-  }
-  const timeTicks = [0, Math.floor(n * 0.25), Math.floor(n * 0.5), Math.floor(n * 0.75), n - 1]
-
-  const renderChart = (title, series) => (
-    <div>
-      <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginBottom: 4 }}>{title}</p>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%' }}>
-        {[0.25, 0.5, 0.75].map(r => (
-          <line key={r} x1={PL} y1={PT + iH * (1 - r)} x2={W - PR} y2={PT + iH * (1 - r)}
-            stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-        ))}
-        {series.map((s, si) => (
-          <g key={si}>
-            {s.fill && <polygon points={areaPts(s.data, s.yFn)} fill={s.color} opacity="0.12" />}
-            <polyline points={polyPts(s.data, s.yFn)} fill="none" stroke={s.color} strokeWidth="1.5" strokeLinejoin="round" />
-          </g>
-        ))}
-        {timeTicks.map(i => (
-          <text key={i} x={toX(i)} y={H - 4} fontSize="7" fill="rgba(255,255,255,0.3)" textAnchor="middle" fontFamily="monospace">
-            {fmtTime(i)}
-          </text>
-        ))}
-      </svg>
-    </div>
-  )
+  const bandValues = {}
+  BANDS.forEach(b => {
+    bandValues[b] = sampled.map(m => parseFloat(m[b] ?? 0) || 0)
+  })
+  const coh = sampled.map(m => parseFloat(m.coherence ?? 0) || 0)
 
   return (
     <Card title="Actividad durante la sesión" accent="#10b981">
       <p style={pStyle}>
-        Evolución temporal de las métricas EEG · {metrics.length} ventanas · {Math.round(totalSecs / 60)}m de sesión
+        Evolución temporal · {metrics.length} ventanas · {Math.round(dur / 60)}m
+        {dur >= 1500 && <span style={{ color: '#f87171', marginLeft: 8, fontSize: '0.68rem', fontFamily: 'monospace' }}>▏líneas rojas = cambio de fase</span>}
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 12 }}>
-        {renderChart(`α + θ · ${metrics.length} ventanas`, [
-          { data: alpha, color: BAND_COLORS.alpha, yFn: bandY, fill: true },
-          { data: theta, color: BAND_COLORS.theta, yFn: bandY, fill: false },
-        ])}
-        {renderChart('Coherencia PLV', [
-          { data: coh, color: '#10b981', yFn: cohY, fill: true },
-        ])}
+      <div style={{ marginTop: 16 }}>
+        {BANDS.map(b => (
+          <SingleBandChart
+            key={b}
+            id={b}
+            label={`${BAND_SYMBOL[b]} ${b}`}
+            color={BAND_COLORS[b]}
+            values={bandValues[b]}
+            durationSeconds={dur}
+          />
+        ))}
+        <SingleBandChart
+          id="coh"
+          label="coherencia PLV"
+          color="#10b981"
+          values={coh}
+          durationSeconds={dur}
+        />
       </div>
-      <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-        {[[BAND_COLORS.alpha, 'α alpha'], [BAND_COLORS.theta, 'θ theta'], ['#10b981', 'coherencia PLV']].map(([c, l]) => (
-          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-            <span style={{ width: 16, height: 2, background: c, display: 'inline-block', borderRadius: 1 }} />
-            {l}
+    </Card>
+  )
+}
+
+// ── ERSP: Event-Related Spectral Perturbation ───────────────────────────────────
+// Pattern: epoch-locked band power, normalized to pre-event baseline.
+// Ref: Makeig et al. 1993 · Brandmeyer & Delorme 2018 (Muse meditation)
+
+const ERSP_PRE_SEC  = 30   // seconds before transition → baseline
+const ERSP_POST_SEC = 55   // seconds after transition to observe
+const PHASE_KEY_MAP = {
+  OA: 'baseline_open', OC: 'baseline_closed', Sha: 'shamatha',
+  Med: 'meditation_free', Cog: 'cognitive_task', Rec: 'recovery',
+  Prof: 'deep_meditation', Cie: 'close',
+}
+
+function computeERSP(metrics, durationSec, phaseT) {
+  if (!metrics || metrics.length < 20 || !durationSec) return null
+  const dt   = durationSec / metrics.length
+  const ci   = Math.round(phaseT / dt)
+  const pre  = Math.round(ERSP_PRE_SEC  / dt)
+  const post = Math.round(ERSP_POST_SEC / dt)
+  if (ci - pre < 2 || ci + post >= metrics.length) return null
+  const epoch = metrics.slice(ci - pre, ci + post + 1)
+  // Baseline: 85% of pre-window to avoid peri-event contamination
+  const blEnd = Math.floor(pre * 0.85)
+  const baselines = {}
+  BANDS.forEach(b => {
+    const vals = epoch.slice(0, blEnd).map(m => parseFloat(m[b] ?? 0) || 0)
+    baselines[b] = vals.reduce((s, v) => s + v, 0) / (vals.length || 1) || 0.0001
+  })
+  // % change relative to baseline at every sample
+  const erspData = epoch.map((m, i) => {
+    const p = { t: (i - pre) * dt }
+    BANDS.forEach(b => { p[b] = ((parseFloat(m[b] ?? 0) || 0) - baselines[b]) / baselines[b] * 100 })
+    return p
+  })
+  // Summary: mean change in first 30s post-event
+  const postCount = Math.min(Math.round(30 / dt), erspData.length - pre)
+  const postSlice = erspData.slice(pre, pre + postCount)
+  const summaryStats = {}
+  BANDS.forEach(b => {
+    const vals = postSlice.map(p => p[b])
+    const mean = vals.reduce((s, v) => s + v, 0) / (vals.length || 1)
+    const peak = vals.reduce((best, v) => Math.abs(v) > Math.abs(best) ? v : best, 0)
+    summaryStats[b] = { mean, peak, baseline: baselines[b] }
+  })
+  return { erspData, baselines, summaryStats, pre, dt }
+}
+
+function erspAutoInterpret(erspResult) {
+  if (!erspResult) return null
+  const { summaryStats } = erspResult
+  const sorted = BANDS.map(b => ({ b, val: summaryStats[b].mean }))
+    .sort((a, b) => Math.abs(b.val) - Math.abs(a.val))
+  const top = sorted[0]
+  if (Math.abs(top.val) < 5) return 'Cambio mínimo — transición suave o estado ya estabilizado antes de la fase.'
+  const dir = top.val > 0 ? 'subió' : 'bajó'
+  const mag = Math.abs(top.val) > 40 ? 'fuertemente' : Math.abs(top.val) > 15 ? 'moderadamente' : 'ligeramente'
+  const INTERP = {
+    alpha: { up: 'Relajación / inhibición cortical — estado meditativo o cierre ocular.',
+             down: 'Activación cortical — procesamiento activo o apertura ocular.' },
+    theta: { up: 'Estado contemplativo profundo, carga de memoria de trabajo elevada.',
+             down: 'Mente activa y alerta — salida del estado meditativo.' },
+    beta:  { up: 'Activación cognitiva/motora — engagement prefrontal.',
+             down: 'Relajación — reducción del pensamiento activo.' },
+    delta: { up: 'Ondas lentas — sueño ligero o artefacto de movimiento.',
+             down: 'Reducción de ondas lentas — mayor activación cortical.' },
+    gamma: { up: 'Binding perceptual / procesamiento de alto nivel.',
+             down: 'Reducción de arousal cognitivo.' },
+  }
+  const ctx = INTERP[top.b]?.[top.val > 0 ? 'up' : 'down'] || ''
+  return `${BAND_SYMBOL[top.b]} ${top.b} ${mag} ${dir} (${top.val > 0 ? '+' : ''}${top.val.toFixed(0)}%). ${ctx}`
+}
+
+function ERSPButterflyChart({ erspResult, phaseName }) {
+  if (!erspResult) return (
+    <div style={{
+      padding: '28px', textAlign: 'center', color: 'rgba(255,255,255,0.2)',
+      fontSize: '0.72rem', fontFamily: 'monospace', borderRadius: 8,
+      background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.06)',
+    }}>
+      Datos insuficientes — la ventana pre-evento cae fuera del rango de la grabación
+    </div>
+  )
+  const { erspData, pre } = erspResult
+  const W = 700, H = 150, PL = 32, PR = 10, PT = 14, PB = 18
+  const iW = W - PL - PR, iH = H - PT - PB, n = erspData.length
+  const allVals = BANDS.flatMap(b => erspData.map(p => Math.max(-100, Math.min(130, p[b]))))
+  const yMin = Math.max(-80, Math.floor(Math.min(...allVals) / 10) * 10)
+  const yMax = Math.min(130, Math.ceil(Math.max(...allVals) / 10) * 10)
+  const yr   = yMax - yMin || 1
+  const toX  = i => PL + (i / Math.max(n - 1, 1)) * iW
+  const toY  = v => PT + iH - ((Math.max(yMin, Math.min(yMax, v)) - yMin) / yr) * iH
+  const cx   = toX(pre)
+  const yGrid = []
+  for (let v = Math.ceil(yMin / 20) * 20; v <= yMax; v += 20) yGrid.push(v)
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 140 }}>
+        {/* Pre-event shaded region */}
+        <rect x={PL} y={PT} width={cx - PL} height={iH} fill="rgba(255,255,255,0.025)" />
+        {/* Y grid + labels */}
+        {yGrid.map(v => (
+          <g key={v}>
+            <line x1={PL} y1={toY(v)} x2={W - PR} y2={toY(v)}
+              stroke={v === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.05)'}
+              strokeWidth={v === 0 ? 0.9 : 0.5} strokeDasharray={v === 0 ? '' : '3,4'} />
+            <text x={PL - 3} y={toY(v) + 3} fontSize="7"
+              fill="rgba(255,255,255,0.28)" textAnchor="end" fontFamily="monospace">
+              {v > 0 ? `+${v}` : v}%
+            </text>
+          </g>
+        ))}
+        {/* Band lines */}
+        {BANDS.map(b => (
+          <polyline key={b}
+            points={erspData.map((p, i) => `${toX(i)},${toY(p[b])}`).join(' ')}
+            fill="none" stroke={BAND_COLORS[b]} strokeWidth="1" opacity="0.9" strokeLinejoin="round" />
+        ))}
+        {/* t=0 event marker */}
+        <line x1={cx} y1={PT} x2={cx} y2={PT + iH}
+          stroke="rgba(255,255,255,0.5)" strokeWidth={1.3} strokeDasharray="4,2" />
+        {/* Region labels */}
+        <text x={PL + (cx - PL) / 2} y={PT + 9} fontSize="7"
+          fill="rgba(255,255,255,0.2)" textAnchor="middle" fontFamily="monospace">baseline ({ERSP_PRE_SEC}s)</text>
+        <text x={cx + (W - PR - cx) / 2} y={PT + 9} fontSize="7"
+          fill="rgba(255,255,255,0.28)" textAnchor="middle" fontFamily="monospace">{phaseName}</text>
+        <text x={cx + 4} y={PT + 20} fontSize="6.5" fill="rgba(255,255,255,0.4)" fontFamily="monospace">t=0</text>
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 32, marginTop: 2 }}>
+        <span style={{ fontSize: '0.55rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)' }}>−{ERSP_PRE_SEC}s</span>
+        <span style={{ fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>↑ transición de fase</span>
+        <span style={{ fontSize: '0.55rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)' }}>+{ERSP_POST_SEC}s</span>
+      </div>
+    </div>
+  )
+}
+
+function ERSPHeatmap({ allErsp }) {
+  const clamp = (v, max) => Math.min(1, Math.abs(v) / max)
+  return (
+    <div>
+      <p style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace',
+        textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 10px 0' }}>
+        Resumen — cambio medio en primeros 30s post-transición
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'separate', borderSpacing: 3, fontSize: '0.62rem', fontFamily: 'monospace' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '2px 10px 4px 4px', color: 'rgba(255,255,255,0.2)', fontWeight: 400, fontSize: '0.58rem' }} />
+              {BANDS.map(b => (
+                <th key={b} style={{ padding: '2px 8px 4px', textAlign: 'center', color: BAND_COLORS[b], fontWeight: 600, minWidth: 56 }}>
+                  {BAND_SYMBOL[b]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {allErsp.map(({ phase, ersp }) => (
+              <tr key={phase.t}>
+                <td style={{ padding: '3px 12px 3px 4px', color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
+                  {phase.short}
+                  <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 6 }}>{formatTimeTick(phase.t)}</span>
+                </td>
+                {BANDS.map(b => {
+                  if (!ersp) return (
+                    <td key={b} style={{ padding: '3px 6px', textAlign: 'center', color: 'rgba(255,255,255,0.1)', borderRadius: 3 }}>—</td>
+                  )
+                  const val = ersp.summaryStats[b].mean
+                  const intensity = clamp(val, 60)
+                  const bg = val > 3  ? `rgba(167,139,250,${intensity * 0.6 + 0.08})`
+                           : val < -3 ? `rgba(248,113,113,${intensity * 0.6 + 0.08})`
+                           : 'rgba(255,255,255,0.04)'
+                  return (
+                    <td key={b} style={{
+                      padding: '3px 6px', textAlign: 'center', borderRadius: 3, background: bg,
+                      color: Math.abs(val) > 12 ? '#e2e8f0' : 'rgba(255,255,255,0.35)',
+                      fontWeight: Math.abs(val) > 20 ? 600 : 400,
+                    }}>
+                      {val > 0 ? '+' : ''}{val.toFixed(0)}%
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.55rem', color: 'rgba(167,139,250,0.6)', fontFamily: 'monospace' }}>■ subida</span>
+        <span style={{ fontSize: '0.55rem', color: 'rgba(248,113,113,0.6)', fontFamily: 'monospace' }}>■ bajada</span>
+        <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.18)', fontFamily: 'monospace' }}>media post-30s vs baseline pre-{ERSP_PRE_SEC}s</span>
+      </div>
+    </div>
+  )
+}
+
+function SectionERSP({ metrics, durationSeconds }) {
+  const [selectedIdx, setSelectedIdx] = useState(1) // default: OC — first real transition
+
+  const isProtocol = durationSeconds != null && durationSeconds >= 1500
+
+  // Pre-compute all ERSP epochs once (skip OA at t=0 — no pre-event data)
+  const allErsp = useMemo(() => {
+    if (!metrics || !durationSeconds) return []
+    return PROTOCOL_PHASES.slice(1).map(p => ({ phase: p, ersp: computeERSP(metrics, durationSeconds, p.t) }))
+  }, [metrics, durationSeconds])
+
+  if (!isProtocol) return (
+    <Card title="ERSP — Análisis de transiciones de fase" accent="#6366f1">
+      <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 8,
+        background: 'rgba(99,102,241,0.04)', border: '1px dashed rgba(99,102,241,0.2)' }}>
+        <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', margin: 0 }}>
+          Disponible solo para sesiones de protocolo completo (≥ 25 min)
+        </p>
+      </div>
+    </Card>
+  )
+
+  if (!metrics || metrics.length < 50) return (
+    <Card title="ERSP — Análisis de transiciones de fase" accent="#6366f1">
+      <p style={{ ...pStyle, textAlign: 'center', padding: '20px 0' }}>Cargando métricas...</p>
+    </Card>
+  )
+
+  const validPhases = PROTOCOL_PHASES.slice(1) // OC → Cie
+  const selIdx      = Math.min(selectedIdx, validPhases.length - 1)
+  const selPhase    = validPhases[selIdx]
+  const erspResult  = allErsp[selIdx]?.ersp ?? null
+  const phaseInfo   = PHASE_INFO[PHASE_KEY_MAP[selPhase.short]] || {}
+  const interp      = erspAutoInterpret(erspResult)
+
+  return (
+    <Card title="ERSP — Análisis de transiciones de fase" accent="#6366f1">
+      <p style={pStyle}>
+        Event-Related Spectral Perturbation: % de cambio de cada banda espectral al inicio de cada fase,
+        normalizado contra el baseline de los {ERSP_PRE_SEC}s previos a la transición.
+      </p>
+
+      {/* Phase selector tabs */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 16, marginTop: 4 }}>
+        {validPhases.map((p, i) => {
+          const info = PHASE_INFO[PHASE_KEY_MAP[p.short]] || {}
+          return (
+            <button key={p.t} onClick={() => setSelectedIdx(i)} style={{
+              padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              fontFamily: 'monospace', fontSize: '0.68rem', transition: 'all 0.15s',
+              background: selIdx === i ? '#6366f1' : 'rgba(255,255,255,0.05)',
+              color: selIdx === i ? '#fff' : 'rgba(255,255,255,0.4)',
+              fontWeight: selIdx === i ? 600 : 400,
+            }}>
+              {info.icon || ''} {p.short}
+              <span style={{ marginLeft: 4, opacity: 0.55, fontSize: '0.58rem' }}>{formatTimeTick(p.t)}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Selected phase header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: '1rem' }}>{phaseInfo.icon || '◉'}</span>
+        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e2e8f0', fontFamily: 'monospace' }}>
+          {phaseInfo.name || selPhase.name}
+        </span>
+        <Badge color="#6366f1">{formatTimeTick(selPhase.t)}</Badge>
+      </div>
+
+      {/* Band legend */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
+        {BANDS.map(b => (
+          <span key={b} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', fontFamily: 'monospace', color: BAND_COLORS[b] }}>
+            <span style={{ width: 12, height: 2, background: BAND_COLORS[b], display: 'inline-block', borderRadius: 1 }} />
+            {BAND_SYMBOL[b]} {b}
           </span>
         ))}
+        <span style={{ marginLeft: 'auto', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>
+          eje Y = % cambio vs baseline
+        </span>
+      </div>
+
+      {/* Butterfly chart */}
+      <ERSPButterflyChart erspResult={erspResult} phaseName={phaseInfo.name || selPhase.name} />
+
+      {/* Stats + interpretation  */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 16 }}>
+        {/* Stats table */}
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)' }}>
+          <p style={{ fontSize: '0.6rem', color: '#6366f1', fontFamily: 'monospace',
+            textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 8px 0' }}>Estadísticas</p>
+          {erspResult ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.63rem', fontFamily: 'monospace' }}>
+              <thead>
+                <tr>
+                  {['banda', 'baseline', 'Δ media', 'Δ pico'].map(h => (
+                    <th key={h} style={{ textAlign: h === 'banda' ? 'left' : 'center', padding: '3px 6px',
+                      color: 'rgba(255,255,255,0.25)', fontWeight: 400,
+                      borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {BANDS.map(b => {
+                  const s = erspResult.summaryStats[b]
+                  const mc = s.mean >  8 ? '#a78bfa' : s.mean < -8 ? '#f87171' : 'rgba(255,255,255,0.4)'
+                  const pc = s.peak > 15 ? '#a78bfa' : s.peak < -15 ? '#f87171' : 'rgba(255,255,255,0.35)'
+                  return (
+                    <tr key={b} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '4px 6px', color: BAND_COLORS[b] }}>{BAND_SYMBOL[b]} {b}</td>
+                      <td style={{ padding: '4px 6px', textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>{s.baseline.toFixed(4)}</td>
+                      <td style={{ padding: '4px 6px', textAlign: 'center', color: mc, fontWeight: Math.abs(s.mean) > 8 ? 600 : 400 }}>
+                        {s.mean > 0 ? '+' : ''}{s.mean.toFixed(1)}%
+                      </td>
+                      <td style={{ padding: '4px 6px', textAlign: 'center', color: pc }}>
+                        {s.peak > 0 ? '+' : ''}{s.peak.toFixed(1)}%
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem' }}>Sin datos</p>
+          )}
+        </div>
+
+        {/* Interpretation */}
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)' }}>
+          <p style={{ fontSize: '0.6rem', color: '#6366f1', fontFamily: 'monospace',
+            textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 8px 0' }}>Qué esperar</p>
+          {phaseInfo.expect && (
+            <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, margin: '0 0 10px 0' }}>
+              {phaseInfo.expect}
+            </p>
+          )}
+          {interp && (
+            <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(99,102,241,0.09)',
+              borderLeft: '2px solid rgba(99,102,241,0.45)', fontSize: '0.7rem',
+              color: 'rgba(255,255,255,0.65)', lineHeight: 1.65 }}>
+              {interp}
+            </div>
+          )}
+          {phaseInfo.science && (
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6,
+              background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(255,255,255,0.08)',
+              fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
+              {phaseInfo.science}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Heatmap overview — all phases */}
+      <div style={{ marginTop: 20, padding: '14px 16px', borderRadius: 8,
+        background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <ERSPHeatmap allErsp={allErsp} />
+      </div>
+
+      <div style={{ marginTop: 10, fontSize: '0.58rem', color: 'rgba(255,255,255,0.12)', fontFamily: 'monospace' }}>
+        Refs: Makeig et al. 1993 (ERSP) · Brandmeyer &amp; Delorme 2018 (Muse meditation)
+        · baseline: {ERSP_PRE_SEC}s pre-evento · observación: {ERSP_POST_SEC}s post-evento
+      </div>
+    </Card>
+  )
+}
+
+// ── Topographic mapping ────────────────────────────────────────────────────────────
+// Canvas-based IDW interpolation over Muse 2 electrode sites.
+// SVG overlay draws the head, nose, ears and electrode labels.
+// Refs: Cannard et al. 2021 (Muse validation) · Klimesch 1999 (band review)
+
+// Electrode positions in normalized head coords: origin = vertex, +y = nose, +x = right
+const MUSE_ELECTRODES = {
+  AF7:  { x: -0.326, y:  0.749 },   // left prefrontal
+  AF8:  { x:  0.326, y:  0.749 },   // right prefrontal
+  TP9:  { x: -0.884, y: -0.150 },   // left temporal-parietal
+  TP10: { x:  0.884, y: -0.150 },   // right temporal-parietal
+}
+
+// Neuroanatomical spatial priors: applied when only aggregate band data available.
+// Alpha is measured from posterior (TP9/TP10) in this backend; theta/beta are frontal-dominant.
+const BAND_SPATIAL_PRIOR = {
+  delta: { AF7: 1.00, AF8: 1.00, TP9: 1.00, TP10: 1.00 },
+  theta: { AF7: 1.20, AF8: 1.20, TP9: 0.80, TP10: 0.80 },
+  alpha: { AF7: 0.78, AF8: 0.78, TP9: 1.25, TP10: 1.25 },
+  beta:  { AF7: 1.12, AF8: 1.12, TP9: 0.88, TP10: 0.88 },
+  gamma: { AF7: 1.15, AF8: 1.15, TP9: 0.85, TP10: 0.85 },
+}
+
+function _jet(t) {
+  return [
+    Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 3))),
+    Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 2))),
+    Math.max(0, Math.min(1, 1.5 - Math.abs(4 * t - 1))),
+  ]
+}
+
+function _idw(px, py, ctrl, power = 2) {
+  let num = 0, den = 0
+  for (const [cx, cy, val] of ctrl) {
+    const d2 = (px - cx) ** 2 + (py - cy) ** 2
+    if (d2 < 1e-8) return val
+    const w = 1 / d2 ** (power / 2)
+    num += val * w; den += w
+  }
+  return den === 0 ? 0 : num / den
+}
+
+function TopoMapCanvas({ values, size }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const S = size * dpr
+    canvas.width = S; canvas.height = S
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, S, S)
+    const chs = Object.keys(MUSE_ELECTRODES).filter(ch => values[ch] != null)
+    if (chs.length < 2) return
+    const vals = chs.map(ch => values[ch])
+    const vMin = Math.min(...vals), vMax = Math.max(...vals)
+    const range = vMax - vMin || 0.0001
+    const R = S / 2, ir = R * 0.92
+    const ctrl = chs.map(ch => {
+      const { x, y } = MUSE_ELECTRODES[ch]
+      return [R + x * ir, R - y * ir, values[ch]]
+    })
+    const img = ctx.createImageData(S, S)
+    const d   = img.data
+    for (let py = 0; py < S; py++) {
+      for (let px = 0; px < S; px++) {
+        const dx = (px - R) / ir, dy = (py - R) / ir
+        if (dx * dx + dy * dy > 1) continue
+        const v = _idw(px, py, ctrl)
+        const [r, g, b] = _jet((v - vMin) / range)
+        const i = (py * S + px) * 4
+        d[i] = Math.round(r * 255); d[i+1] = Math.round(g * 255)
+        d[i+2] = Math.round(b * 255); d[i+3] = 255
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+  }, [values, size])
+  return <canvas ref={ref} style={{ position: 'absolute', top: 0, left: 0, width: size, height: size }} />
+}
+
+function TopoMap({ values, size = 120 }) {
+  const R  = size / 2
+  const ir = R * 0.92
+  const hasData = values && Object.keys(MUSE_ELECTRODES).some(ch => values[ch] != null && values[ch] > 0)
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      {hasData && <TopoMapCanvas values={values} size={size} />}
+      <svg viewBox={`0 0 ${size} ${size}`}
+        style={{ position: 'absolute', top: 0, left: 0, width: size, height: size }}>
+        {/* Head circle */}
+        <circle cx={R} cy={R} r={ir}
+          fill={hasData ? 'none' : 'rgba(255,255,255,0.025)'}
+          stroke="rgba(255,255,255,0.45)" strokeWidth="0.8" />
+        {/* Nose */}
+        <path d={`M ${R-5},${R-ir*0.87} Q ${R},${R-ir*1.07} ${R+5},${R-ir*0.87}`}
+          fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8" />
+        {/* Left ear */}
+        <path d={`M ${R-ir-1},${R+ir*0.13} Q ${R-ir*1.1},${R} ${R-ir-1},${R-ir*0.13}`}
+          fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8" />
+        {/* Right ear */}
+        <path d={`M ${R+ir+1},${R+ir*0.13} Q ${R+ir*1.1},${R} ${R+ir+1},${R-ir*0.13}`}
+          fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8" />
+        {/* Electrodes */}
+        {Object.entries(MUSE_ELECTRODES).map(([ch, pos]) => {
+          const cx = R + pos.x * ir, cy = R - pos.y * ir
+          return (
+            <g key={ch}>
+              <circle cx={cx} cy={cy} r={3.5}
+                fill="rgba(0,0,0,0.7)" stroke="rgba(255,255,255,0.8)" strokeWidth="0.8" />
+              <text
+                x={cx + (pos.x < 0 ? -5.5 : 5.5)} y={cy - 5}
+                fontSize="6" fill="rgba(255,255,255,0.65)" fontFamily="monospace"
+                textAnchor={pos.x < 0 ? 'end' : 'start'}>
+                {ch}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function TopoColorBar({ vMin, vMax, width = 280 }) {
+  const stops = Array.from({ length: 60 }, (_, i) => {
+    const t = i / 59
+    const [r, g, b] = _jet(t)
+    return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`
+  }).join(',')
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: '0.58rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', minWidth: 30, textAlign: 'right' }}>
+        {(vMin * 100).toFixed(1)}%
+      </span>
+      <div style={{
+        width, height: 7, borderRadius: 4, flexShrink: 0,
+        background: `linear-gradient(to right, ${stops})`,
+        border: '1px solid rgba(255,255,255,0.1)',
+      }} />
+      <span style={{ fontSize: '0.58rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', minWidth: 30 }}>
+        {(vMax * 100).toFixed(1)}%
+      </span>
+    </div>
+  )
+}
+
+function computePhaseAverages(metrics, durationSec) {
+  if (!metrics || !durationSec || metrics.length < 10) return {}
+  const dt = durationSec / metrics.length
+  const res = {}
+  PROTOCOL_PHASES.forEach((phase, i) => {
+    const nextT = PROTOCOL_PHASES[i + 1]?.t ?? durationSec
+    const s = Math.max(0, Math.round(phase.t / dt))
+    const e = Math.min(metrics.length, Math.round(nextT / dt))
+    if (e <= s + 2) return
+    const slice = metrics.slice(s, e)
+    res[phase.short] = {}
+    BANDS.forEach(b => {
+      res[phase.short][b] = slice.reduce((a, m) => a + (parseFloat(m[b]) || 0), 0) / slice.length
+    })
+    res[phase.short].coherence = slice.reduce((a, m) => a + (parseFloat(m.coherence) || 0), 0) / slice.length
+  })
+  return res
+}
+
+function SectionTopoMaps({ metrics, durationSeconds }) {
+  const [band, setBand] = useState('alpha')
+  const isProtocol = durationSeconds != null && durationSeconds >= 1500
+  const phaseAvgs = useMemo(
+    () => computePhaseAverages(metrics, durationSeconds),
+    [metrics, durationSeconds]
+  )
+
+  if (!isProtocol) return (
+    <Card title="Topographic mapping — distribución espacial" accent="#ec4899">
+      <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 8,
+        background: 'rgba(236,72,153,0.04)', border: '1px dashed rgba(236,72,153,0.2)' }}>
+        <p style={{ ...pStyle, margin: 0 }}>Disponible para sesiones de protocolo completo (≥ 25 min)</p>
+      </div>
+    </Card>
+  )
+  if (!metrics || metrics.length < 50) return (
+    <Card title="Topographic mapping — distribución espacial" accent="#ec4899">
+      <p style={{ ...pStyle, textAlign: 'center', padding: '20px 0' }}>Cargando métricas...</p>
+    </Card>
+  )
+
+  const prior = BAND_SPATIAL_PRIOR[band] || BAND_SPATIAL_PRIOR.alpha
+  const phaseTopo = PROTOCOL_PHASES.map(p => {
+    const avg = phaseAvgs[p.short]
+    const base = avg?.[band] ?? 0
+    return {
+      phase: p,
+      phaseInfo: PHASE_INFO[PHASE_KEY_MAP?.[p.short]] || {},
+      values: { AF7: base * prior.AF7, AF8: base * prior.AF8, TP9: base * prior.TP9, TP10: base * prior.TP10 },
+      bandAvg: base,
+      coh: avg?.coherence ?? 0,
+    }
+  })
+
+  const allVals = phaseTopo.flatMap(p => Object.values(p.values))
+  const gMin = Math.min(...allVals), gMax = Math.max(...allVals)
+
+  return (
+    <Card title="Topographic mapping — distribución espacial" accent="#ec4899">
+      <p style={pStyle}>
+        Distribución espacial estimada de la potencia de banda en los 4 electrodos del Muse 2
+        por cada fase del protocolo. Interpolación IDW (Inverse Distance Weighting)
+        con prior neuroanatómico por banda.
+      </p>
+
+      {/* Band selector */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 22, marginTop: 4 }}>
+        {BANDS.map(b => (
+          <button key={b} onClick={() => setBand(b)} style={{
+            padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+            fontFamily: 'monospace', fontSize: '0.7rem', transition: 'all 0.15s',
+            background: band === b ? BAND_COLORS[b] : 'rgba(255,255,255,0.05)',
+            color: band === b ? '#fff' : BAND_COLORS[b],
+            fontWeight: band === b ? 600 : 400,
+            boxShadow: band === b ? `0 0 12px ${BAND_COLORS[b]}55` : 'none',
+          }}>
+            {BAND_SYMBOL[b]} {b}
+          </button>
+        ))}
+      </div>
+
+      {/* Topo grid: 4 columns × 2 rows */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px 16px' }}>
+        {phaseTopo.map(({ phase, phaseInfo, values, bandAvg, coh }) => (
+          <div key={phase.t} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <TopoMap values={values} size={110} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.65rem', fontFamily: 'monospace', fontWeight: 600,
+                color: 'rgba(255,255,255,0.75)' }}>
+                {phaseInfo.icon || ''} {phase.short}
+              </div>
+              <div style={{ fontSize: '0.56rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)' }}>
+                {formatTimeTick(phase.t)}
+              </div>
+              <div style={{ fontSize: '0.62rem', fontFamily: 'monospace', marginTop: 2, color: BAND_COLORS[band] }}>
+                {(bandAvg * 100).toFixed(1)}%
+              </div>
+              {coh > 0 && (
+                <div style={{ fontSize: '0.55rem', fontFamily: 'monospace', color: 'rgba(16,185,129,0.55)' }}>
+                  coh {coh.toFixed(2)}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Color bar */}
+      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', flexDirection: 'column',
+        alignItems: 'center', gap: 4 }}>
+        <TopoColorBar vMin={gMin} vMax={gMax} />
+        <span style={{ fontSize: '0.56rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)' }}>
+          escala global de la sesión · azul = bajo · rojo = alto
+        </span>
+      </div>
+
+      {/* Data provenance note */}
+      <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8,
+        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
+        fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)', lineHeight: 1.7 }}>
+        Estimación espacial basada en priors neuroanatómicos (α: posterior TP9/TP10×1.25 · θ/β: frontal AF7/AF8×1.2).
+        El valor base es la media del agregado de los 4 canales por fase de protocolo.
+        Para asimetría hemisférica real (FAA, lateralización) se requiere almacenar
+        alpha_af7, alpha_af8, alpha_tp9, alpha_tp10 individualmente en InfluxDB.
       </div>
     </Card>
   )
@@ -835,7 +1534,9 @@ export default function SessionDetail() {
   const renderSection = useCallback((key) => {
     switch (key) {
       case 'resumen':    return <SectionOverview data={data} sessionId={sessionId} />
-      case 'actividad':  return <SectionTimeSeries metrics={metrics} />
+      case 'actividad':  return <SectionTimeSeries metrics={metrics} durationSeconds={data?.recording?.duration_seconds} />
+      case 'ersp':       return <SectionERSP metrics={metrics} durationSeconds={data?.recording?.duration_seconds} />
+      case 'topomap':    return <SectionTopoMaps metrics={metrics} durationSeconds={data?.recording?.duration_seconds} />
       case 'video':      return <SectionVideo sessionId={Number(sessionId)} />
       case 'validacion': return <SectionValidation data={data} />
       case 'protocolo':  return <SectionProtocol data={data} />

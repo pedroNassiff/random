@@ -222,6 +222,19 @@ class SessionRecorderV2:
                     aggregated_metrics[key] = float(value)
         except Exception as e:
             print(f"⚠️ Failed to get aggregated metrics: {e}")
+
+        # Get per-channel aggregates (FAA, per-channel alpha averages, etc.)
+        try:
+            per_channel_agg = self.influx.get_per_channel_aggregates(self._recording_id)
+            aggregated_metrics.update(per_channel_agg)
+            if per_channel_agg.get('per_channel_version', 0) == 1:
+                print(f"  📊 [per-channel] α_tp9={per_channel_agg.get('alpha_tp9_avg', 'n/a'):.3f}  "
+                      f"α_af7={per_channel_agg.get('alpha_af7_avg', 'n/a'):.3f}  "
+                      f"α_af8={per_channel_agg.get('alpha_af8_avg', 'n/a'):.3f}  "
+                      f"α_tp10={per_channel_agg.get('alpha_tp10_avg', 'n/a'):.3f}  "
+                      f"FAA={per_channel_agg.get('faa_mean', 'n/a')}")
+        except Exception as e:
+            print(f"⚠️ Failed to get per-channel aggregates: {e}")
         
         # Calculate duration
         duration = float(time.time() - self._start_time)
@@ -366,9 +379,13 @@ class SessionRecorderV2:
         try:
             from hardware import MuseToSyntergicAdapter, EOGDetector
             from analysis.metrics import SyntergicMetrics
+            from analysis.spectral import SpectralAnalyzer
         except ImportError:
             print("⚠️ Metrics modules not available")
             return
+
+        # Channel index → name mapping for Muse 2
+        _CH_NAMES = ['tp9', 'af7', 'af8', 'tp10']
         
         while not self._stop_event.is_set():
             try:
@@ -421,6 +438,35 @@ class SessionRecorderV2:
                     # Callback if set
                     if self._on_metrics:
                         self._on_metrics(timestamp, metrics)
+
+                    # --- Per-channel band powers (eeg_band_power measurement) ---
+                    # Compute Welch PSD per channel from the raw window and persist to InfluxDB.
+                    # Written directly (not buffered) — best-effort, non-blocking on error.
+                    try:
+                        # window.data shape: (n_channels, n_samples)
+                        # Restructure to: {band: {channel: raw_µV²/Hz}}
+                        bands_per_channel: Dict = {}
+                        for ch_idx, ch_name in enumerate(_CH_NAMES):
+                            if ch_idx >= window.data.shape[0]:
+                                continue
+                            ch_bands_raw = SpectralAnalyzer.compute_frequency_bands_raw(
+                                window.data[ch_idx], window.fs
+                            )
+                            for band_name, raw_val in ch_bands_raw.items():
+                                if band_name not in bands_per_channel:
+                                    bands_per_channel[band_name] = {}
+                                bands_per_channel[band_name][ch_name] = raw_val
+
+                        ts_ns = int((self._base_timestamp.timestamp() + timestamp) * 1e9)
+                        self.influx.write_band_power_per_channel(
+                            recording_id=self._recording_id,
+                            ts_ns=ts_ns,
+                            channel_bands=bands_per_channel,
+                            state=snapshot.state,
+                        )
+                    except Exception as e_pc:
+                        # Non-fatal: existing eeg_metrics write is unaffected
+                        print(f"⚠️ Per-channel band power write failed: {e_pc}")
                 
                 time.sleep(0.2)  # 5Hz metrics rate
                 

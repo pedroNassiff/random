@@ -498,6 +498,264 @@ class InfluxDBEEGClient:
         
         return 0
     
+    # ==================== PER-CHANNEL BAND POWER ====================
+
+    def write_band_power_per_channel(
+        self,
+        recording_id: int,
+        ts_ns: int,
+        channel_bands: Dict[str, Dict[str, float]],
+        state: str = "",
+    ):
+        """
+        Write per-channel band powers to the eeg_band_power measurement.
+
+        Schema:
+            measurement: eeg_band_power
+            tags:  recording_id, band (alpha|theta|...), channel (tp9|af7|af8|tp10), state
+            fields: value (normalized 0-1), value_raw (µV²/Hz)
+
+        Args:
+            recording_id: PostgreSQL recording ID.
+            ts_ns:         Absolute timestamp in nanoseconds.
+            channel_bands: {band_name: {channel_name: raw_µV²/Hz_value}}.
+                           E.g. {"alpha": {"tp9": 5.2, "af7": 3.1, "af8": 3.8, "tp10": 5.0}, ...}
+            state:         Optional session state tag (e.g. "alpha_dominant", "baseline_closed").
+        """
+        if not self._connected:
+            self.connect()
+
+        CHANNELS = ['tp9', 'af7', 'af8', 'tp10']
+        points = []
+
+        for band_name, ch_raw in channel_bands.items():
+            # Normalize per-channel: each channel's band powers sum to 1 across all bands.
+            # We need total power for each channel across ALL bands.
+            # ch_raw only has one band, so normalization must happen at write time using
+            # total across all available bands for this channel.
+            pass  # total computed below per-channel (see loop after collection)
+
+        # Collect all raw values per channel {channel: {band: raw}}
+        channel_all_bands: Dict[str, Dict[str, float]] = {}
+        for band_name, ch_raw in channel_bands.items():
+            for ch_name, raw_val in ch_raw.items():
+                if ch_name not in channel_all_bands:
+                    channel_all_bands[ch_name] = {}
+                channel_all_bands[ch_name][band_name] = float(raw_val)
+
+        for ch_name, band_raws in channel_all_bands.items():
+            total_raw = sum(band_raws.values()) or 1.0
+            for band_name, raw_val in band_raws.items():
+                value_normalized = raw_val / total_raw
+                point = (
+                    Point("eeg_band_power")
+                    .tag("recording_id", str(recording_id))
+                    .tag("band", band_name)
+                    .tag("channel", ch_name)
+                    .field("value", float(value_normalized))
+                    .field("value_raw", float(raw_val))
+                    .time(ts_ns, WritePrecision.NS)
+                )
+                if state:
+                    point = point.tag("state", state)
+                points.append(point)
+
+        if points:
+            self.write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=points)
+
+    def get_per_channel_metrics(self, recording_id: int) -> Optional[Dict]:
+        """
+        Query per-channel band power time series from eeg_band_power.
+
+        Returns the `per_channel` object for the /sessions/{id}/metrics API response:
+        {
+            "timestamps": [t0, t1, ...],
+            "alpha":     {"tp9": [...], "af7": [...], "af8": [...], "tp10": [...]},
+            "alpha_raw": {"tp9": [...], ...},
+            ...same for delta, theta, beta, gamma...
+        }
+        Returns None if no per-channel data exists for this recording.
+        """
+        if not self._connected:
+            self.connect()
+
+        query = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+            |> range(start: -30d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
+            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> sort(columns: ["_time"])
+        '''
+
+        tables = self.query_api.query(query, org=INFLUX_ORG)
+
+        # Accumulate: {timestamp_float: {band: {channel: {value: float, value_raw: float}}}}
+        time_points: Dict[float, Any] = {}
+
+        for table in tables:
+            for record in table.records:
+                ts = record.get_time().timestamp()
+                band = record.values.get('band', '')
+                channel = record.values.get('channel', '')
+                field = record.get_field()  # 'value' or 'value_raw'
+                val = record.get_value()
+
+                if not band or not channel:
+                    continue
+
+                if ts not in time_points:
+                    time_points[ts] = {}
+                if band not in time_points[ts]:
+                    time_points[ts][band] = {}
+                if channel not in time_points[ts][band]:
+                    time_points[ts][band][channel] = {'value': 0.0, 'value_raw': 0.0}
+
+                if field in ('value', 'value_raw') and val is not None:
+                    time_points[ts][band][channel][field] = float(val)
+
+        if not time_points:
+            return None
+
+        sorted_ts = sorted(time_points.keys())
+        channels = ['tp9', 'af7', 'af8', 'tp10']
+        bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']
+
+        per_channel: Dict[str, Any] = {"timestamps": sorted_ts}
+
+        for band in bands:
+            per_channel[band] = {ch: [] for ch in channels}
+            per_channel[f"{band}_raw"] = {ch: [] for ch in channels}
+            for ts in sorted_ts:
+                for ch in channels:
+                    pt = time_points[ts].get(band, {}).get(ch, {})
+                    per_channel[band][ch].append(pt.get('value', 0.0))
+                    per_channel[f"{band}_raw"][ch].append(pt.get('value_raw', 0.0))
+
+        return per_channel
+
+    def get_per_channel_aggregates(self, recording_id: int) -> Dict:
+        """
+        Compute per-channel session aggregates from eeg_band_power.
+
+        Returns dict ready to be merged into the end_recording call:
+        {
+            alpha_tp9_avg, alpha_af7_avg, alpha_af8_avg, alpha_tp10_avg,
+            faa_mean, faa_baseline_closed, posterior_asymmetry_mean,
+            per_channel_version
+        }
+        Returns {'per_channel_version': 0} if no per-channel data exists.
+        """
+        import math
+
+        if not self._connected:
+            self.connect()
+
+        # 1. Average normalized alpha per channel (→ Postgres alpha_*_avg columns)
+        avg_norm_query = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+            |> range(start: -30d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
+            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> filter(fn: (r) => r["band"] == "alpha")
+            |> filter(fn: (r) => r["_field"] == "value")
+            |> group(columns: ["channel"])
+            |> mean()
+        '''
+
+        # 2. All per-window alpha raw values (for FAA + posterior asymmetry)
+        raw_query = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+            |> range(start: -30d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
+            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> filter(fn: (r) => r["band"] == "alpha")
+            |> filter(fn: (r) => r["_field"] == "value_raw")
+            |> sort(columns: ["_time"])
+        '''
+
+        # 3. Baseline-closed raw alpha (for faa_baseline_closed)
+        baseline_query = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+            |> range(start: -30d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
+            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> filter(fn: (r) => r["band"] == "alpha")
+            |> filter(fn: (r) => r["_field"] == "value_raw")
+            |> filter(fn: (r) => r["state"] == "baseline_closed")
+            |> sort(columns: ["_time"])
+        '''
+
+        avg_tables = self.query_api.query(avg_norm_query, org=INFLUX_ORG)
+        raw_tables = self.query_api.query(raw_query, org=INFLUX_ORG)
+        baseline_tables = self.query_api.query(baseline_query, org=INFLUX_ORG)
+
+        # --- Extract normalized averages ---
+        channel_avg_norm: Dict[str, float] = {}
+        for table in avg_tables:
+            for record in table.records:
+                ch = record.values.get('channel', '')
+                val = record.get_value()
+                if ch and val is not None:
+                    channel_avg_norm[ch] = float(val)
+
+        if not channel_avg_norm:
+            return {'per_channel_version': 0}
+
+        # --- Collect per-window raw values {ts: {channel: raw}} ---
+        ts_ch_raw: Dict[float, Dict[str, float]] = {}
+        for table in raw_tables:
+            for record in table.records:
+                ts = record.get_time().timestamp()
+                ch = record.values.get('channel', '')
+                val = record.get_value()
+                if ch and val is not None:
+                    if ts not in ts_ch_raw:
+                        ts_ch_raw[ts] = {}
+                    ts_ch_raw[ts][ch] = float(val)
+
+        # --- Compute FAA and posterior asymmetry window-by-window ---
+        faa_values = []
+        posterior_asym_values = []
+        for ts, ch_vals in ts_ch_raw.items():
+            af7 = ch_vals.get('af7', 0.0)
+            af8 = ch_vals.get('af8', 0.0)
+            tp9 = ch_vals.get('tp9', 0.0)
+            tp10 = ch_vals.get('tp10', 0.0)
+            if af7 > 0 and af8 > 0:
+                faa_values.append(math.log(af8) - math.log(af7))
+            if tp9 > 0 and tp10 > 0:
+                posterior_asym_values.append(tp10 - tp9)
+
+        # --- Baseline FAA ---
+        baseline_ts_ch: Dict[float, Dict[str, float]] = {}
+        for table in baseline_tables:
+            for record in table.records:
+                ts = record.get_time().timestamp()
+                ch = record.values.get('channel', '')
+                val = record.get_value()
+                if ch in ('af7', 'af8') and val is not None:
+                    if ts not in baseline_ts_ch:
+                        baseline_ts_ch[ts] = {}
+                    baseline_ts_ch[ts][ch] = float(val)
+
+        baseline_faa_values = []
+        for ts, ch_vals in baseline_ts_ch.items():
+            af7 = ch_vals.get('af7', 0.0)
+            af8 = ch_vals.get('af8', 0.0)
+            if af7 > 0 and af8 > 0:
+                baseline_faa_values.append(math.log(af8) - math.log(af7))
+
+        return {
+            'alpha_tp9_avg':            channel_avg_norm.get('tp9'),
+            'alpha_af7_avg':            channel_avg_norm.get('af7'),
+            'alpha_af8_avg':            channel_avg_norm.get('af8'),
+            'alpha_tp10_avg':           channel_avg_norm.get('tp10'),
+            'faa_mean':                 float(sum(faa_values) / len(faa_values)) if faa_values else None,
+            'faa_baseline_closed':      float(sum(baseline_faa_values) / len(baseline_faa_values)) if baseline_faa_values else None,
+            'posterior_asymmetry_mean': float(sum(posterior_asym_values) / len(posterior_asym_values)) if posterior_asym_values else None,
+            'per_channel_version':      1,
+        }
+
     def delete_recording_data(self, recording_id: int):
         """Delete all data for a recording."""
         if not self._connected:
