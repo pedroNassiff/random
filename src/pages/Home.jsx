@@ -18,6 +18,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 // Analytics
 import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
 import ProjectHoverOverlay from '../components/ProjectHoverOverlay';
+import AsciiCard from '../components/AsciiParticleCard';
 
 // Project images
 import hermesDashboard from '../img/hermes/dashboard.png';
@@ -449,113 +450,73 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         
 
         {/* Project 2 - Calavera Sur */}
-        <div 
-          ref={project2Ref} 
+        <AsciiCard
+          ref={project2Ref}
+          image={calaveraHome}
+          title="Calavera Sur"
           onClick={() => {
             trackClick('project_card_click', 'calavera-sur', '.project-card');
             navigate('/work/calavera-sur');
           }}
           className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          {/* Imagen de fondo */}
-          <img 
-            src={calaveraHome} 
-            alt="Calavera Sur" 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          
-          {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/80"></div>
-
           <ProjectHoverOverlay title="CALAVERA SUR" viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiCard>
 
         {/* Project 3 - Misia */}
-        <div 
-          ref={project3Ref} 
+        <AsciiCard
+          ref={project3Ref}
+          image={misiaHome}
+          title="Misia"
           onClick={() => {
             trackClick('project_card_click', 'misia', '.project-card');
             navigate('/work/misia');
           }}
           className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          {/* Imagen de fondo */}
-          <img 
-            src={misiaHome} 
-            alt="Misia" 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          
-          {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/80"></div>
-
           <ProjectHoverOverlay title="MISIA" viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiCard>
 
         {/* Project 4 - Hub City Guides */}
-        <div 
-          ref={project4Ref} 
+        <AsciiCard
+          ref={project4Ref}
+          image={hcgHome}
+          title="Hub City Guides"
           onClick={() => {
             trackClick('project_card_click', 'hub-city-guides', '.project-card');
             navigate('/work/hub-city-guides');
           }}
           className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          {/* Imagen de fondo */}
-          <img 
-            src={hcgHome} 
-            alt="Hub City Guides" 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          
-          {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/80"></div>
-
           <ProjectHoverOverlay title="HUB CITY GUIDES" viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiCard>
 
         {/* Project 5 - NDS */}
-        <div 
-          ref={project5Ref} 
+        <AsciiCard
+          ref={project5Ref}
+          image={ndsHome}
+          title="NDS"
           onClick={() => {
             trackClick('project_card_click', 'nds', '.project-card');
             navigate('/work/nds');
           }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          {/* Imagen de fondo */}
-          <img 
-            src={ndsHome} 
-            alt="NDS" 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          
-          {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/80"></div>
-
           <ProjectHoverOverlay title="NDS" viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiCard>
 
-        <div 
-          ref={project1Ref} 
+        <AsciiCard
+          ref={project1Ref}
+          image={hermesDashboard}
+          title="ADA"
           onClick={() => {
             trackClick('project_card_click', 'hermes', '.project-card');
             navigate('/work/hermes');
           }}
           className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          {/* Imagen de fondo */}
-          <img 
-            src={hermesDashboard} 
-            alt="ADA Dashboard" 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          
-          {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/50"></div>
-
           <ProjectHoverOverlay title="ADA" viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiCard>
 
         {/* CTA Section */}
         <div
