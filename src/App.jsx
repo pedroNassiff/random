@@ -13,6 +13,7 @@ import AnalisisDatasets from './pages/AnalisisDatasets.jsx';
 import AuditDashboard from './pages/AuditDashboard.jsx';
 import SanjiBitacora from './pages/SanjiBitacora.jsx';
 import SanjiDashboard from './pages/SanjiDashboard.jsx';
+import SanjiDayDetail from './pages/SanjiDayDetail.jsx';
 import PlanningProspeccion from './components/PlanningProspeccion.jsx';
 import PageTransition from './components/PageTransition.jsx';
 import { AnalyticsProvider } from './lib/useAnalytics.jsx';
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="/audit" element={<AuditDashboard />} />
         <Route path="/sanji" element={<SanjiBitacora />} />
         <Route path="/sanji/dashboard" element={<SanjiDashboard />} />
+        <Route path="/sanji/dia/:date" element={<SanjiDayDetail />} />
         <Route path="/planning-house" element={<Navigate to="/planning-prospeccion" replace />} />
         <Route path="/lanalisis-datasets" element={<Navigate to="/analisis-datasets" replace />} />
       </Routes>

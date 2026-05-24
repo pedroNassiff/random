@@ -1,8 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import SanjiCopilotPanel from '../components/SanjiCopilotPanel';
+import DayVisionGallery from '../components/DayVisionGallery';
+import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+import '../styles/Analytics.css';
 
 const API_BASE = import.meta.env.VITE_SANJI_API || 'http://localhost:8001';
+
+const SANJI_STORAGE_KEY = 'sanji_bitacora_layout';
+const DEFAULT_LAYOUT = {
+  lg: [
+    { i: 'digestivo',    x: 0, y: 0,  w: 8, h: 8, minW: 5, minH: 6 },
+    { i: 'medicacion',   x: 8, y: 0,  w: 4, h: 8, minW: 3, minH: 5 },
+    { i: 'sensorial',    x: 0, y: 8,  w: 4, h: 6, minW: 3, minH: 5 },
+    { i: 'motor',        x: 4, y: 8,  w: 4, h: 5, minW: 3, minH: 4 },
+    { i: 'semana',       x: 8, y: 8,  w: 4, h: 6, minW: 3, minH: 5 },
+    { i: 'emocional',    x: 0, y: 14, w: 4, h: 6, minW: 3, minH: 5 },
+    { i: 'suenio',       x: 4, y: 14, w: 4, h: 5, minW: 3, minH: 4 },
+    { i: 'coregulacion', x: 8, y: 14, w: 4, h: 5, minW: 3, minH: 4 },
+    { i: 'flags',        x: 0, y: 19, w: 8, h: 7, minW: 5, minH: 6 },
+    { i: 'fotos',        x: 8, y: 19, w: 4, h: 9, minW: 3, minH: 6 },
+  ]
+};
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -55,7 +76,7 @@ function Toggle({ label, name, value, onChange, sentiment = 'neutral' }) {
   );
 }
 
-function MedCard({ med, givenSlots, onToggleSlot }) {
+function MedCard({ med, givenSlots, onToggleSlot, onTimeChange }) {
   const hours = med.schedule_hours || [];
   const dosesPerDay = hours.length || 1;
   const givenCount = hours.filter(h => givenSlots[`${med.id}_${h}`]).length;
@@ -80,18 +101,27 @@ function MedCard({ med, givenSlots, onToggleSlot }) {
           const key = `${med.id}_${hour}`;
           const isGiven = !!givenSlots[key];
           return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onToggleSlot(key)}
-              className={`px-3 py-1.5 rounded text-xs font-mono border transition-all ${
-                isGiven
-                  ? 'bg-green-900/30 border-green-700 text-green-300'
-                  : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-cyan-600'
-              }`}
-            >
-              {isGiven ? '✓' : '○'} {String(hour).padStart(2,'0')}:00
-            </button>
+            <div key={key} className="flex flex-col gap-1 items-start">
+              <button
+                type="button"
+                onClick={() => onToggleSlot(key)}
+                className={`px-3 py-1.5 rounded text-xs font-mono border transition-all ${
+                  isGiven
+                    ? 'bg-green-900/30 border-green-700 text-green-300'
+                    : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-cyan-600'
+                }`}
+              >
+                {isGiven ? '✓' : '○'} {String(hour).padStart(2,'0')}:00
+              </button>
+              {isGiven && (
+                <input
+                  type="time"
+                  value={givenSlots[key]}
+                  onChange={e => onTimeChange(key, e.target.value)}
+                  className="text-[11px] font-mono bg-neutral-900 border border-green-800 rounded px-1.5 py-0.5 text-green-300 w-[72px]"
+                />
+              )}
+            </div>
           );
         })}
       </div>
@@ -167,7 +197,9 @@ export default function SanjiBitacora() {
         (data.administrations_today || []).forEach(a => {
           if (a.given) {
             const hour = new Date(a.scheduled_at).getHours();
-            alreadyGiven[`${a.medication_id}_${hour}`] = true;
+            const givenDate = a.given_at ? new Date(a.given_at) : new Date(a.scheduled_at);
+            const hhmm = `${String(givenDate.getHours()).padStart(2,'0')}:${String(givenDate.getMinutes()).padStart(2,'0')}`;
+            alreadyGiven[`${a.medication_id}_${hour}`] = hhmm;
           }
         });
         setMedGiven(alreadyGiven);
@@ -208,8 +240,51 @@ export default function SanjiBitacora() {
 
   const setField = (name, value) => setForm(f => ({ ...f, [name]: value }));
 
+  const nowHHMM = () => {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  };
+
   const toggleDose = (key) =>
-    setMedGiven(prev => ({ ...prev, [key]: !prev[key] }));
+    setMedGiven(prev => ({ ...prev, [key]: prev[key] ? null : nowHHMM() }));
+
+  const setDoseTime = (key, hhmm) =>
+    setMedGiven(prev => ({ ...prev, [key]: hhmm }));
+
+  // ── grid layout ────────────────────────────────────────────────────────────
+  const { containerRef: gridRef, width: gridWidth } = useContainerWidth();
+  const [layouts, setLayouts] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SANJI_STORAGE_KEY);
+      if (!saved) return DEFAULT_LAYOUT;
+      const parsed = JSON.parse(saved);
+      const items = parsed.lg ?? [];
+      const isValid = items.length === DEFAULT_LAYOUT.lg.length &&
+        items.every(item => item.w >= 2 && item.h >= 2);
+      if (!isValid) {
+        localStorage.removeItem(SANJI_STORAGE_KEY);
+        return DEFAULT_LAYOUT;
+      }
+      return parsed;
+    } catch { return DEFAULT_LAYOUT; }
+  });
+
+  const handleLayoutChange = useCallback((_, allLayouts) => {
+    setLayouts(allLayouts);
+    localStorage.setItem(SANJI_STORAGE_KEY, JSON.stringify(allLayouts));
+  }, []);
+
+  const resetLayout = () => {
+    setLayouts(DEFAULT_LAYOUT);
+    localStorage.removeItem(SANJI_STORAGE_KEY);
+  };
+
+  const DragHandle = ({ title }) => (
+    <div className="widget-drag-handle">
+      <span className="widget-title">{title}</span>
+      <span className="drag-hint">⠿</span>
+    </div>
+  );
 
   // ── submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async e => {
@@ -237,12 +312,15 @@ export default function SanjiBitacora() {
           if (medGiven[key]) {
             const scheduledAt = new Date();
             scheduledAt.setHours(hour, 0, 0, 0);
+            const givenAt = new Date();
+            const [gh, gm] = medGiven[key].split(':').map(Number);
+            givenAt.setHours(gh, gm, 0, 0);
             await fetch(`${API_BASE}/sanji/medications/${med.id}/give`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 scheduled_at: scheduledAt.toISOString(),
-                given_at: new Date().toISOString(),
+                given_at: givenAt.toISOString(),
               }),
             });
           }
@@ -273,292 +351,256 @@ export default function SanjiBitacora() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex">
-      <div className={`flex-1 transition-all duration-300 ${copilotOpen ? 'mr-80' : ''}`}>
-      <main className="max-w-lg mx-auto px-4 pt-8 pb-32">
-        {/* Header */}
-        <div className="mb-6">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="text-xs font-mono text-neutral-500 hover:text-neutral-300 mb-4 flex items-center gap-1"
-          >
-            ← volver
-          </button>
-          <div className="flex items-center justify-between">
+      <div className={`flex-1 min-w-0 transition-all duration-300 ${copilotOpen ? 'mr-80' : ''}`}>
+        <div className="max-w-7xl mx-auto px-4 pt-8 pb-24">
+
+          {/* ── Header ──────────────────────────────────────────── */}
+          <div className="flex items-start justify-between mb-5">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Bitácora de Sanji</h1>
-              <p className="text-neutral-500 text-sm mt-1 font-mono">
+              <button type="button" onClick={() => navigate(-1)}
+                className="text-xs font-mono text-neutral-500 hover:text-neutral-300 mb-2 flex items-center gap-1">
+                ← volver
+              </button>
+              <h1 className="text-2xl font-bold tracking-tight">El Día de Sanji</h1>
+              <p className="text-neutral-500 text-sm mt-0.5 font-mono">
                 {today()}{state?.log_today ? ' · editando registro existente' : ''}
               </p>
             </div>
-            <div className="flex flex-col gap-2 items-end">
+            <div className="flex gap-2 items-center mt-6">
               <Link to="/sanji/dashboard"
-                className="text-[10px] font-mono text-neutral-500 hover:text-cyan-400 border border-neutral-700 hover:border-cyan-700 px-2 py-1 rounded transition-colors">
-                ver dashboard →
+                className="text-xs font-mono text-neutral-400 hover:text-cyan-400 border border-neutral-700 hover:border-cyan-700 px-3 py-1.5 rounded transition-colors">
+                dashboard →
               </Link>
-              <button
-                type="button"
-                onClick={() => setCopilotOpen(o => !o)}
+              <button type="button" onClick={resetLayout} className="reset-layout-btn">
+                ↺ layout
+              </button>
+              <button type="button" onClick={() => setCopilotOpen(o => !o)}
                 className={`px-3 py-1.5 rounded text-xs font-mono font-bold uppercase border transition-colors ${
                   copilotOpen
                     ? 'bg-cyan-900/40 text-cyan-300 border-cyan-700'
                     : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:border-cyan-700'
-                }`}
-              >
+                }`}>
                 ⬡ HERMES
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Alertas críticas */}
-        <AlertBanner alerts={alerts} />
-
-        {state?.status === 'error' && (
-          <div className="p-3 mb-4 rounded border border-amber-700 bg-amber-950/30 text-amber-300 text-xs">
-            No se pudo conectar con el backend (puerto 8001). ¿Está corriendo?
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-8">
-
-          {/* ── MEDICACIONES ─────────────────────────────────────── */}
-          {meds.length > 0 && (
-            <section>
-              <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-                Medicaciones de hoy
-              </h2>
-              <div className="space-y-2">
-                {meds.map(med => (
-                  <MedCard
-                    key={med.id}
-                    med={med}
-                    givenSlots={medGiven}
-                    onToggleSlot={toggleDose}
-                  />
-                ))}
-              </div>
-            </section>
+          {/* ── Alertas + error (full width) ────────────────────── */}
+          <AlertBanner alerts={alerts} />
+          {state?.status === 'error' && (
+            <div className="p-3 mb-4 rounded border border-amber-700 bg-amber-950/30 text-amber-300 text-xs font-mono">
+              No se pudo conectar con el backend (puerto 8001). ¿Está corriendo?
+            </div>
           )}
 
-          {/* ── DIGESTIVO ────────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-              Sistema digestivo
-            </h2>
-            <ScoreSlider
-              label="Apetito" name="appetite_pct"
-              min={0} max={100} step={5} value={form.appetite_pct}
-              onChange={setField}
-              hint="100 = come todo · 0 = no comió nada"
-            />
-            <ScoreSlider
-              label="Calidad de heces" name="stool_quality"
-              min={1} max={5} step={1} value={form.stool_quality}
-              onChange={setField}
-              hint="1=diarrea severa · 5=normal"
-            />
-            <ScoreSlider
-              label="Vómitos (cantidad)" name="vomit_count"
-              min={0} max={10} step={1} value={form.vomit_count}
-              onChange={setField}
-            />
-            <Toggle label="Aceptó comida" name="food_accepted" value={form.food_accepted} onChange={setField} sentiment="good" />
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <ScoreSlider
-                label="Visitas al plato" name="food_visits"
-                min={0} max={20} step={1} value={form.food_visits}
-                onChange={setField}
-                hint="Veces que se acercó al plato"
-              />
-              <ScoreSlider
-                label="Visitas al bebedero" name="water_visits"
-                min={0} max={30} step={1} value={form.water_visits}
-                onChange={setField}
-                hint="↑ puede indicar PU/PD por fenobarbital"
-              />
-            </div>
-          </section>
-
-          {/* ── SENSORIAL ────────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-              Sistema sensorial
-            </h2>
-            <ScoreSlider
-              label="Hiperestesia (hipersensibilidad táctil)" name="hyperesthesia_score"
-              min={0} max={5} step={1} value={form.hyperesthesia_score}
-              onChange={setField}
-              hint="0=ninguna · 5=severa. ≥4 genera alerta por Morbovet"
-            />
-            <ScoreSlider
-              label="Reactividad al sonido" name="sound_reactivity"
-              min={0} max={5} step={1} value={form.sound_reactivity}
-              onChange={setField}
-            />
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Toggle label="Seguimiento visual presente" name="visual_tracking" value={form.visual_tracking} onChange={setField} sentiment="good" />
-            </div>
-          </section>
-
-          {/* ── MOTOR ────────────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-              Sistema motor
-            </h2>
-            <ScoreSlider
-              label="Ataxia" name="ataxia_score"
-              min={0} max={5} step={1} value={form.ataxia_score}
-              onChange={setField}
-              hint="0=coordinación normal · 5=incapaz de caminar"
-            />
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Toggle label="Se acicala" name="grooming" value={form.grooming} onChange={setField} sentiment="good" />
-              <Toggle label="Intentó saltar / subir" name="jump_attempt" value={form.jump_attempt} onChange={setField} sentiment="good" />
-            </div>
-          </section>
-
-          {/* ── EMOCIONAL ────────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-              Estado emocional / conductual
-            </h2>
-            <ScoreSlider
-              label="Sociabilidad con cuidadores" name="social_score"
-              min={0} max={5} step={1} value={form.social_score}
-              onChange={setField}
-              hint="0=aislamiento total · 5=busca activamente compañía"
-            />
-            <ScoreSlider
-              label="Vocalizaciones" name="vocalization_count"
-              min={0} max={20} step={1} value={form.vocalization_count}
-              onChange={setField}
-            />
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Toggle label="Se esconde / aísla" name="hiding" value={form.hiding} onChange={setField} sentiment="bad" />
-              <Toggle label="Interés en juego" name="play_interest" value={form.play_interest} onChange={setField} sentiment="good" />
-            </div>
-          </section>
-
-          {/* ── SUEÑO ────────────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-              Sueño / descanso
-            </h2>
-            <ScoreSlider
-              label="Calidad del sueño observada" name="sleep_quality"
-              min={0} max={5} step={1} value={form.sleep_quality}
-              onChange={setField}
-              hint="5 = sueño profundo y tranquilo · 0 = muy inquieto"
-            />
-            <ScoreSlider
-              label="Horas estimadas durmiendo" name="sleep_hours"
-              min={0} max={24} step={0.5} value={form.sleep_hours}
-              onChange={setField}
-            />
-          </section>
-
-          {/* ── CO-REGULACIÓN ────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-              Estado del cuidador (co-regulación)
-            </h2>
-            <ScoreSlider
-              label="Estrés de Pedro (1-5)" name="stress"
-              min={1} max={5} step={1}
-              value={form.caretaker_state.stress}
-              onChange={(_, v) => setForm(f => ({ ...f, caretaker_state: { ...f.caretaker_state, stress: v } }))}
-            />
-            <ScoreSlider
-              label="Horas de sueño de Pedro" name="sleep"
-              min={0} max={12} step={0.5}
-              value={form.caretaker_state.sleep}
-              onChange={(_, v) => setForm(f => ({ ...f, caretaker_state: { ...f.caretaker_state, sleep: v } }))}
-            />
-            <label className="block text-xs font-mono text-neutral-400 uppercase tracking-widest mb-1 mt-3">
-              Notas del cuidador
-            </label>
-            <textarea
-              rows={2}
-              placeholder="¿Cómo estás hoy? Esto puede co-regular a Sanji."
-              className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-sm text-white placeholder-neutral-600 resize-none focus:border-cyan-600 outline-none"
-              value={form.caretaker_state.notes}
-              onChange={e => setForm(f => ({ ...f, caretaker_state: { ...f.caretaker_state, notes: e.target.value } }))}
-            />
-          </section>
-
-          {/* ── BANDERA ROJA ─────────────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-red-500 uppercase tracking-widest mb-3">
-              ⚠ Flags clínicas
-            </h2>
-            <Toggle
-              label="¿Posible crisis epiléptica?"
-              name="seizure_suspected"
-              value={form.seizure_suspected}
-              onChange={setField}
-              sentiment="bad"
-            />
-            <p className="text-[10px] text-neutral-600 mt-1">
-              Activa si observaste sacudidas, mirada fija, pérdida de conciencia o movimientos involuntarios.
-            </p>
-          </section>
-
-          {/* ── OBSERVACIONES LIBRES ──────────────────────────────── */}
-          <section>
-            <h2 className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-3">
-              Observaciones libres
-            </h2>
-            <textarea
-              rows={4}
-              placeholder="Describe con tus palabras cómo estuvo Sanji hoy…"
-              className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-sm text-white placeholder-neutral-600 resize-none focus:border-cyan-600 outline-none"
-              value={form.free_notes}
-              onChange={e => setField('free_notes', e.target.value)}
-            />
-          </section>
-
-          {/* ── SUBMIT ───────────────────────────────────────────── */}
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full py-3 rounded font-mono text-sm font-bold uppercase tracking-widest transition-all
-              bg-cyan-700 hover:bg-cyan-600 text-white disabled:opacity-50"
-          >
-            {saving ? 'Guardando…' : 'Guardar bitácora del día'}
-          </button>
-
-          {savedOk && (
-            <p className="text-center text-green-400 text-sm font-mono">
-              ✓ {state?.log_today ? 'Bitácora actualizada.' : 'Bitácora guardada correctamente.'}
-            </p>
-          )}
-        </form>
-
-        {/* ── STATS SEMANA ─────────────────────────────────────── */}
-        {state?.week_stats && (
-          <section className="mt-12 border-t border-neutral-800 pt-8">
-            <h2 className="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-4">
-              Resumen últimos 7 días
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ['Apetito prom.', state.week_stats.appetite_avg != null ? `${state.week_stats.appetite_avg}%` : '—'],
-                ['Hiperestesia prom.', state.week_stats.hyperesthesia_avg ?? '—'],
-                ['Sociabilidad prom.', state.week_stats.social_avg ?? '—'],
-                ['Sueño prom.', state.week_stats.sleep_avg ?? '—'],
-                ['Adherencia med.', `${state.week_stats.adherence_7d_pct}%`],
-                ['Días registrados', `${state.week_stats.days_logged} / 7`],
-              ].map(([label, val]) => (
-                <div key={label} className="bg-neutral-900 rounded p-3">
-                  <p className="text-[10px] text-neutral-500 font-mono uppercase">{label}</p>
-                  <p className="text-lg font-bold text-white mt-0.5">{val}</p>
+          {/* ── Widget Grid ──────────────────────────────────────── */}
+          <form onSubmit={handleSubmit}>
+            <div ref={gridRef} className="dashboard-grid">
+              <ResponsiveGridLayout
+                width={gridWidth}
+                layouts={layouts}
+                onLayoutChange={handleLayoutChange}
+                breakpoints={{ lg: 1200, md: 996, sm: 768 }}
+                cols={{ lg: 12, md: 10, sm: 6 }}
+                rowHeight={60}
+                draggableHandle=".widget-drag-handle"
+                draggableCancel="input,textarea,button,select,label,a"
+                margin={[16, 16]}
+                containerPadding={[0, 0]}
+                useCSSTransforms
+              >
+                {/* DIGESTIVO */}
+                <div key="digestivo" className="widget">
+                  <DragHandle title="Sistema Digestivo" />
+                  <div className="widget-body widget-scroll">
+                    <div className="grid grid-cols-2 gap-x-6">
+                      <ScoreSlider label="Apetito" name="appetite_pct"
+                        min={0} max={100} step={5} value={form.appetite_pct} onChange={setField}
+                        hint="100 = todo · 0 = nada" />
+                      <ScoreSlider label="Calidad heces" name="stool_quality"
+                        min={1} max={5} step={1} value={form.stool_quality} onChange={setField}
+                        hint="1=diarrea · 5=normal" />
+                      <ScoreSlider label="Vómitos" name="vomit_count"
+                        min={0} max={10} step={1} value={form.vomit_count} onChange={setField} />
+                      <div className="flex flex-col justify-center gap-2 pb-4">
+                        <Toggle label="Aceptó comida" name="food_accepted" value={form.food_accepted} onChange={setField} sentiment="good" />
+                      </div>
+                      <ScoreSlider label="Visitas al plato" name="food_visits"
+                        min={0} max={20} step={1} value={form.food_visits} onChange={setField}
+                        hint="# de veces" />
+                      <ScoreSlider label="Visitas al bebedero" name="water_visits"
+                        min={0} max={30} step={1} value={form.water_visits} onChange={setField}
+                        hint="↑ = PU/PD fenobarbital" />
+                    </div>
+                  </div>
                 </div>
-              ))}
+
+                {/* SENSORIAL */}
+                <div key="sensorial" className="widget">
+                  <DragHandle title="Sensorial" />
+                  <div className="widget-body widget-scroll">
+                    <ScoreSlider label="Hiperestesia" name="hyperesthesia_score"
+                      min={0} max={5} step={1} value={form.hyperesthesia_score} onChange={setField}
+                      hint="0=ninguna · 5=severa" />
+                    <ScoreSlider label="Reactividad sonido" name="sound_reactivity"
+                      min={0} max={5} step={1} value={form.sound_reactivity} onChange={setField} />
+                    <Toggle label="Seguimiento visual" name="visual_tracking" value={form.visual_tracking} onChange={setField} sentiment="good" />
+                  </div>
+                </div>
+
+                {/* MOTOR */}
+                <div key="motor" className="widget">
+                  <DragHandle title="Motor" />
+                  <div className="widget-body widget-scroll">
+                    <ScoreSlider label="Ataxia" name="ataxia_score"
+                      min={0} max={5} step={1} value={form.ataxia_score} onChange={setField}
+                      hint="0=normal · 5=no camina" />
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Toggle label="Se acicala" name="grooming" value={form.grooming} onChange={setField} sentiment="good" />
+                      <Toggle label="Intentó saltar" name="jump_attempt" value={form.jump_attempt} onChange={setField} sentiment="good" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* EMOCIONAL */}
+                <div key="emocional" className="widget">
+                  <DragHandle title="Emocional / Conductual" />
+                  <div className="widget-body widget-scroll">
+                    <ScoreSlider label="Sociabilidad" name="social_score"
+                      min={0} max={5} step={1} value={form.social_score} onChange={setField}
+                      hint="0=aislamiento · 5=busca compañía" />
+                    <ScoreSlider label="Vocalizaciones" name="vocalization_count"
+                      min={0} max={20} step={1} value={form.vocalization_count} onChange={setField} />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Toggle label="Se esconde" name="hiding" value={form.hiding} onChange={setField} sentiment="bad" />
+                      <Toggle label="Interés en juego" name="play_interest" value={form.play_interest} onChange={setField} sentiment="good" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SUEÑO */}
+                <div key="suenio" className="widget">
+                  <DragHandle title="Sueño" />
+                  <div className="widget-body widget-scroll">
+                    <ScoreSlider label="Calidad" name="sleep_quality"
+                      min={0} max={5} step={1} value={form.sleep_quality} onChange={setField}
+                      hint="5=profundo tranquilo · 0=inquieto" />
+                    <ScoreSlider label="Horas durmiendo" name="sleep_hours"
+                      min={0} max={24} step={0.5} value={form.sleep_hours} onChange={setField} />
+                  </div>
+                </div>
+
+                {/* CO-REGULACIÓN */}
+                <div key="coregulacion" className="widget">
+                  <DragHandle title="Co-regulación (Pedro)" />
+                  <div className="widget-body widget-scroll">
+                    <div className="grid grid-cols-2 gap-x-6">
+                      <ScoreSlider label="Estrés (1-5)" name="stress"
+                        min={1} max={5} step={1}
+                        value={form.caretaker_state.stress}
+                        onChange={(_, v) => setForm(f => ({ ...f, caretaker_state: { ...f.caretaker_state, stress: v } }))} />
+                      <ScoreSlider label="Horas de sueño" name="sleep"
+                        min={0} max={12} step={0.5}
+                        value={form.caretaker_state.sleep}
+                        onChange={(_, v) => setForm(f => ({ ...f, caretaker_state: { ...f.caretaker_state, sleep: v } }))} />
+                    </div>
+                    <textarea rows={2}
+                      placeholder="¿Cómo estás hoy?"
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-sm text-white placeholder-neutral-600 resize-none focus:border-cyan-600 outline-none"
+                      value={form.caretaker_state.notes}
+                      onChange={e => setForm(f => ({ ...f, caretaker_state: { ...f.caretaker_state, notes: e.target.value } }))}
+                    />
+                  </div>
+                </div>
+
+                {/* FLAGS + OBSERVACIONES + SUBMIT */}
+                <div key="flags" className="widget">
+                  <DragHandle title="⚠ Flags · Observaciones · Guardar" />
+                  <div className="widget-body widget-scroll space-y-4">
+                    <div>
+                      <h2 className="text-[10px] font-mono text-red-500 uppercase tracking-widest mb-3">⚠ Flags clínicas</h2>
+                      <Toggle label="¿Posible crisis epiléptica?" name="seizure_suspected"
+                        value={form.seizure_suspected} onChange={setField} sentiment="bad" />
+                      <p className="text-[10px] text-neutral-600 mt-1">
+                        Sacudidas, mirada fija, pérdida de conciencia o movimientos involuntarios.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">
+                        Observaciones libres
+                      </label>
+                      <textarea rows={3}
+                        placeholder="Describe con tus palabras cómo estuvo Sanji hoy…"
+                        className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-sm text-white placeholder-neutral-600 resize-none focus:border-cyan-600 outline-none"
+                        value={form.free_notes}
+                        onChange={e => setField('free_notes', e.target.value)}
+                      />
+                    </div>
+                    <button type="submit" disabled={saving}
+                      className="w-full py-3 rounded font-mono text-sm font-bold uppercase tracking-widest transition-all bg-cyan-700 hover:bg-cyan-600 text-white disabled:opacity-50">
+                      {saving ? 'Guardando…' : 'Guardar bitácora del día'}
+                    </button>
+                    {savedOk && (
+                      <p className="text-center text-green-400 text-sm font-mono">
+                        ✓ {state?.log_today ? 'Bitácora actualizada.' : 'Guardada correctamente.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* MEDICACIÓN */}
+                <div key="medicacion" className="widget">
+                  <DragHandle title="Medicación de hoy" />
+                  <div className="widget-body widget-scroll">
+                    {meds.length > 0 ? (
+                      <div className="space-y-2">
+                        {meds.map(med => (
+                          <MedCard key={med.id} med={med} givenSlots={medGiven} onToggleSlot={toggleDose} onTimeChange={setDoseTime} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-neutral-600 text-xs font-mono">Sin medicaciones activas.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* STATS SEMANA */}
+                <div key="semana" className="widget">
+                  <DragHandle title="Semana" />
+                  <div className="widget-body widget-scroll">
+                    {state?.week_stats ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          ['Apetito', state.week_stats.appetite_avg != null ? `${state.week_stats.appetite_avg}%` : '—'],
+                          ['Hiperestesia', state.week_stats.hyperesthesia_avg ?? '—'],
+                          ['Sociabilidad', state.week_stats.social_avg ?? '—'],
+                          ['Sueño', state.week_stats.sleep_avg ?? '—'],
+                          ['Adherencia', `${state.week_stats.adherence_7d_pct ?? '—'}%`],
+                          ['Días log.', `${state.week_stats.days_logged ?? 0}/7`],
+                        ].map(([label, val]) => (
+                          <div key={label} className="bg-neutral-800 rounded-lg p-2.5">
+                            <p className="text-[9px] text-neutral-500 font-mono uppercase">{label}</p>
+                            <p className="text-base font-bold text-white mt-0.5 tabular-nums">{val}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-neutral-600 text-xs font-mono">Sin datos de semana.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* FOTOS */}
+                <div key="fotos" className="widget">
+                  <DragHandle title="Fotos del día" />
+                  <div className="widget-body widget-scroll">
+                    <DayVisionGallery date={today()} />
+                  </div>
+                </div>
+              </ResponsiveGridLayout>
             </div>
-          </section>
-        )}
-      </main>
+          </form>
+        </div>
       </div>
 
       {/* ── Copilot panel ─────────────────────────────────────── */}
@@ -571,6 +613,7 @@ export default function SanjiBitacora() {
               medications_active: state?.medications_active,
               alerts_unread: state?.alerts_unread,
             }}
+            logDate={today()}
             onClose={() => setCopilotOpen(false)}
           />
         </div>

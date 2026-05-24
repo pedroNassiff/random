@@ -63,27 +63,7 @@ import nds6 from '../img/nds/nds6.png';
 
 
 export const projects = [
-  {
-    id: 'hermes',
-    title: 'ADA',
-    image: hermesDashboard,
-    heroImage: hermesDashboard,
-    description: 'Plataforma neurológica que fusiona ciencia y consciencia con IA y visualización 3D',
-    fullDescription: 'ADA traduce ondas cerebrales en geometría viva. Conectamos un Muse 2 headband para capturar señales EEG en tiempo real – te pones el dispositivo y empiezas a ver tu campo neuronal desplegarse en 3D mientras meditas, focalizas o simplemente observas. El sistema procesa estas señales con un VAE (Variational Autoencoder) entrenado sobre el dataset PhysioNet de "motor imagery" – ese momento donde imaginas mover tu mano pero no la mueves, pura intención sin acción física. El modelo comprime esa información en un espacio latente que llamamos Campo Sintérgico, siguiendo las teorías de Jacobo Grinberg sobre cómo el cerebro interactúa con un campo pre-espacial de potencialidades. La coherencia neuronal se calcula como la inversa de la varianza del latent space (menos ruido = mayor sintergia), y las dimensiones principales del vector se mapean a coordenadas 3D en tiempo real. El resultado: una interfaz Three.js donde ves tu actividad cerebral como un sistema de partículas que colapsa y expande durante ejercicios de meditación o concentración, visualizando literalmente el "campo neuronal" que emerge entre la conciencia y la materia. WebSockets mantienen todo sincronizado – el backend en Python procesa las señales del Muse 2 con PyTorch mientras el frontend renderiza la topología del campo. Es neurociencia + filosofía ejecutándose a 60fps con hardware consumer.',
-    category: 'Health Tech × Consciousness',
-    year: '2025',
-    client: 'Random Lab',
-    technologies: 'React, Three.js, PyTorch VAE, Muse 2 EEG, WebSockets, PhysioNet',
-    link: '/project/hermes',
-    labLink: '/lab/brain',
-    docLink: '/lab/brain/doc',
-    images: [
-      // { src: hermesDashboard, size: 'large' },
-      // { src: hermesDashboard, size: 'medium' },
-      // { src: hermesDashboard, size: 'medium' },
-      // { src: hermesDashboard, size: 'full' }
-    ]
-  },
+  
   {
     id: 'calavera-sur',
     title: 'CALAVERA SUR',
@@ -161,6 +141,27 @@ export const projects = [
       { src: nds4, size: 'medium' },
       { src: nds5, size: 'medium' },
       { src: nds6, size: 'full' }
+    ]
+  },
+  {
+    id: 'hermes',
+    title: 'ADA',
+    image: hermesDashboard,
+    heroImage: hermesDashboard,
+    description: 'Plataforma neurológica que fusiona ciencia y consciencia con IA y visualización 3D',
+    fullDescription: 'ADA traduce ondas cerebrales en geometría viva. Conectamos un Muse 2 headband para capturar señales EEG en tiempo real – te pones el dispositivo y empiezas a ver tu campo neuronal desplegarse en 3D mientras meditas, focalizas o simplemente observas. El sistema procesa estas señales con un VAE (Variational Autoencoder) entrenado sobre el dataset PhysioNet de "motor imagery" – ese momento donde imaginas mover tu mano pero no la mueves, pura intención sin acción física. El modelo comprime esa información en un espacio latente que llamamos Campo Sintérgico, siguiendo las teorías de Jacobo Grinberg sobre cómo el cerebro interactúa con un campo pre-espacial de potencialidades. La coherencia neuronal se calcula como la inversa de la varianza del latent space (menos ruido = mayor sintergia), y las dimensiones principales del vector se mapean a coordenadas 3D en tiempo real. El resultado: una interfaz Three.js donde ves tu actividad cerebral como un sistema de partículas que colapsa y expande durante ejercicios de meditación o concentración, visualizando literalmente el "campo neuronal" que emerge entre la conciencia y la materia. WebSockets mantienen todo sincronizado – el backend en Python procesa las señales del Muse 2 con PyTorch mientras el frontend renderiza la topología del campo. Es neurociencia + filosofía ejecutándose a 60fps con hardware consumer.',
+    category: 'Health Tech × Consciousness',
+    year: '2025',
+    client: 'Random Lab',
+    technologies: 'React, Three.js, PyTorch VAE, Muse 2 EEG, WebSockets, PhysioNet',
+    link: '/project/hermes',
+    labLink: '/lab/brain',
+    docLink: '/lab/brain/doc',
+    images: [
+      // { src: hermesDashboard, size: 'large' },
+      // { src: hermesDashboard, size: 'medium' },
+      // { src: hermesDashboard, size: 'medium' },
+      // { src: hermesDashboard, size: 'full' }
     ]
   },
   {

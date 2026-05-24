@@ -266,7 +266,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -90,
+        xPercent: -10,
         scrollTrigger: {
           trigger: project1Ref.current,
           start: 'top bottom',
@@ -283,7 +283,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -10,
+        xPercent: -40,
         scrollTrigger: {
           trigger: project2Ref.current,
           start: 'top bottom',
@@ -317,7 +317,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -10,
+        xPercent: -40,
         scrollTrigger: {
           trigger: project4Ref.current,
           start: 'top bottom',
@@ -334,7 +334,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       { x: '-100vw', xPercent: 0 },
       {
         x: '0vw',
-        xPercent: -90,
+        xPercent: -70,
         scrollTrigger: {
           trigger: project5Ref.current,
           start: 'top bottom',
@@ -446,26 +446,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
         </div>
   
         {/* Project 1 - ADA */}
-        <div 
-          ref={project1Ref} 
-          onClick={() => {
-            trackClick('project_card_click', 'hermes', '.project-card');
-            navigate('/work/hermes');
-          }}
-          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
-        >
-          {/* Imagen de fondo */}
-          <img 
-            src={hermesDashboard} 
-            alt="ADA Dashboard" 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          
-          {/* Overlay oscuro */}
-          <div className="absolute inset-0 bg-black/50"></div>
-
-          <ProjectHoverOverlay title="ADA" viewLabel={t('home.view_project')} />
-        </div>
+        
 
         {/* Project 2 - Calavera Sur */}
         <div 
@@ -553,6 +534,27 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           <div className="absolute inset-0 bg-black/80"></div>
 
           <ProjectHoverOverlay title="NDS" viewLabel={t('home.view_project')} />
+        </div>
+
+        <div 
+          ref={project1Ref} 
+          onClick={() => {
+            trackClick('project_card_click', 'hermes', '.project-card');
+            navigate('/work/hermes');
+          }}
+          className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
+        >
+          {/* Imagen de fondo */}
+          <img 
+            src={hermesDashboard} 
+            alt="ADA Dashboard" 
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          
+          {/* Overlay oscuro */}
+          <div className="absolute inset-0 bg-black/50"></div>
+
+          <ProjectHoverOverlay title="ADA" viewLabel={t('home.view_project')} />
         </div>
 
         {/* CTA Section */}

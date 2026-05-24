@@ -98,7 +98,7 @@ Fase 2.2 — Mapeo de superficie de ataque
    ↓ [gate: review + decisión prod/staging]
 Fase 2.3 — Testing activo no destructivo
    ↓ [gate: review + decisión escalada]
-Fase 2.4 — Testing activo profundo  ←  SOLO si hay staging
+Fase 2.4 — Testing activo profundo  ←  SOLO si hay staging o si es prod necesitamos confirmar en avanzar!
    ↓ [gate: consolidación]
 Fase 2.5 — Reporting y handoff
    ↓

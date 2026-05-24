@@ -37,7 +37,7 @@ Lo que queremos capturar:
 | Head tilt residual | Secuela vestibular — comparación longitudinal |
 | Postura de cuerpo | Síndrome húsped, ataxia residual, preferencia de peso |
 
-La cámara del celular de Pedro ya tiene la resolución necesaria. Solo falta el sistema de análisis.
+La cámara del celular  ya tiene la resolución necesaria. Solo falta el sistema de análisis.
 
 ---
 

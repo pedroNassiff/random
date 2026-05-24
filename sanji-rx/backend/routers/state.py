@@ -197,3 +197,70 @@ async def list_alerts(subject_id: Optional[str] = None, unread_only: bool = True
 
     rows = await pool.fetch(query, sid)
     return {"status": "ok", "alerts": [dict(r) for r in rows]}
+
+
+@router.get("/history")
+async def get_history(days: int = 30):
+    """
+    Historial enriquecido: daily_log + conteo de fotos + avg FGS + resumen visual conjunto.
+    Un item por día registrado, ordenado del más reciente al más antiguo.
+    """
+    pool = await get_pool()
+    sid = await _get_default_subject_id(pool)
+    if not sid:
+        return []
+
+    from_date = date.today() - timedelta(days=days)
+
+    # --- Daily logs ---
+    log_rows = await pool.fetch(
+        """SELECT log_date, appetite_pct, hyperesthesia_score, social_score,
+                  sleep_quality, vomit_count, water_visits, seizure_suspected,
+                  observations, food_visits
+           FROM daily_log
+           WHERE subject_id=$1 AND log_date >= $2
+           ORDER BY log_date DESC""",
+        sid, from_date,
+    )
+
+    # --- Photo counts + avg FGS per day ---
+    photo_rows = await pool.fetch(
+        """SELECT log_date, COUNT(*) AS photo_count,
+                  ROUND(AVG(fgs_score)::numeric, 1) AS avg_fgs,
+                  bool_or(COALESCE(array_length(urgent_flags, 1), 0) > 0) AS has_urgent
+           FROM vision_analysis
+           WHERE subject_id=$1 AND log_date >= $2
+           GROUP BY log_date""",
+        sid, from_date,
+    )
+    photos_by_date = {str(r["log_date"]): r for r in photo_rows}
+
+    # --- Vision day summaries ---
+    summary_rows = await pool.fetch(
+        "SELECT log_date, summary FROM vision_day_summaries WHERE log_date >= $1",
+        from_date,
+    )
+    summaries_by_date = {str(r["log_date"]): r["summary"] for r in summary_rows}
+
+    result = []
+    for row in log_rows:
+        d = str(row["log_date"])
+        ph = photos_by_date.get(d, {})
+        result.append({
+            "log_date": d,
+            "appetite_pct": row["appetite_pct"],
+            "hyperesthesia_score": row["hyperesthesia_score"],
+            "social_score": row["social_score"],
+            "sleep_quality": row["sleep_quality"],
+            "vomit_count": row["vomit_count"],
+            "water_visits": row["water_visits"],
+            "food_visits": row["food_visits"],
+            "seizure_suspected": row["seizure_suspected"],
+            "observations": row["observations"],
+            "photo_count": int(ph.get("photo_count", 0)) if ph else 0,
+            "avg_fgs": float(ph["avg_fgs"]) if ph and ph.get("avg_fgs") is not None else None,
+            "has_urgent_vision": bool(ph.get("has_urgent", False)) if ph else False,
+            "vision_summary": summaries_by_date.get(d),
+        })
+
+    return result

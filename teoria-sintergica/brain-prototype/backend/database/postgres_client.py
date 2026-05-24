@@ -287,7 +287,18 @@ class PostgresClient:
                 'DELETE FROM eeg_recordings WHERE id = $1', recording_id
             )
             return 'DELETE 1' in result
-    
+
+
+class PostgresClientSync:
+    """
+    Sync (psycopg2) PostgreSQL client for brain prototype.
+    Used in threads and non-async contexts (RecorderV2, scripts).
+    """
+
+    def __init__(self):
+        self._conn = None
+        self._connected = False
+
     def _row_to_recording(self, row) -> EEGRecording:
         """Convert database row to EEGRecording dataclass."""
         return EEGRecording(

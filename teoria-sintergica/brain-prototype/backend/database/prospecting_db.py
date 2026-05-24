@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS contacts (
     next_action    TEXT,
     responded      INTEGER NOT NULL DEFAULT 0,  -- boolean
     ai_analysis    TEXT,   -- JSON blob
-    scraped_content TEXT,  -- last scrape raw text
+    ai_proposal      TEXT,   -- JSON blob (commercial proposal, second-stage AI)
+    ai_proposal_chat  TEXT,   -- JSON array of {role, content} chat messages
+    scraped_content   TEXT,  -- last scrape raw text
     scrape_ts      TEXT,   -- ISO timestamp of last scrape
     created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
@@ -119,6 +121,14 @@ def init_db():
     with _lock:
         c = _conn()
         c.executescript(_SCHEMA)
+        # Additive migrations for columns added after initial deploy
+        for col, ddl in [
+            ("ai_proposal",      "ALTER TABLE contacts ADD COLUMN ai_proposal TEXT"),
+            ("ai_proposal_chat", "ALTER TABLE contacts ADD COLUMN ai_proposal_chat TEXT"),
+        ]:
+            existing = [r[1] for r in c.execute("PRAGMA table_info(contacts)").fetchall()]
+            if col not in existing:
+                c.execute(ddl)
         c.commit()
         _migrate_from_json(c)
         c.close()
@@ -229,7 +239,9 @@ def _migrate_from_json(c: sqlite3.Connection):
 def _row_to_contact(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["responded"]    = bool(d["responded"])
-    d["ai_analysis"]  = json.loads(d["ai_analysis"]) if d.get("ai_analysis") else None
+    d["ai_analysis"]  = json.loads(d["ai_analysis"])  if d.get("ai_analysis")  else None
+    d["ai_proposal"]      = json.loads(d["ai_proposal"])      if d.get("ai_proposal")      else None
+    d["ai_proposal_chat"] = json.loads(d["ai_proposal_chat"]) if d.get("ai_proposal_chat") else None
     return d
 
 
@@ -316,7 +328,9 @@ def contact_update(contact_id: int, data: dict) -> Optional[dict]:
         "next_action":    ("next_action",    lambda v: v),
         "responded":      ("responded",      lambda v: 1 if v else 0),
         "ai_analysis":    ("ai_analysis",    lambda v: json.dumps(v) if v is not None else None),
-        "scraped_content":("scraped_content",lambda v: v),
+        "ai_proposal":      ("ai_proposal",      lambda v: json.dumps(v) if v is not None else None),
+        "ai_proposal_chat": ("ai_proposal_chat", lambda v: json.dumps(v) if v is not None else None),
+        "scraped_content":  ("scraped_content",  lambda v: v),
         "scrape_ts":      ("scrape_ts",      lambda v: v),
     }
 

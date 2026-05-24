@@ -190,4 +190,52 @@ CREATE TABLE IF NOT EXISTS weekly_summaries (
     UNIQUE(subject_id, week_start)
 );
 
+-- ── Vision analysis ──────────────────────────────────────────────────────────
+-- Resultados del análisis clínico visual (Hermes Vision).
+CREATE TABLE IF NOT EXISTS vision_analysis (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_id          UUID REFERENCES subjects(id) ON DELETE CASCADE,
+    captured_at         TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Imagen (hash para deduplicación, no se guarda el contenido)
+    image_hash          TEXT,
+    image_quality       TEXT,               -- 'good' | 'acceptable' | 'poor'
+
+    -- FGS (Feline Grimace Scale) — 5 UAFs + total
+    fgs_orbital         SMALLINT,           -- 0 | 1 | 2 | null
+    fgs_ears            SMALLINT,
+    fgs_muzzle          SMALLINT,
+    fgs_whiskers        SMALLINT,
+    fgs_head            SMALLINT,
+    fgs_score           NUMERIC(3,1),       -- 0-10, null si <3 UAFs evaluables
+    fgs_pain_level      TEXT,               -- 'none'|'mild'|'moderate'|'severe'|'not_evaluable'
+
+    -- Ojos
+    pupil_symmetry      TEXT,               -- 'symmetric'|'mild_asymmetry'|'marked_asymmetry'|'not_evaluable'
+    third_eyelid_left   TEXT,               -- 'not_visible'|'slight'|'moderate'|'prominent'
+    third_eyelid_right  TEXT,
+    discharge_left      TEXT,               -- 'none'|'serous'|'mucoid'|'purulent'
+    discharge_right     TEXT,
+    eye_details         JSONB,              -- detalles completos por ojo
+
+    -- Neurológico
+    head_tilt_deg       NUMERIC(4,1),       -- null si no evaluable
+    ear_position        TEXT,               -- 'upright_forward'|'lateral'|'rotated_back'|'flattened'|'asymmetric'
+    whisker_state       TEXT,               -- 'forward'|'neutral'|'back'|'flat'
+
+    -- Postura
+    posture_type        TEXT,
+    coat_condition      TEXT,               -- 'good'|'fair'|'poor'
+
+    -- Output clínico
+    urgent_flags        TEXT[],             -- señales que requieren atención inmediata
+    clinical_notes      TEXT,               -- párrafo clínico en castellano
+    uncertainty         TEXT,
+    llm_raw             JSONB,              -- output completo del LLM
+    model_used          TEXT,
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_vision_subject_time
+    ON vision_analysis(subject_id, captured_at DESC);
+
 INSERT INTO schema_version(version) VALUES (1) ON CONFLICT DO NOTHING;

@@ -79,6 +79,8 @@ class ContactUpdate(BaseModel):
     next_action: Optional[str] = None
     responded: Optional[bool] = None
     ai_analysis: Optional[dict] = None
+    ai_proposal: Optional[dict] = None
+    ai_proposal_chat: Optional[list] = None
     scraped_content: Optional[str] = None
     scrape_ts: Optional[str] = None
 

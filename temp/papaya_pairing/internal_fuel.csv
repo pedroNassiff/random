@@ -1,0 +1,11 @@
+reg_plate,month,fuel_spend,notes
+BCN-1234,2024-01,141.10,ok
+BCN-5678,2024-01,189.60,ok
+BCN-9012,2024-01,146.40,ok
+BCN-3456,2024-01,171.68,ok
+BCN-7890,2024-01,130.40,ok
+BCN-1234,2024-02,144.26,ok
+BCN-5678,2024-02,215.00,recarga extra no registrada en shell
+BCN-9012,2024-02,,no data received
+BCN-7890,2024-02,132.80,ok
+BCN-2222,2024-02,45.00,vehículo nuevo

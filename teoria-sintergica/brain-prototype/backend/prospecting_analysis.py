@@ -1018,3 +1018,69 @@ async def translate_pitch(request: TranslatePitchRequest):
     except anthropic.APIError as e:
         raise HTTPException(status_code=502, detail=f"Error Anthropic API: {str(e)}")
 
+
+# ── Proposal chat ─────────────────────────────────────────────────────────────
+
+class ChatMessage(BaseModel):
+    role: str   # "user" | "assistant"
+    content: str
+
+class ProposalChatRequest(BaseModel):
+    messages: list[ChatMessage]
+    proposal: Optional[dict] = None
+    analysis: Optional[dict] = None
+    contact_company: str = ""
+    model: Optional[str] = None
+
+class ProposalChatResponse(BaseModel):
+    reply: str
+
+@router.post("/proposal-chat", response_model=ProposalChatResponse)
+async def proposal_chat(request: ProposalChatRequest):
+    """
+    Conversational endpoint: the user can ask questions about the proposal in context.
+    The full proposal + analysis are injected as system context.
+    """
+    api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY no configurada")
+
+    model = request.model or TIER_MODELS.get("paid", TIER_MODELS["free"])
+
+    proposal_block = json.dumps(request.proposal, ensure_ascii=False, indent=2) if request.proposal else "(no disponible)"
+    analysis_block = json.dumps(request.analysis,  ensure_ascii=False, indent=2) if request.analysis else "(no disponible)"
+
+    system = f"""Sos el co-founder técnico de Random Lab, una consultora de software boutique especializada en IA aplicada, data pipelines, visualización y arquitectura de sistemas complejos.
+
+Estás ayudando a preparar una reunión comercial con **{request.contact_company}**.
+
+**PROPUESTA GENERADA:**
+{proposal_block}
+
+**ANÁLISIS DEL PROSPECTO:**
+{analysis_block}
+
+Tu rol en este chat:
+- Ayudás a refinar argumentos, manejar objeciones y preparar respuestas para la reunión
+- Respondés en español, de forma concisa y directa — no hay floro
+- Si te preguntan cómo decir algo, das la frase exacta lista para usar
+- Si te preguntan sobre el alcance/precio/timeline, usás lo que está en la propuesta como base
+- Podés sugerir ajustes a la propuesta si el usuario lo pide
+- Nunca inventás datos sobre el cliente que no estén en el análisis"""
+
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model=model,
+            max_tokens=1000,
+            system=system,
+            messages=messages,
+        )
+        return ProposalChatResponse(reply=response.content[0].text.strip())
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=502, detail=f"Error Anthropic API: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")
+

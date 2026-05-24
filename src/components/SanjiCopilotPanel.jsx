@@ -1,10 +1,13 @@
 /**
  * SanjiCopilotPanel — Chat clínico con el copiloto de SANJI-RX.
  * Historial persistido en localStorage. Contexto clínico enviado solo al inicio de sesión.
+ * Soporta análisis visual de imágenes (Hermes Vision).
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import VisionAnalysisCard from './VisionAnalysisCard';
 
 const COPILOT_URL = (import.meta.env.VITE_SANJI_API || 'http://localhost:8001') + '/sanji/copilot/chat';
+const VISION_URL  = (import.meta.env.VITE_SANJI_API || 'http://localhost:8001') + '/sanji/vision/analyze';
 const STORAGE_KEY = 'sanji_hermes_v2';
 const MAX_STORED = 80;
 const NEW_SESSION_IDLE_MS = 2 * 60 * 60 * 1000; // 2 horas = nueva sesión clínica
@@ -88,13 +91,16 @@ function TypingDots() {
   );
 }
 
-export default function SanjiCopilotPanel({ historyContext, onClose }) {
+export default function SanjiCopilotPanel({ historyContext, onClose, logDate }) {
   const [messages, setMessages] = useState(() => loadPersistedMessages() ?? [WELCOME_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [visionLoading, setVisionLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Persist on every change
   useEffect(() => {
@@ -165,6 +171,66 @@ export default function SanjiCopilotPanel({ historyContext, onClose }) {
       setLoading(false);
     }
   }, [loading, messages, historyContext]);
+
+  const sendImage = useCallback(async (file) => {
+    if (!file || visionLoading || loading) return;
+    setVisionLoading(true);
+    setImagePreview(null);
+
+    const ts = Date.now();
+    // Show preview in chat immediately
+    const previewUrl = URL.createObjectURL(file);
+    setMessages(prev => [...prev, {
+      role: 'user',
+      text: `📷 ${file.name}`,
+      imagePreview: previewUrl,
+      ts,
+    }]);
+
+    try {
+      // Convert to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let b of bytes) binary += String.fromCharCode(b);
+      const b64 = btoa(binary);
+      const mediaType = file.type || 'image/jpeg';
+
+      const res = await fetch(VISION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_b64: b64,
+          media_type: mediaType,
+          context_note: null,
+          log_date: logDate ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        vision: data.analysis,
+        model: data.model,
+        imageUrl: data.image_url,
+        ts: Date.now(),
+      }]);
+      // Notify bitácora gallery to refresh
+      if (logDate && data.image_url) {
+        window.dispatchEvent(new CustomEvent('sanji-vision-saved', { detail: { date: logDate } }));
+      }
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        text: `❌ Error analizando imagen: ${err.message}`,
+        error: true,
+        ts: Date.now(),
+      }]);
+    } finally {
+      setVisionLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [visionLoading, loading, logDate]);
 
   // Build list with day-separator markers
   const renderedItems = [];
@@ -237,30 +303,53 @@ export default function SanjiCopilotPanel({ historyContext, onClose }) {
                 ${msg.role === 'user' ? 'bg-white/10 text-white/50' : 'bg-cyan-900/60 text-cyan-300'}`}>
                 {msg.role === 'user' ? 'tú' : '⬡'}
               </div>
-              <div className={`max-w-[85%] rounded-xl px-3 py-2.5 ${
-                msg.role === 'user'
-                  ? 'bg-white/[0.06] border border-white/[0.08]'
-                  : msg.error
-                    ? 'bg-red-900/20 border border-red-500/20'
-                    : 'bg-neutral-800 border border-neutral-700'
-              }`}>
-                {msg.role === 'user'
-                  ? <p className="text-[12px] text-white/80">{msg.text}</p>
-                  : <SimpleMarkdown text={msg.text} />
-                }
-                <p className="text-[9px] text-neutral-600 mt-1 font-mono leading-none">
-                  {msg.model ? `${msg.model} · ` : ''}{fmtTime(msg.ts)}
-                </p>
+              <div className={`max-w-[85%] ${msg.vision ? 'w-full' : ''}`}>
+                {/* Vision card (assistant) */}
+                {msg.vision && (
+                  <VisionAnalysisCard analysis={msg.vision} model={msg.model} />
+                )}
+                {/* Image preview (user) */}
+                {msg.imagePreview && (
+                  <div className={`rounded-xl overflow-hidden border border-white/10 mb-1 ${msg.vision ? '' : 'max-w-[140px]'}`}>
+                    <img src={msg.imagePreview} alt="imagen" className="w-full object-cover rounded-xl" />
+                  </div>
+                )}
+                {/* Regular text bubble */}
+                {!msg.vision && (
+                  <div className={`rounded-xl px-3 py-2.5 ${
+                    msg.role === 'user'
+                      ? 'bg-white/[0.06] border border-white/[0.08]'
+                      : msg.error
+                        ? 'bg-red-900/20 border border-red-500/20'
+                        : 'bg-neutral-800 border border-neutral-700'
+                  }`}>
+                    {msg.role === 'user'
+                      ? <p className="text-[12px] text-white/80">{msg.text}</p>
+                      : <SimpleMarkdown text={msg.text} />
+                    }
+                    <p className="text-[9px] text-neutral-600 mt-1 font-mono leading-none">
+                      {msg.model ? `${msg.model} · ` : ''}{fmtTime(msg.ts)}
+                    </p>
+                  </div>
+                )}
+                {msg.vision && (
+                  <p className="text-[9px] text-neutral-600 mt-1 font-mono leading-none pl-1">
+                    {msg.model ? `${msg.model} · ` : ''}{fmtTime(msg.ts)}
+                  </p>
+                )}
               </div>
             </div>
           );
         })}
-        {loading && (
+        {(loading || visionLoading) && (
           <div className="flex gap-2">
             <div className="w-6 h-6 rounded-full bg-cyan-900/60 flex items-center justify-center text-[10px] text-cyan-300">⬡</div>
             <div className="bg-neutral-800 border border-neutral-700 rounded-xl px-3">
               <TypingDots />
             </div>
+            {visionLoading && (
+              <span className="text-[9px] text-cyan-500 font-mono self-end pb-2">analizando imagen…</span>
+            )}
           </div>
         )}
         <div ref={bottomRef} />
@@ -281,16 +370,37 @@ export default function SanjiCopilotPanel({ historyContext, onClose }) {
       {/* Input */}
       <form onSubmit={e => { e.preventDefault(); send(input); }}
         className="px-4 pb-4 pt-2 border-t border-neutral-800 flex-shrink-0">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic"
+          className="hidden"
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (file) sendImage(file);
+          }}
+        />
         <div className="flex gap-2">
+          {/* Camera button */}
+          <button
+            type="button"
+            disabled={loading || visionLoading}
+            onClick={() => fileInputRef.current?.click()}
+            title="Analizar imagen de Sanji"
+            className="px-2.5 py-2 bg-neutral-800 border border-neutral-700 hover:border-cyan-600 text-neutral-400 hover:text-cyan-300 rounded-lg text-sm transition-colors disabled:opacity-40"
+          >
+            📷
+          </button>
           <input
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Preguntá sobre Sanji…"
-            disabled={loading}
+            disabled={loading || visionLoading}
             className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-cyan-600 disabled:opacity-50"
           />
-          <button type="submit" disabled={loading || !input.trim()}
+          <button type="submit" disabled={loading || visionLoading || !input.trim()}
             className="px-3 py-2 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg text-sm font-mono disabled:opacity-40 transition-colors">
             →
           </button>

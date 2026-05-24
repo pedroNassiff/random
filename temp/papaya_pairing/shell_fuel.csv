@@ -1,0 +1,20 @@
+vehicle_id,date,litres,cost_eur,station
+BCN-1234,2024-01-05,45.2,72.30,Shell Diagonal
+BCN-1234,2024-01-18,43.0,68.80,Shell Diagonal
+BCN-5678,2024-01-07,60.1,96.16,Shell Granvia
+BCN-5678,2024-01-21,58.4,93.44,Shell Granvia
+BCN-9012,2024-01-03,30.0,48.00,Shell Sarria
+BCN-9012,2024-01-15,32.5,52.00,Shell Sarria
+BCN-9012,2024-01-28,29.0,46.40,Shell Sarria
+bcn-3456,2024-01-10,55.0,88.00,Shell Poblenou
+BCN-3456,2024-01-24,52.3,83.68,Shell Poblenou
+BCN-7890,2024-01-09,40.0,64.00,Shell Gracia
+BCN-7890,2024-01-22,41.5,66.40,Shell Gracia
+BCN-1234,2024-02-06,44.8,74.37,Shell Diagonal
+BCN-1234,2024-02-20,42.1,69.89,Shell Diagonal
+BCN-5678,2024-02-08,61.0,101.26,Shell Granvia
+BCN-5678,2024-02-22,57.9,96.11,Shell Granvia
+BCN-9012,2024-02-04,31.2,51.79,Shell Sarria
+BCN-7890,2024-02-11,39.8,66.07,Shell Gracia
+BCN-7890,2024-02-25,40.2,66.73,Shell Gracia
+BCN-XXXX,2024-02-14,20.0,33.20,Shell Diagonal

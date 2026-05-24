@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
 import { projects } from '../data/projects';
 import ProjectHoverOverlay from '../components/ProjectHoverOverlay';
+import AsciiParticleCard from '../components/AsciiParticleCard';
 import GlitchButton from '../components/GlitchButton';
 import ScrollingText from '../components/ScrollingText';
 import Navbar from '../components/Navbar';
@@ -194,148 +195,116 @@ export default function Work() {
         </div>
 
         {/* Project 1 */}
-        <div 
-          ref={project1Ref} 
+        <AsciiParticleCard
+          ref={project1Ref}
+          image={projects[0].image}
+          title={projects[0].title}
           onClick={() => {
             trackClick('work_project_click', projects[0].id, '.work-project-card');
             navigate(`/work/${projects[0].id}`);
           }}
           className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[0].image} 
-            alt={projects[0].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/50"></div>
           <ProjectHoverOverlay title={projects[0].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
         {/* Project 2 */}
-        <div 
-          ref={project2Ref} 
+        <AsciiParticleCard
+          ref={project2Ref}
+          image={projects[1].image}
+          title={projects[1].title}
           onClick={() => {
             trackClick('work_project_click', projects[1].id, '.work-project-card');
             navigate(`/work/${projects[1].id}`);
           }}
           className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[1].image} 
-            alt={projects[1].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80"></div>
           <ProjectHoverOverlay title={projects[1].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
         {/* Project 3 */}
-        <div 
-          ref={project3Ref} 
+        <AsciiParticleCard
+          ref={project3Ref}
+          image={projects[2].image}
+          title={projects[2].title}
           onClick={() => {
             trackClick('work_project_click', projects[2].id, '.work-project-card');
             navigate(`/work/${projects[2].id}`);
           }}
           className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[2].image} 
-            alt={projects[2].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80"></div>
           <ProjectHoverOverlay title={projects[2].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
         {/* Project 4 */}
-        <div 
-          ref={project4Ref} 
+        <AsciiParticleCard
+          ref={project4Ref}
+          image={projects[3].image}
+          title={projects[3].title}
           onClick={() => {
             trackClick('work_project_click', projects[3].id, '.work-project-card');
             navigate(`/work/${projects[3].id}`);
           }}
           className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[3].image} 
-            alt={projects[3].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80"></div>
           <ProjectHoverOverlay title={projects[3].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
-         {/* Project 5 */}
-        <div 
-          ref={project5Ref} 
+        {/* Project 5 */}
+        <AsciiParticleCard
+          ref={project5Ref}
+          image={projects[4].image}
+          title={projects[4].title}
           onClick={() => {
             trackClick('work_project_click', projects[4].id, '.work-project-card');
             navigate(`/work/${projects[4].id}`);
           }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[4].image} 
-            alt={projects[4].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80"></div>
           <ProjectHoverOverlay title={projects[4].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
         {/* Project 6 */}
-        <div 
-          ref={project6Ref} 
+        <AsciiParticleCard
+          ref={project6Ref}
+          image={projects[5].image}
+          title={projects[5].title}
           onClick={() => {
             trackClick('work_project_click', projects[5].id, '.work-project-card');
             navigate(`/work/${projects[5].id}`);
           }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[5].image} 
-            alt={projects[5].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80"></div>
           <ProjectHoverOverlay title={projects[5].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
         {/* Project 7 */}
-        <div 
-          ref={project7Ref} 
+        <AsciiParticleCard
+          ref={project7Ref}
+          image={projects[6].image}
+          title={projects[6].title}
           onClick={() => {
             trackClick('work_project_click', projects[6].id, '.work-project-card');
             navigate(`/work/${projects[6].id}`);
           }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[6].image} 
-            alt={projects[6].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80"></div>
           <ProjectHoverOverlay title={projects[6].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
         {/* Project 8 */}
-        <div 
-          ref={project8Ref} 
+        <AsciiParticleCard
+          ref={project8Ref}
+          image={projects[7].image}
+          title={projects[7].title}
           onClick={() => {
             trackClick('work_project_click', projects[7].id, '.work-project-card');
             navigate(`/work/${projects[7].id}`);
           }}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
-          <img 
-            src={projects[7].image} 
-            alt={projects[7].title} 
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80"></div>
           <ProjectHoverOverlay title={projects[7].title} viewLabel={t('home.view_project')} />
-        </div>
+        </AsciiParticleCard>
 
         {/* CTA Section */}
         {/* <div className="absolute top-[3561px] left-16 max-w-[800px] flex flex-col gap-10">
