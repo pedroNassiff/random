@@ -1,0 +1,247 @@
+{
+  "status": "success",
+  "session_name": "prueba validacion",
+  "session_date": "2026-05-25T16:44:07",
+  "analysis_type": "ws_stream_approximate",
+  "data_source": "WS broadcast (recorder failed — normalized band powers)",
+  "protocol": {
+    "phases_completed": 3,
+    "total_phases": 3,
+    "total_duration_s": 210.03076004981995,
+    "mode": "quick_validation"
+  },
+  "windows_parsed": 42,
+  "windows_in_protocol": 42,
+  "phase_stats": {
+    "baseline_open": {
+      "n": 12,
+      "alpha": {
+        "mean": 0.0253,
+        "median": 0.0225,
+        "std": 0.0151,
+        "min": 0.009,
+        "max": 0.064
+      },
+      "theta": {
+        "mean": 0.0708,
+        "median": 0.051,
+        "std": 0.0584,
+        "min": 0.018,
+        "max": 0.221
+      },
+      "delta": {
+        "mean": 0.1872,
+        "median": 0.166,
+        "std": 0.1265,
+        "min": 0.024,
+        "max": 0.455
+      },
+      "beta": {
+        "mean": 0.0057,
+        "median": 0.005,
+        "std": 0.0016,
+        "min": 0.004,
+        "max": 0.008
+      },
+      "gamma": {
+        "mean": 0.7112,
+        "median": 0.759,
+        "std": 0.1957,
+        "min": 0.256,
+        "max": 0.945
+      },
+      "coherence": {
+        "mean": 0.5681,
+        "median": 0.6285,
+        "std": 0.169,
+        "min": 0.302,
+        "max": 0.78
+      },
+      "state_distribution": {
+        "focused": 12
+      },
+      "dominant_state": "focused"
+    },
+    "baseline_closed": {
+      "n": 18,
+      "alpha": {
+        "mean": 0.0193,
+        "median": 0.018,
+        "std": 0.0094,
+        "min": 0.009,
+        "max": 0.046
+      },
+      "theta": {
+        "mean": 0.0762,
+        "median": 0.0755,
+        "std": 0.016,
+        "min": 0.048,
+        "max": 0.114
+      },
+      "delta": {
+        "mean": 0.4371,
+        "median": 0.447,
+        "std": 0.1669,
+        "min": 0.107,
+        "max": 0.77
+      },
+      "beta": {
+        "mean": 0.005,
+        "median": 0.0045,
+        "std": 0.002,
+        "min": 0.002,
+        "max": 0.01
+      },
+      "gamma": {
+        "mean": 0.4628,
+        "median": 0.46,
+        "std": 0.1669,
+        "min": 0.155,
+        "max": 0.805
+      },
+      "coherence": {
+        "mean": 0.476,
+        "median": 0.4715,
+        "std": 0.1047,
+        "min": 0.341,
+        "max": 0.725
+      },
+      "state_distribution": {
+        "focused": 13,
+        "deep_relaxation": 5
+      },
+      "dominant_state": "focused"
+    },
+    "recovery": {
+      "n": 12,
+      "alpha": {
+        "mean": 0.0601,
+        "median": 0.05,
+        "std": 0.0347,
+        "min": 0.018,
+        "max": 0.126
+      },
+      "theta": {
+        "mean": 0.1445,
+        "median": 0.146,
+        "std": 0.0454,
+        "min": 0.046,
+        "max": 0.218
+      },
+      "delta": {
+        "mean": 0.6405,
+        "median": 0.6445,
+        "std": 0.1763,
+        "min": 0.215,
+        "max": 0.832
+      },
+      "beta": {
+        "mean": 0.0104,
+        "median": 0.009,
+        "std": 0.0062,
+        "min": 0.004,
+        "max": 0.024
+      },
+      "gamma": {
+        "mean": 0.1445,
+        "median": 0.078,
+        "std": 0.1924,
+        "min": 0.029,
+        "max": 0.714
+      },
+      "coherence": {
+        "mean": 0.5168,
+        "median": 0.5045,
+        "std": 0.0652,
+        "min": 0.415,
+        "max": 0.605
+      },
+      "state_distribution": {
+        "focused": 2,
+        "deep_relaxation": 10
+      },
+      "dominant_state": "deep_relaxation"
+    }
+  },
+  "tests": {
+    "berger_effect": {
+      "test": "berger_effect_approximate",
+      "passed": false,
+      "quality": "failed",
+      "metrics": {
+        "alpha_open_mean": 0.0253,
+        "alpha_closed_mean": 0.0193,
+        "ratio": 0.763,
+        "open_samples": 12,
+        "closed_samples": 18
+      },
+      "caveat": "Normalized band powers used — absolute alpha may have increased while normalized share dropped due to delta surge with eyes closed. Re-run with recorder active for absolute µV²/Hz values.",
+      "thresholds": {
+        "excellent": ">1.5x",
+        "good": ">1.2x",
+        "marginal": ">1.05x"
+      }
+    },
+    "delta_eyes_closed": {
+      "test": "delta_eyes_closed",
+      "passed": true,
+      "metrics": {
+        "delta_open_mean": 0.1872,
+        "delta_closed_mean": 0.4371,
+        "ratio": 2.335
+      },
+      "warning": null
+    },
+    "gamma_emg_artifact": {
+      "test": "gamma_emg_artifact",
+      "passed": false,
+      "quality": "high_emg_artifact",
+      "metrics": {
+        "gamma_open_mean": 0.7112,
+        "normal_range": "< 0.15"
+      },
+      "interpretation": "Low gamma = clean signal. High gamma during eyes-open baseline is typically frontal EMG (forehead tension). Relax forehead, check AF7/AF8 contact."
+    },
+    "coherence_stability": {
+      "test": "coherence_stability",
+      "passed": true,
+      "quality": "marginal",
+      "metrics": {
+        "mean_coherence": 0.514,
+        "std_coherence": 0.1218,
+        "coefficient_of_variation": 0.2371,
+        "autocorrelation_lag1": 0.2985,
+        "n_samples": 42
+      },
+      "interpretation": {
+        "> 0.7": "Real neural coherence, excellent signal",
+        "0.5-0.7": "Acceptable, likely real signal",
+        "0.3-0.5": "Marginal, may contain noise",
+        "< 0.3": "Likely noise, check electrode contact"
+      }
+    }
+  },
+  "summary": {
+    "passed": 2,
+    "total": 3,
+    "quality_score": {
+      "total_score": 18.9,
+      "grade": "F",
+      "components": {
+        "alpha_reactivity": 0,
+        "coherence_stability": 29.8,
+        "signal_quality_proxy": 0,
+        "data_completeness": 100
+      },
+      "caveat": "Score computed from normalized band powers (WS stream). Re-run with active recorder for production-quality score."
+    },
+    "overall": "good"
+  },
+  "limitations": [
+    "Session recorder failed (psycopg2 not imported — now fixed). No InfluxDB data persisted.",
+    "Band powers are NORMALIZED (0-1, sum≈1 per window). Berger absolute ratio unavailable.",
+    "Gamma surge during eyes-open suggests frontal EMG artifact (forehead tension).",
+    "Re-run protocol with recorder active for production-quality validation."
+  ],
+  "fix_applied": "postgres_client.py now imports psycopg2 with try/except — recorder will work on next run."
+}

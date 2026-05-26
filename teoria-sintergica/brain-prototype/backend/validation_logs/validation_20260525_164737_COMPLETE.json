@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "name": "prueba validacion",
+    "notes": "",
+    "time_of_day": "",
+    "sleep_quality": 0,
+    "caffeine": false,
+    "prior_meditation_min": 0,
+    "subjective_pre": 0,
+    "subjective_post": 0
+  },
+  "protocol_start": 1779720247.761167,
+  "protocol_start_iso": "2026-05-25T16:44:07.761167",
+  "phases_completed": 3,
+  "total_phases": 3,
+  "total_events": 8,
+  "events": [
+    {
+      "time": 1779720247.7612329,
+      "time_iso": "2026-05-25T16:44:07.761234",
+      "elapsed": 9.083747863769531e-05,
+      "event": "protocol_start",
+      "data": {
+        "name": "prueba validacion",
+        "total_phases": 3,
+        "total_duration": 210
+      }
+    },
+    {
+      "time": 1779720247.761272,
+      "time_iso": "2026-05-25T16:44:07.761272",
+      "elapsed": 0.00010704994201660156,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_open",
+        "label": "BASELINE",
+        "duration": 60,
+        "instruction": "Ojos abiertos"
+      }
+    },
+    {
+      "time": 1779720307.7786398,
+      "time_iso": "2026-05-25T16:45:07.778641",
+      "elapsed": 60.01748991012573,
+      "event": "phase_end",
+      "data": {
+        "phase": "baseline_open",
+        "elapsed": 60.01735019683838,
+        "expected_duration": 60,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1779720307.778663,
+      "time_iso": "2026-05-25T16:45:07.778663",
+      "elapsed": 60.017496824264526,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_closed",
+        "label": "BASELINE",
+        "duration": 90,
+        "instruction": "Cerr\u00e1 los ojos"
+      }
+    },
+    {
+      "time": 1779720397.784714,
+      "time_iso": "2026-05-25T16:46:37.784716",
+      "elapsed": 150.02355885505676,
+      "event": "phase_end",
+      "data": {
+        "phase": "baseline_closed",
+        "elapsed": 90.00604701042175,
+        "expected_duration": 90,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1779720397.784748,
+      "time_iso": "2026-05-25T16:46:37.784748",
+      "elapsed": 150.02358412742615,
+      "event": "phase_start",
+      "data": {
+        "phase": "recovery",
+        "label": "RECUPERACI\u00d3N",
+        "duration": 60,
+        "instruction": "Volv\u00e9 al cuerpo"
+      }
+    },
+    {
+      "time": 1779720457.791841,
+      "time_iso": "2026-05-25T16:47:37.791843",
+      "elapsed": 210.0307378768921,
+      "event": "phase_end",
+      "data": {
+        "phase": "recovery",
+        "elapsed": 60.00702500343323,
+        "expected_duration": 60,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1779720457.791924,
+      "time_iso": "2026-05-25T16:47:37.791925",
+      "elapsed": 210.03076004981995,
+      "event": "protocol_stop",
+      "data": {
+        "completed_phases": 3,
+        "total_phases": 3,
+        "total_elapsed": 210.0307559967041
+      }
+    }
+  ]
+}

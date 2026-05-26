@@ -650,14 +650,14 @@ class InfluxDBEEGClient:
         if not self._connected:
             self.connect()
 
-        # 1. Average normalized alpha per channel (→ Postgres alpha_*_avg columns)
+        # 1. Average raw alpha (µV²/Hz) per channel (→ Postgres alpha_*_avg columns)
         avg_norm_query = f'''
         from(bucket: "{INFLUX_BUCKET}")
             |> range(start: -30d)
             |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> filter(fn: (r) => r["band"] == "alpha")
-            |> filter(fn: (r) => r["_field"] == "value")
+            |> filter(fn: (r) => r["_field"] == "value_raw")
             |> group(columns: ["channel"])
             |> mean()
         '''
@@ -673,21 +673,8 @@ class InfluxDBEEGClient:
             |> sort(columns: ["_time"])
         '''
 
-        # 3. Baseline-closed raw alpha (for faa_baseline_closed)
-        baseline_query = f'''
-        from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
-            |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
-            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
-            |> filter(fn: (r) => r["band"] == "alpha")
-            |> filter(fn: (r) => r["_field"] == "value_raw")
-            |> filter(fn: (r) => r["state"] == "baseline_closed")
-            |> sort(columns: ["_time"])
-        '''
-
         avg_tables = self.query_api.query(avg_norm_query, org=INFLUX_ORG)
         raw_tables = self.query_api.query(raw_query, org=INFLUX_ORG)
-        baseline_tables = self.query_api.query(baseline_query, org=INFLUX_ORG)
 
         # --- Extract normalized averages ---
         channel_avg_norm: Dict[str, float] = {}
@@ -726,24 +713,28 @@ class InfluxDBEEGClient:
             if tp9 > 0 and tp10 > 0:
                 posterior_asym_values.append(tp10 - tp9)
 
-        # --- Baseline FAA ---
-        baseline_ts_ch: Dict[float, Dict[str, float]] = {}
-        for table in baseline_tables:
-            for record in table.records:
-                ts = record.get_time().timestamp()
-                ch = record.values.get('channel', '')
-                val = record.get_value()
-                if ch in ('af7', 'af8') and val is not None:
-                    if ts not in baseline_ts_ch:
-                        baseline_ts_ch[ts] = {}
-                    baseline_ts_ch[ts][ch] = float(val)
+        # --- Baseline-closed FAA: derive time window from protocol markers ---
+        t_closed_start = None
+        t_closed_end = None
+        try:
+            events = self.get_events(recording_id)
+            for ev in events:
+                if ev['label'] == 'baseline_closed_start':
+                    t_closed_start = ev['timestamp']
+                elif ev['label'] == 'baseline_closed_end':
+                    t_closed_end = ev['timestamp']
+        except Exception:
+            pass
 
         baseline_faa_values = []
-        for ts, ch_vals in baseline_ts_ch.items():
-            af7 = ch_vals.get('af7', 0.0)
-            af8 = ch_vals.get('af8', 0.0)
-            if af7 > 0 and af8 > 0:
-                baseline_faa_values.append(math.log(af8) - math.log(af7))
+        if t_closed_start is not None and t_closed_end is not None:
+            for ts, ch_vals in ts_ch_raw.items():
+                if not (t_closed_start <= ts <= t_closed_end):
+                    continue
+                af7 = ch_vals.get('af7', 0.0)
+                af8 = ch_vals.get('af8', 0.0)
+                if af7 > 0 and af8 > 0:
+                    baseline_faa_values.append(math.log(af8) - math.log(af7))
 
         return {
             'alpha_tp9_avg':            channel_avg_norm.get('tp9'),
@@ -755,6 +746,91 @@ class InfluxDBEEGClient:
             'posterior_asymmetry_mean': float(sum(posterior_asym_values) / len(posterior_asym_values)) if posterior_asym_values else None,
             'per_channel_version':      1,
         }
+
+    def get_per_channel_by_phase(self, recording_id: int) -> Optional[Dict]:
+        """
+        Aggregate per-channel band power by protocol phase, using event markers
+        as phase boundaries.
+
+        Phases come from *_start / *_end marker pairs in eeg_event
+        (e.g. baseline_closed_start → baseline_closed_end). Both markers (via
+        get_events) and band_power points use ABSOLUTE timestamps, so no
+        relative↔absolute conversion is needed.
+
+        Returns raw µV²/Hz averages:
+            {
+              "baseline_closed": {
+                "alpha": {"af7": 0.73, "af8": 0.68, "tp9": 7.19, "tp10": 7.74},
+                "theta": {...}, ...
+              },
+              ...
+            }
+        or None if no per-channel data / no phase markers exist.
+        """
+        if not self._connected:
+            self.connect()
+
+        # 1. Build phase windows [t_start, t_end] from markers (absolute ts)
+        events = self.get_events(recording_id)
+        if not events:
+            return None
+
+        starts: Dict[str, float] = {}
+        windows: Dict[str, tuple] = {}
+        for e in events:
+            label = e.get('label', '')
+            ts = e.get('timestamp', 0)
+            if label.endswith('_start'):
+                starts[label[:-6]] = ts                 # strip "_start"
+            elif label.endswith('_end'):
+                phase = label[:-4]                       # strip "_end"
+                if phase in starts:
+                    windows[phase] = (starts[phase], ts)
+
+        windows.pop('protocol', None)                    # drop wrapper window
+        if not windows:
+            return None
+
+        # 2. Pull all per-channel raw band powers with timestamps
+        raw_query = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+            |> range(start: -30d)
+            |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
+            |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
+            |> filter(fn: (r) => r["_field"] == "value_raw")
+            |> sort(columns: ["_time"])
+        '''
+        tables = self.query_api.query(raw_query, org=INFLUX_ORG)
+
+        # 3. Accumulate sums per phase/band/channel → [sum, count]
+        acc: Dict = {p: {} for p in windows}
+        for table in tables:
+            for record in table.records:
+                ts = record.get_time().timestamp()
+                band = record.values.get('band', '')
+                ch = record.values.get('channel', '')
+                val = record.get_value()
+                if not band or not ch or val is None:
+                    continue
+                for phase, (t0, t1) in windows.items():
+                    if t0 <= ts <= t1:
+                        b = acc[phase].setdefault(band, {})
+                        s = b.setdefault(ch, [0.0, 0])
+                        s[0] += float(val)
+                        s[1] += 1
+                        break
+
+        # 4. Average
+        result: Dict = {}
+        for phase, bands in acc.items():
+            if not bands:
+                continue
+            result[phase] = {
+                band: {ch: (s[0] / s[1] if s[1] else 0.0) for ch, s in chans.items()}
+                for band, chans in bands.items()
+            }
+
+        return result or None
 
     def delete_recording_data(self, recording_id: int):
         """Delete all data for a recording."""

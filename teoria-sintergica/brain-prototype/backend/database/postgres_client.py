@@ -10,6 +10,12 @@ Handles:
 import os
 import asyncio
 import asyncpg
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except ImportError:
+    psycopg2 = None  # type: ignore
+    RealDictCursor = None  # type: ignore
 from typing import Optional, Dict, List
 from datetime import datetime
 from dataclasses import dataclass, field
