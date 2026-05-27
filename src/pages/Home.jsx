@@ -17,6 +17,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 // Analytics
 import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
+import { useExpandTransition } from '../lib/useExpandTransition';
 import ProjectHoverOverlay from '../components/ProjectHoverOverlay';
 import AsciiCard from '../components/AsciiParticleCard';
 
@@ -36,6 +37,8 @@ import serv4 from '../img/servicios/serv4.png';
 
 import MatrixRain from '../components/MatrixRain';
 import GlitchCard from '../components/GlitchCard';
+import { AsciiText } from '../components/GlitchCard';
+import { projects } from '../data/projects';
 
 
 
@@ -52,6 +55,7 @@ export default function Home() {
   // Analytics tracking
   usePageTracking('home');
   const { trackClick } = useEventTracking();
+  const { triggerExpand } = useExpandTransition();
   const heroRef = useEngagementTracking('home-hero');
   const projectsRef = useEngagementTracking('home-projects');
   const servicesRef = useEngagementTracking('home-services');
@@ -64,6 +68,12 @@ export default function Home() {
   const project3Ref = useRef(null);
   const project4Ref = useRef(null);
   const project5Ref = useRef(null);
+  // Project card click with expand transition
+  const handleHomeProjectClick = React.useCallback((project, cardRef) => {
+    trackClick('project_card_click', project.id, '.project-card');
+    triggerExpand(project, cardRef);
+  }, [triggerExpand, trackClick]);
+
   // Textos rotativos para el badge
   const badgeTexts = [
     "donde fluyen caos y orden",
@@ -460,10 +470,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           ref={project2Ref}
           image={calaveraHome}
           title="Calavera Sur"
-          onClick={() => {
-            trackClick('project_card_click', 'calavera-sur', '.project-card');
-            navigate('/work/calavera-sur');
-          }}
+          onClick={() => handleHomeProjectClick(projects[0], project2Ref)}
           className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title="CALAVERA SUR" viewLabel={t('home.view_project')} />
@@ -474,10 +481,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           ref={project3Ref}
           image={misiaHome}
           title="Misia"
-          onClick={() => {
-            trackClick('project_card_click', 'misia', '.project-card');
-            navigate('/work/misia');
-          }}
+          onClick={() => handleHomeProjectClick(projects[1], project3Ref)}
           className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title="MISIA" viewLabel={t('home.view_project')} />
@@ -488,10 +492,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           ref={project4Ref}
           image={hcgHome}
           title="Hub City Guides"
-          onClick={() => {
-            trackClick('project_card_click', 'hub-city-guides', '.project-card');
-            navigate('/work/hub-city-guides');
-          }}
+          onClick={() => handleHomeProjectClick(projects[2], project4Ref)}
           className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title="HUB CITY GUIDES" viewLabel={t('home.view_project')} />
@@ -502,10 +503,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           ref={project5Ref}
           image={ndsHome}
           title="NDS"
-          onClick={() => {
-            trackClick('project_card_click', 'nds', '.project-card');
-            navigate('/work/nds');
-          }}
+          onClick={() => handleHomeProjectClick(projects[3], project5Ref)}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title="NDS" viewLabel={t('home.view_project')} />
@@ -515,10 +513,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
           ref={project1Ref}
           image={hermesDashboard}
           title="ADA"
-          onClick={() => {
-            trackClick('project_card_click', 'hermes', '.project-card');
-            navigate('/work/hermes');
-          }}
+          onClick={() => handleHomeProjectClick(projects[4], project1Ref)}
           className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title="ADA" viewLabel={t('home.view_project')} />
@@ -561,20 +556,16 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
           {/* Service Card 1 — Web Dev — coral */}
           {(() => {
-            const theme = '#E85A4F';
+            const theme = '#ffffff';
             return (
               <GlitchCard color={theme} image={serv1}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>01</span>
-                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>WEB</span>
+                  <AsciiText tag="span" className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>01</AsciiText>
+                  <AsciiText tag="span" className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>WEB</AsciiText>
                 </div>
                 <div className="flex flex-col gap-3">
-                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
-                    {t('home.services.web_dev.title')}
-                  </h3>
-                  <p className="text-[13px] leading-[1.7] text-[#666666]">
-                    {t('home.services.web_dev.description')}
-                  </p>
+                  <AsciiText tag="h3" className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>{t('home.services.web_dev.title')}</AsciiText>
+                  <AsciiText tag="p" className="text-[13px] leading-[1.7] text-[#666666]">{t('home.services.web_dev.description')}</AsciiText>
                 </div>
               </GlitchCard>
             );
@@ -582,20 +573,16 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
           {/* Service Card 2 — Cloud — silver */}
           {(() => {
-            const theme = '#C9BFA8';
+            const theme = '#ffffff';
             return (
               <GlitchCard color={theme} image={serv2}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>02</span>
-                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>CLOUD</span>
+                  <AsciiText tag="span" className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>02</AsciiText>
+                  <AsciiText tag="span" className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>CLOUD</AsciiText>
                 </div>
                 <div className="flex flex-col gap-3">
-                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
-                    {t('home.services.cloud.title')}
-                  </h3>
-                  <p className="text-[13px] leading-[1.7] text-[#666666]">
-                    {t('home.services.cloud.description')}
-                  </p>
+                  <AsciiText tag="h3" className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>{t('home.services.cloud.title')}</AsciiText>
+                  <AsciiText tag="p" className="text-[13px] leading-[1.7] text-[#666666]">{t('home.services.cloud.description')}</AsciiText>
                 </div>
               </GlitchCard>
             );
@@ -603,20 +590,16 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
           {/* Service Card 3 — AI — teal */}
           {(() => {
-            const theme = '#6EC6CC';
+            const theme = '#ffffff';  
             return (
               <GlitchCard color={theme} image={serv3}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>03</span>
-                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>AI</span>
+                  <AsciiText tag="span" className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>03</AsciiText>
+                  <AsciiText tag="span" className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>AI</AsciiText>
                 </div>
                 <div className="flex flex-col gap-3">
-                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
-                    {t('home.services.ai.title')}
-                  </h3>
-                  <p className="text-[13px] leading-[1.7] text-[#666666]">
-                    {t('home.services.ai.description')}
-                  </p>
+                  <AsciiText tag="h3" className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>{t('home.services.ai.title')}</AsciiText>
+                  <AsciiText tag="p" className="text-[13px] leading-[1.7] text-[#666666]">{t('home.services.ai.description')}</AsciiText>
                 </div>
               </GlitchCard>
             );
@@ -624,20 +607,16 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
 
           {/* Service Card 4 — 3D/Creative — amber */}
           {(() => {
-            const theme = '#C8A96E';
+            const theme = '#ffffff';
             return (
               <GlitchCard color={theme} image={serv4}>
                 <div className="flex items-start justify-between">
-                  <span className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>04</span>
-                  <span className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>3D</span>
+                  <AsciiText tag="span" className="font-mono text-[52px] leading-none font-bold" style={{ color: theme + 'aa' }}>04</AsciiText>
+                  <AsciiText tag="span" className="font-mono text-xs tracking-[0.2em] uppercase self-start pt-2" style={{ color: theme + '44' }}>3D</AsciiText>
                 </div>
                 <div className="flex flex-col gap-3">
-                  <h3 className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>
-                    {t('home.services.3d.title')}
-                  </h3>
-                  <p className="text-[13px] leading-[1.7] text-[#666666]">
-                    {t('home.services.3d.description')}
-                  </p>
+                  <AsciiText tag="h3" className="font-mono uppercase leading-none text-[22px] md:text-[20px] lg:text-[18px] xl:text-[22px]" style={{ color: theme }}>{t('home.services.3d.title')}</AsciiText>
+                  <AsciiText tag="p" className="text-[13px] leading-[1.7] text-[#666666]">{t('home.services.3d.description')}</AsciiText>
                 </div>
               </GlitchCard>
             );

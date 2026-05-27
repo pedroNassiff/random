@@ -310,16 +310,21 @@ function useSessionData(sessionId) {
 
 function useSessionTimeSeries(recordingId) {
   const [metrics, setMetrics] = useState(null)
+  const [perChannelByPhase, setPerChannelByPhase] = useState(null)
 
   useEffect(() => {
     if (!recordingId) return
     fetch(`${API}/sessions/${recordingId}/metrics`)
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && Array.isArray(d.metrics)) setMetrics(d.metrics) })
+      .then(d => {
+        if (!d) return
+        if (Array.isArray(d.metrics)) setMetrics(d.metrics)
+        if (d.per_channel_by_phase) setPerChannelByPhase(d.per_channel_by_phase)
+      })
       .catch(() => {})
   }, [recordingId])
 
-  return metrics
+  return { metrics, perChannelByPhase }
 }
 
 // ── Section: Time-series EEG charts ──────────────────────────────────────────
@@ -936,16 +941,17 @@ function TopoMap({ values, size = 120 }) {
   )
 }
 
-function TopoColorBar({ vMin, vMax, width = 280 }) {
+function TopoColorBar({ vMin, vMax, width = 280, raw = false }) {
   const stops = Array.from({ length: 60 }, (_, i) => {
     const t = i / 59
     const [r, g, b] = _jet(t)
     return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`
   }).join(',')
+  const fmt = v => raw ? v.toFixed(2) : `${(v * 100).toFixed(1)}%`
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ fontSize: '0.58rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', minWidth: 30, textAlign: 'right' }}>
-        {(vMin * 100).toFixed(1)}%
+        {fmt(vMin)}
       </span>
       <div style={{
         width, height: 7, borderRadius: 4, flexShrink: 0,
@@ -953,7 +959,7 @@ function TopoColorBar({ vMin, vMax, width = 280 }) {
         border: '1px solid rgba(255,255,255,0.1)',
       }} />
       <span style={{ fontSize: '0.58rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', minWidth: 30 }}>
-        {(vMax * 100).toFixed(1)}%
+        {fmt(vMax)}
       </span>
     </div>
   )
@@ -978,19 +984,121 @@ function computePhaseAverages(metrics, durationSec) {
   return res
 }
 
-function SectionTopoMaps({ metrics, durationSeconds }) {
+const CH_MAP = { af7: 'AF7', af8: 'AF8', tp9: 'TP9', tp10: 'TP10' }
+const PHASE_ORDER = [
+  'baseline_open', 'baseline_closed', 'shamatha', 'meditation_free',
+  'cognitive_task', 'recovery', 'deep_meditation', 'close',
+]
+const PHASE_SHORT = {
+  baseline_open: 'OA', baseline_closed: 'OC', shamatha: 'Sha',
+  meditation_free: 'Med', cognitive_task: 'Cog', recovery: 'Rec',
+  deep_meditation: 'Prof', close: 'Cie',
+}
+
+function SectionTopoMaps({ metrics, perChannelByPhase, durationSeconds }) {
   const [band, setBand] = useState('alpha')
-  const isProtocol = durationSeconds != null && durationSeconds >= 1500
+
+  // useMemo must be before any conditional return (Rules of Hooks)
   const phaseAvgs = useMemo(
     () => computePhaseAverages(metrics, durationSeconds),
     [metrics, durationSeconds]
   )
 
+  const hasReal = perChannelByPhase && Object.keys(perChannelByPhase).length > 0
+
+  // ── REAL DATA BRANCH ────────────────────────────────────────────────────────
+  if (hasReal) {
+    const phases = PHASE_ORDER.filter(p => perChannelByPhase[p])
+    const phaseTopo = phases.map(phaseKey => {
+      const bandData = perChannelByPhase[phaseKey]?.[band] || {}
+      const values = {}
+      Object.entries(bandData).forEach(([k, v]) => {
+        if (CH_MAP[k]) values[CH_MAP[k]] = v
+      })
+      const present = Object.values(values).filter(v => v != null)
+      const bandAvg = present.length ? present.reduce((a, b) => a + b, 0) / present.length : 0
+      return { phaseKey, phaseInfo: PHASE_INFO[phaseKey] || {}, values, bandAvg }
+    })
+
+    const allVals = phaseTopo.flatMap(p => Object.values(p.values))
+    const gMin = allVals.length ? Math.min(...allVals) : 0
+    const gMax = allVals.length ? Math.max(...allVals) : 1
+
+    return (
+      <Card title="Topographic mapping — distribución espacial" accent="#ec4899">
+        <p style={pStyle}>
+          Potencia de banda <strong>medida</strong> en cada electrodo del Muse 2
+          (TP9, AF7, AF8, TP10) por fase del protocolo. Valores en µV²/Hz absolutos,
+          interpolación IDW. Sin priors — distribución espacial real de la sesión.
+        </p>
+
+        <div style={{ marginBottom: 14 }}>
+          <Badge color="#10b981">● MEDIDO · per-channel real</Badge>
+        </div>
+
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 22, marginTop: 4 }}>
+          {BANDS.map(b => (
+            <button key={b} onClick={() => setBand(b)} style={{
+              padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              fontFamily: 'monospace', fontSize: '0.7rem', transition: 'all 0.15s',
+              background: band === b ? BAND_COLORS[b] : 'rgba(255,255,255,0.05)',
+              color: band === b ? '#fff' : BAND_COLORS[b],
+              fontWeight: band === b ? 600 : 400,
+              boxShadow: band === b ? `0 0 12px ${BAND_COLORS[b]}55` : 'none',
+            }}>
+              {BAND_SYMBOL[b]} {b}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(phaseTopo.length, 4)}, 1fr)`, gap: '24px 16px' }}>
+          {phaseTopo.map(({ phaseKey, phaseInfo, values, bandAvg }) => (
+            <div key={phaseKey} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <TopoMap values={values} size={110} />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.65rem', fontFamily: 'monospace', fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>
+                  {phaseInfo.icon || ''} {PHASE_SHORT[phaseKey] || phaseKey}
+                </div>
+                <div style={{ fontSize: '0.56rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)' }}>
+                  {phaseInfo.name || phaseKey}
+                </div>
+                <div style={{ fontSize: '0.62rem', fontFamily: 'monospace', marginTop: 2, color: BAND_COLORS[band] }}>
+                  {bandAvg.toFixed(2)} µV²
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <TopoColorBar vMin={gMin} vMax={gMax} raw />
+          <span style={{ fontSize: '0.56rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)' }}>
+            escala global de la sesión (µV²/Hz) · azul = bajo · rojo = alto
+          </span>
+        </div>
+
+        <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8,
+          background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)',
+          fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', lineHeight: 1.7 }}>
+          Distribución real por electrodo desde eeg_band_power. Las fases se derivan de
+          los markers del protocolo (no de tiempos fijos). Habilita FAA y asimetría
+          hemisférica reales (próximas fases). Refs: Cannard et al. 2021 · Klimesch 1999.
+        </div>
+      </Card>
+    )
+  }
+
+  // ── FALLBACK: estimación con priors ─────────────────────────────────────────
+  const isProtocol = durationSeconds != null && durationSeconds >= 1500
+
   if (!isProtocol) return (
     <Card title="Topographic mapping — distribución espacial" accent="#ec4899">
       <div style={{ padding: '32px 16px', textAlign: 'center', borderRadius: 8,
         background: 'rgba(236,72,153,0.04)', border: '1px dashed rgba(236,72,153,0.2)' }}>
-        <p style={{ ...pStyle, margin: 0 }}>Disponible para sesiones de protocolo completo (≥ 25 min)</p>
+        <p style={{ ...pStyle, margin: 0 }}>
+          Sin datos per-channel para esta sesión. Disponible para sesiones de
+          protocolo completo (≥ 25 min) grabadas antes del sistema per-channel.
+        </p>
       </div>
     </Card>
   )
@@ -1019,12 +1127,12 @@ function SectionTopoMaps({ metrics, durationSeconds }) {
   return (
     <Card title="Topographic mapping — distribución espacial" accent="#ec4899">
       <p style={pStyle}>
-        Distribución espacial estimada de la potencia de banda en los 4 electrodos del Muse 2
-        por cada fase del protocolo. Interpolación IDW (Inverse Distance Weighting)
-        con prior neuroanatómico por banda.
+        Distribución espacial <strong>estimada</strong> de la potencia de banda con prior
+        neuroanatómico. Interpolación IDW.
       </p>
-
-      {/* Band selector */}
+      <div style={{ marginBottom: 14 }}>
+        <Badge color="#f59e0b">◐ ESTIMADO · prior neuroanatómico</Badge>
+      </div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 22, marginTop: 4 }}>
         {BANDS.map(b => (
           <button key={b} onClick={() => setBand(b)} style={{
@@ -1034,20 +1142,15 @@ function SectionTopoMaps({ metrics, durationSeconds }) {
             color: band === b ? '#fff' : BAND_COLORS[b],
             fontWeight: band === b ? 600 : 400,
             boxShadow: band === b ? `0 0 12px ${BAND_COLORS[b]}55` : 'none',
-          }}>
-            {BAND_SYMBOL[b]} {b}
-          </button>
+          }}>{BAND_SYMBOL[b]} {b}</button>
         ))}
       </div>
-
-      {/* Topo grid: 4 columns × 2 rows */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px 16px' }}>
         {phaseTopo.map(({ phase, phaseInfo, values, bandAvg, coh }) => (
           <div key={phase.t} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <TopoMap values={values} size={110} />
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.65rem', fontFamily: 'monospace', fontWeight: 600,
-                color: 'rgba(255,255,255,0.75)' }}>
+              <div style={{ fontSize: '0.65rem', fontFamily: 'monospace', fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>
                 {phaseInfo.icon || ''} {phase.short}
               </div>
               <div style={{ fontSize: '0.56rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)' }}>
@@ -1065,24 +1168,11 @@ function SectionTopoMaps({ metrics, durationSeconds }) {
           </div>
         ))}
       </div>
-
-      {/* Color bar */}
-      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', flexDirection: 'column',
-        alignItems: 'center', gap: 4 }}>
+      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
         <TopoColorBar vMin={gMin} vMax={gMax} />
         <span style={{ fontSize: '0.56rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.18)' }}>
           escala global de la sesión · azul = bajo · rojo = alto
         </span>
-      </div>
-
-      {/* Data provenance note */}
-      <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8,
-        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
-        fontSize: '0.6rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.2)', lineHeight: 1.7 }}>
-        Estimación espacial basada en priors neuroanatómicos (α: posterior TP9/TP10×1.25 · θ/β: frontal AF7/AF8×1.2).
-        El valor base es la media del agregado de los 4 canales por fase de protocolo.
-        Para asimetría hemisférica real (FAA, lateralización) se requiere almacenar
-        alpha_af7, alpha_af8, alpha_tp9, alpha_tp10 individualmente en InfluxDB.
       </div>
     </Card>
   )
@@ -1505,7 +1595,7 @@ export default function SessionDetail() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
   const { data, loading, error, reload } = useSessionData(sessionId)
-  const metrics = useSessionTimeSeries(data?.recording?.id)
+  const { metrics, perChannelByPhase } = useSessionTimeSeries(data?.recording?.id)
   const { containerRef: gridRef, width: gridWidth } = useContainerWidth()
 
   const [layouts, setLayouts] = useState(() => {
@@ -1536,7 +1626,7 @@ export default function SessionDetail() {
       case 'resumen':    return <SectionOverview data={data} sessionId={sessionId} />
       case 'actividad':  return <SectionTimeSeries metrics={metrics} durationSeconds={data?.recording?.duration_seconds} />
       case 'ersp':       return <SectionERSP metrics={metrics} durationSeconds={data?.recording?.duration_seconds} />
-      case 'topomap':    return <SectionTopoMaps metrics={metrics} durationSeconds={data?.recording?.duration_seconds} />
+      case 'topomap':    return <SectionTopoMaps metrics={metrics} perChannelByPhase={perChannelByPhase} durationSeconds={data?.recording?.duration_seconds} />
       case 'video':      return <SectionVideo sessionId={Number(sessionId)} />
       case 'validacion': return <SectionValidation data={data} />
       case 'protocolo':  return <SectionProtocol data={data} />

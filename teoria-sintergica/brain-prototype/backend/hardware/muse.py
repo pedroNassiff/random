@@ -491,7 +491,7 @@ class MuseConnector(EEGDevice):
         Si el stream se pierde (BLE disconnect), detecta stale data y reconecta.
         """
         reconnect_attempts = 0
-        max_reconnect = 5
+        max_reconnect = 15  # increased: muselsl BLE reconnect can take >40s on macOS
         stale_logged = False
         
         while not self._stop_event.is_set():
@@ -504,6 +504,11 @@ class MuseConnector(EEGDevice):
                     if stale_logged:
                         print("✅ Stream recuperado — datos fluyendo de nuevo")
                         stale_logged = False
+                        # Audio: señal de recuperación (distinto al alerta de pérdida)
+                        subprocess.Popen(["afplay", "/System/Library/Sounds/Glass.aiff"],
+                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        subprocess.Popen(["say", "-v", "Luciana", "Señal recuperada"],
+                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     with self._buffer_lock:
                         # Agregar a buffers
                         for i, ch in enumerate(self.CHANNELS):
@@ -519,9 +524,14 @@ class MuseConnector(EEGDevice):
                         if gap > self._stale_threshold and not stale_logged:
                             print(f"⚠️ Stream stale: {gap:.1f}s sin datos EEG. Posible desconexión BLE.")
                             stale_logged = True
+                            # Audio alert — grave y urgente, claramente distinto a Glass de fases
+                            subprocess.Popen(["afplay", "/System/Library/Sounds/Basso.aiff"],
+                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            subprocess.Popen(["say", "-v", "Luciana", "Señal perdida. Reconectando."],
+                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                         
-                        if gap > 8.0:
-                            # Más de 8s sin datos: intentar reconectar LSL
+                        if gap > 15.0:
+                            # Más de 15s sin datos: intentar reconectar LSL (da tiempo a muselsl de reconectar BLE)
                             reconnect_attempts += 1
                             if reconnect_attempts > max_reconnect:
                                 print("❌ Stream loop: máximo de reconexiones alcanzado.")

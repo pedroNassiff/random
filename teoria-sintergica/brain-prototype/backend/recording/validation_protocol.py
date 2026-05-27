@@ -24,6 +24,7 @@ Usage:
 
 import time
 import json
+import subprocess
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 from pathlib import Path
@@ -414,6 +415,18 @@ class ValidationProtocol:
             "instruction": phase.instruction,
         })
         print(f"📍 [ValidationProtocol] Phase {self.current_phase_idx + 1}/{len(self.phases)}: {phase.label} — {phase.instruction} ({phase.duration}s)")
+
+        # Audio local: campana de transición + instrucción hablada.
+        # Funciona aunque ElevenLabs esté caído. Glass es claramente distinto
+        # al Basso que suena en BLE disconnect.
+        try:
+            subprocess.Popen(["afplay", "/System/Library/Sounds/Glass.aiff"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if phase.tts_on_start:
+                subprocess.Popen(["say", "-v", "Luciana", phase.tts_on_start],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass  # no bloquear el protocolo si afplay/say no está disponible
 
     def _add_marker(self, label: str):
         if self.recorder:

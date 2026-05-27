@@ -35,6 +35,17 @@ const PageTransition = ({ children }) => {
   // Transición entre páginas
   useEffect(() => {
     if (!isInitialMount.current && location.pathname !== prevLocationRef.current) {
+      // Si viene del expand de un proyecto, saltar animación de barras
+      const skip = sessionStorage.getItem('skipPageTransition')
+      if (skip) {
+        sessionStorage.removeItem('skipPageTransition')
+        prevLocationRef.current = location.pathname
+        setIsTransitioning(false)
+        setShowContent(true)
+        window.scrollTo(0, 0)
+        return
+      }
+
       // Ocultar contenido viejo inmediatamente
       setShowContent(false)
       setIsTransitioning(true)

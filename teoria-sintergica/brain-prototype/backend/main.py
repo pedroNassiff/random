@@ -1483,6 +1483,74 @@ async def get_session_eeg(session_id: int, start: float = 0, end: float = None):
         "count": len(samples)
     }
 
+@app.post("/sessions/{session_id}/reclose")
+async def reclose_session(session_id: int):
+    """
+    Re-runs end_recording for a session whose recorder stopped before persisting
+    per-channel aggregates to PostgreSQL. Raw and per-window data must already
+    exist in InfluxDB.
+
+    Safe to call multiple times — always overwrites with fresh InfluxDB aggregates.
+    """
+    try:
+        pg = get_postgres_client_sync()
+        influx = get_influx_client()
+
+        recording = pg.get_recording(session_id)
+        if recording is None:
+            return {"status": "error", "message": f"Session {session_id} not found in PostgreSQL"}
+
+        # Recompute aggregated metrics from InfluxDB
+        aggregated_metrics = {}
+        try:
+            aggregated_metrics = influx.get_aggregated_metrics(session_id)
+            for k, v in aggregated_metrics.items():
+                if hasattr(v, 'item'):
+                    aggregated_metrics[k] = v.item()
+                elif v is not None:
+                    aggregated_metrics[k] = float(v)
+        except Exception as e:
+            return {"status": "error", "message": f"Failed to get aggregated metrics: {e}"}
+
+        # Recompute per-channel aggregates (FAA, alpha_*_avg)
+        per_channel_agg = {}
+        try:
+            per_channel_agg = influx.get_per_channel_aggregates(session_id)
+            aggregated_metrics.update(per_channel_agg)
+        except Exception as e:
+            return {"status": "error", "message": f"Failed to get per-channel aggregates: {e}"}
+
+        if per_channel_agg.get('per_channel_version', 0) == 0:
+            return {"status": "error", "message": "No per-channel data found in InfluxDB for this session"}
+
+        updated = pg.end_recording(
+            session_id,
+            duration_seconds=recording.duration_seconds or 0,
+            sample_count=recording.sample_count or 0,
+            metrics_count=recording.metrics_count or 0,
+            calibration_passed=recording.calibration_passed or False,
+            avg_signal_quality=recording.avg_signal_quality or 0,
+            aggregated_metrics=aggregated_metrics,
+        )
+
+        if updated is None:
+            return {"status": "error", "message": f"UPDATE returned no row for session {session_id}"}
+
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "per_channel_version": per_channel_agg.get('per_channel_version'),
+            "alpha_tp9_avg": per_channel_agg.get('alpha_tp9_avg'),
+            "alpha_af7_avg": per_channel_agg.get('alpha_af7_avg'),
+            "alpha_af8_avg": per_channel_agg.get('alpha_af8_avg'),
+            "alpha_tp10_avg": per_channel_agg.get('alpha_tp10_avg'),
+            "faa_mean": per_channel_agg.get('faa_mean'),
+            "faa_baseline_closed": per_channel_agg.get('faa_baseline_closed'),
+            "posterior_asymmetry_mean": per_channel_agg.get('posterior_asymmetry_mean'),
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/sessions/{session_id}/metrics")
 async def get_session_metrics(session_id: int):
     """
@@ -1510,11 +1578,18 @@ async def get_session_metrics(session_id: int):
         except Exception as e_pc:
             pass  # Non-fatal: per_channel stays None
 
+        per_channel_by_phase = None
+        try:
+            per_channel_by_phase = influx.get_per_channel_by_phase(session_id)
+        except Exception:
+            pass  # non-fatal
+
         return {
             "status": "success",
             "metrics": metrics,
             "count": len(metrics),
             "per_channel": per_channel,
+            "per_channel_by_phase": per_channel_by_phase,
             "per_channel_version": per_channel_version,
         }
     except Exception as e:
@@ -1524,6 +1599,7 @@ async def get_session_metrics(session_id: int):
             "metrics": metrics,
             "count": len(metrics),
             "per_channel": None,
+            "per_channel_by_phase": None,
             "per_channel_version": 0,
             "source": "sqlite",
         }

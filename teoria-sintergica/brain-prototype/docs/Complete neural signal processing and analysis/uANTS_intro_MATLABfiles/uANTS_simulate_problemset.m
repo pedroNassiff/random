@@ -26,21 +26,21 @@
 
 % specify EEG parameters
 EEG.srate  = 500; % sampling rate in Hz
-EEG.pnts   = 
-EEG.trials = 
-EEG.nbchan = 
+EEG.pnts   = EEG.srate*2; % number of time points (2 seconds of data)
+EEG.trials = 30;
+EEG.nbchan = 10;
 
 % time vector
 EEG.times = (0:EEG.pnts-1)/EEG.srate;
 
 
 % create data as white noise
-EEG.data = randn
+EEG.data = randn(EEG.nbchan, EEG.pnts, EEG.trials);
 
 % the function below takes at least one argument (EEG),
 % and optionally a second argument (channel number),
 % and optionally a third argument (figure number)
-plot_simEEG(EEG,2,3)
+plot_simEEG(EEG,2,1)
 
 
 %%% Question: What is the effect of noise amplitude on the 
@@ -65,7 +65,7 @@ EEG.nbchan = 4;
 ed = 50; % try different values!
 
 % initialize EEG data as a zeros matrix
-EEG.data = zeros();
+EEG.data = zeros(EEG.nbchan, EEG.pnts, EEG.trials);
 
 
 for chani=1:EEG.nbchan
@@ -86,7 +86,7 @@ for chani=1:EEG.nbchan
     end
 end
 
-
+plot_simEEG(EEG,1,1)
 
 %%% Question: Which looks more like real EEG data: white or pink noise?
 %             Why do you think this is?
@@ -114,11 +114,11 @@ for chani=1:EEG.nbchan
         % create a multicomponent sine wave
         sinewave = zeros(1,EEG.pnts);
         for si=1:length(frex)
-            sinewave = sinewave + 
+            sinewave = sinewave + amps(si) * sin(2*pi*EEG.times*frex(si));
         end
         
         % data as a sine wave plus noise
-        EEG.data = sinewave;
+        EEG.data(chani,:,triali) = sinewave + randn(1,EEG.pnts);
     end
 end
 

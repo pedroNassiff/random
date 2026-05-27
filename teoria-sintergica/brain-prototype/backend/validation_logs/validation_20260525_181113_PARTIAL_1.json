@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "name": "sesion-per-channel",
+    "notes": "",
+    "time_of_day": "evening",
+    "sleep_quality": 4,
+    "caffeine": true,
+    "prior_meditation_min": 0,
+    "subjective_pre": 8,
+    "subjective_post": 0
+  },
+  "protocol_start": 1779725316.760684,
+  "protocol_start_iso": "2026-05-25T18:08:36.760684",
+  "phases_completed": 1,
+  "total_phases": 8,
+  "total_events": 9,
+  "events": [
+    {
+      "time": 1779725316.777293,
+      "time_iso": "2026-05-25T18:08:36.777295",
+      "elapsed": 0.01662588119506836,
+      "event": "protocol_start",
+      "data": {
+        "name": "sesion-per-channel",
+        "total_phases": 8,
+        "total_duration": 1800
+      }
+    },
+    {
+      "time": 1779725316.8131552,
+      "time_iso": "2026-05-25T18:08:36.813163",
+      "elapsed": 0.05250191688537598,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_open",
+        "label": "BASELINE",
+        "duration": 120,
+        "instruction": "Ojos abiertos"
+      }
+    },
+    {
+      "time": 1779725432.898918,
+      "time_iso": "2026-05-25T18:10:32.898920",
+      "elapsed": 116.13824582099915,
+      "event": "protocol_pause",
+      "data": {
+        "phase": "baseline_open"
+      }
+    },
+    {
+      "time": 1779725433.848243,
+      "time_iso": "2026-05-25T18:10:33.848244",
+      "elapsed": 117.08757090568542,
+      "event": "protocol_resume",
+      "data": {
+        "phase": "baseline_open"
+      }
+    },
+    {
+      "time": 1779725437.840629,
+      "time_iso": "2026-05-25T18:10:37.840633",
+      "elapsed": 121.07996010780334,
+      "event": "phase_end",
+      "data": {
+        "phase": "baseline_open",
+        "elapsed": 120.07791686058044,
+        "expected_duration": 120,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1779725437.843223,
+      "time_iso": "2026-05-25T18:10:37.843223",
+      "elapsed": 121.08254384994507,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_closed",
+        "label": "BASELINE",
+        "duration": 120,
+        "instruction": "Cerr\u00e1 los ojos"
+      }
+    },
+    {
+      "time": 1779725441.774552,
+      "time_iso": "2026-05-25T18:10:41.774556",
+      "elapsed": 125.0138828754425,
+      "event": "protocol_pause",
+      "data": {
+        "phase": "baseline_closed"
+      }
+    },
+    {
+      "time": 1779725441.8755682,
+      "time_iso": "2026-05-25T18:10:41.875573",
+      "elapsed": 125.11491203308105,
+      "event": "protocol_resume",
+      "data": {
+        "phase": "baseline_closed"
+      }
+    },
+    {
+      "time": 1779725473.777219,
+      "time_iso": "2026-05-25T18:11:13.777222",
+      "elapsed": 157.01654410362244,
+      "event": "protocol_stop",
+      "data": {
+        "completed_phases": 1,
+        "total_phases": 8,
+        "total_elapsed": 157.01652693748474
+      }
+    }
+  ]
+}
