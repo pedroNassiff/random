@@ -17,13 +17,15 @@ import SanjiDayDetail from './pages/SanjiDayDetail.jsx';
 import PlanningProspeccion from './components/PlanningProspeccion.jsx';
 import PageTransition from './components/PageTransition.jsx';
 import { AnalyticsProvider } from './lib/useAnalytics.jsx';
+import { ExpandTransitionProvider } from './lib/useExpandTransition.jsx';
 import './index.css';
 
 function AppRoutes() {
   const location = useLocation();
   
   return (
-    <PageTransition>
+    <ExpandTransitionProvider>
+      <PageTransition>
       <Routes location={location}>
         <Route path="/" element={<Home />} />
         <Route path="/work" element={<Work />} />
@@ -43,7 +45,8 @@ function AppRoutes() {
         <Route path="/planning-house" element={<Navigate to="/planning-prospeccion" replace />} />
         <Route path="/lanalisis-datasets" element={<Navigate to="/analisis-datasets" replace />} />
       </Routes>
-    </PageTransition>
+      </PageTransition>
+    </ExpandTransitionProvider>
   );
 }
 

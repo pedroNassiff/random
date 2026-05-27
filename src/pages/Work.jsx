@@ -1,5 +1,4 @@
-import React, { useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePageTracking, useEngagementTracking, useEventTracking } from '../lib/useAnalytics.jsx';
 import { projects } from '../data/projects';
@@ -11,11 +10,11 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useExpandTransition } from '../lib/useExpandTransition';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function Work() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   usePageTracking('work');
   const { trackClick } = useEventTracking();
@@ -28,6 +27,13 @@ export default function Work() {
   const project6Ref = useRef(null);
   const project7Ref = useRef(null);
   const project8Ref = useRef(null);
+
+  const { triggerExpand } = useExpandTransition();
+
+  const handleProjectClick = useCallback((project, cardRef) => {
+    trackClick('work_project_click', project.id, '.work-project-card');
+    triggerExpand(project, cardRef);
+  }, [triggerExpand, trackClick]);
 
   // Scroll to top al montar el componente
   useEffect(() => {
@@ -199,10 +205,7 @@ export default function Work() {
           ref={project1Ref}
           image={projects[0].image}
           title={projects[0].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[0].id, '.work-project-card');
-            navigate(`/work/${projects[0].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[0], project1Ref)}
           className="absolute top-24 left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[0].title} viewLabel={t('home.view_project')} />
@@ -213,10 +216,7 @@ export default function Work() {
           ref={project2Ref}
           image={projects[1].image}
           title={projects[1].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[1].id, '.work-project-card');
-            navigate(`/work/${projects[1].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[1], project2Ref)}
           className="absolute top-[40px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[1].title} viewLabel={t('home.view_project')} />
@@ -227,10 +227,7 @@ export default function Work() {
           ref={project3Ref}
           image={projects[2].image}
           title={projects[2].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[2].id, '.work-project-card');
-            navigate(`/work/${projects[2].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[2], project3Ref)}
           className="absolute top-[20px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[2].title} viewLabel={t('home.view_project')} />
@@ -241,10 +238,7 @@ export default function Work() {
           ref={project4Ref}
           image={projects[3].image}
           title={projects[3].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[3].id, '.work-project-card');
-            navigate(`/work/${projects[3].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[3], project4Ref)}
           className="absolute top-[2px] left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[3].title} viewLabel={t('home.view_project')} />
@@ -255,10 +249,7 @@ export default function Work() {
           ref={project5Ref}
           image={projects[4].image}
           title={projects[4].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[4].id, '.work-project-card');
-            navigate(`/work/${projects[4].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[4], project5Ref)}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[4].title} viewLabel={t('home.view_project')} />
@@ -269,10 +260,7 @@ export default function Work() {
           ref={project6Ref}
           image={projects[5].image}
           title={projects[5].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[5].id, '.work-project-card');
-            navigate(`/work/${projects[5].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[5], project6Ref)}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[5].title} viewLabel={t('home.view_project')} />
@@ -283,10 +271,7 @@ export default function Work() {
           ref={project7Ref}
           image={projects[6].image}
           title={projects[6].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[6].id, '.work-project-card');
-            navigate(`/work/${projects[6].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[6], project7Ref)}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[6].title} viewLabel={t('home.view_project')} />
@@ -297,10 +282,7 @@ export default function Work() {
           ref={project8Ref}
           image={projects[7].image}
           title={projects[7].title}
-          onClick={() => {
-            trackClick('work_project_click', projects[7].id, '.work-project-card');
-            navigate(`/work/${projects[7].id}`);
-          }}
+          onClick={() => handleProjectClick(projects[7], project8Ref)}
           className="absolute left-1/2 w-[calc(100%-32px)] md:w-full max-w-[595px] lg:max-w-[646px] h-[340px] md:h-[612px] lg:h-[697px] rounded-2xl border border-[#E8E8E8] overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative cursor-pointer"
         >
           <ProjectHoverOverlay title={projects[7].title} viewLabel={t('home.view_project')} />

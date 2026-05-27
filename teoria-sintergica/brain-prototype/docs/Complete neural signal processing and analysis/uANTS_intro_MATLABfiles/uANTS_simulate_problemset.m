@@ -65,7 +65,7 @@ EEG.nbchan = 4;
 ed = 50; % try different values!
 
 % initialize EEG data as a zeros matrix
-EEG.data = zeros();
+EEG.data = zeros(EEG.nbchan, EEG.pnts, EEG.trials);
 
 
 for chani=1:EEG.nbchan
@@ -86,7 +86,7 @@ for chani=1:EEG.nbchan
     end
 end
 
-
+plot_simEEG(EEG,1,1)
 
 %%% Question: Which looks more like real EEG data: white or pink noise?
 %             Why do you think this is?
@@ -114,11 +114,11 @@ for chani=1:EEG.nbchan
         % create a multicomponent sine wave
         sinewave = zeros(1,EEG.pnts);
         for si=1:length(frex)
-            sinewave = sinewave + 
+            sinewave = sinewave + amps(si) * sin(2*pi*EEG.times*frex(si));
         end
         
         % data as a sine wave plus noise
-        EEG.data = sinewave;
+        EEG.data(chani,:,triali) = sinewave + randn(1,EEG.pnts);
     end
 end
 
