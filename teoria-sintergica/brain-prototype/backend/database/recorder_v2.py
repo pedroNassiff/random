@@ -10,7 +10,7 @@ import time
 import threading
 import numpy as np
 from typing import Optional, Dict, Callable, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .postgres_client import get_postgres_client_sync, PostgresClientSync, EEGRecording
 from .influx_client import get_influx_client, InfluxDBEEGClient, EEGSample, MetricSnapshot
@@ -155,7 +155,7 @@ class SessionRecorderV2:
         )
         
         self._start_time = time.time()
-        self._base_timestamp = datetime.utcnow()
+        self._base_timestamp = datetime.now(timezone.utc)
         self._recording = True
         self._samples_recorded = 0
         self._metrics_recorded = 0
@@ -167,7 +167,7 @@ class SessionRecorderV2:
    PostgreSQL ID : #{self._recording_id}
    Name          : {name or '(auto)'}
    Tags          : {tags or '(none)'}
-   Base timestamp: {self._base_timestamp.isoformat()}Z
+   Base timestamp: {self._base_timestamp.isoformat()}
    InfluxDB bucket: eeg-data  measurement: eeg_samples + eeg_metrics
 {'='*60}""")
         

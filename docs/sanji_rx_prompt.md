@@ -29,7 +29,7 @@ Cinco principios que rigen todo el sistema. Si una decisión de prompt los viola
 5. **Capas separadas: clínica primero, sintérgica como complemento opcional.** La capa científica sostiene el sistema. La capa sintérgica/grinbergiana entra como interpretación adicional, marcada explícitamente, nunca como fundamento de una alerta médica.
 
 ---
-
+ 
 ## 1. Arquitectura del prompting
 
 ```

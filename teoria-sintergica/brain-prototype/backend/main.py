@@ -1127,14 +1127,26 @@ async def stop_recording():
         }
     
     summary = session_recorder.stop()
-    
+
     # Refrescar playlist para incluir la nueva sesión
     brain.playlist.refresh_recorded_sessions()
-    
+
+    # Validación científica automática — corre siempre, sin piso de duración.
+    # Con pocos datos los tests van a dar "failed"/"marginal", pero corren igual
+    # y el resultado queda en validation_logs/validate-{id}.json para el doc.
+    auto_validation = None
+    recording_id = summary.get('recording_id') if summary else None
+    if recording_id:
+        try:
+            auto_validation = await protocol_validate(recording_id)
+        except Exception as e:
+            print(f"⚠️ [recording/stop] Auto-validación falló para #{recording_id}: {e}")
+
     return {
         "status": "success",
         "message": "Recording stopped",
-        "session": summary
+        "session": summary,
+        "auto_validation": auto_validation
     }
 
 @app.get("/recording/status")
@@ -1665,8 +1677,20 @@ async def protocol_start(request: ProtocolStartRequest):
 
 @app.post("/protocol/stop")
 async def protocol_stop():
-    """Detiene el protocolo y guarda el log."""
-    return validation_protocol.stop()
+    """Detiene el protocolo, guarda el log y corre la validación científica."""
+    result = validation_protocol.stop()
+
+    # Validación científica automática — misma lógica que /recording/stop.
+    # Corre sin importar cuántas fases se hayan completado ni cuánto duró.
+    recording_id = result.get('recording_id') if result else None
+    if recording_id:
+        try:
+            result['auto_validation'] = await protocol_validate(recording_id)
+        except Exception as e:
+            print(f"⚠️ [protocol/stop] Auto-validación falló para #{recording_id}: {e}")
+            result['auto_validation'] = None
+
+    return result
 
 @app.post("/protocol/pause")
 async def protocol_pause():

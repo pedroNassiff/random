@@ -166,7 +166,7 @@ for chani=1:EEG.nbchan
         fc = rand(1,EEG.pnts) .* exp(1i*2*pi*rand(1,EEG.pnts));
         
         % taper Fourier coefficients by the Gaussian
-        fc = 
+        fc = fc .* fg;
         
         % go back to time domain to get EEG data
         EEG.data(chani,:,triali) = real( ifft(fc) );

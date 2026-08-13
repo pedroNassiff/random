@@ -73,10 +73,10 @@ function LiveStatusBar({ bands, coherence, sessionProgress }) {
       {isActive && (
         <div className="flex gap-3">
           {[
-            { label: 'α', value: alpha, color: '#a78bfa', threshold: ALPHA_DEEP },
-            { label: 'θ', value: theta, color: '#34d399', threshold: 0.15 },
-            { label: 'β', value: beta,  color: '#fbbf24', threshold: BETA_HIGH },
-            { label: 'coh', value: coherence, color: '#60a5fa', threshold: COH_GOOD },
+            { label: 'α', value: alpha, color: '#10b981', threshold: ALPHA_DEEP },
+            { label: 'θ', value: theta, color: '#3b82f6', threshold: 0.15 },
+            { label: 'β', value: beta,  color: '#f59e0b', threshold: BETA_HIGH },
+            { label: 'coh', value: coherence, color: '#22d3ee', threshold: COH_GOOD },
           ].map(({ label, value, color, threshold }) => (
             <div key={label} className="flex-1">
               <div className="flex items-center justify-between mb-0.5">

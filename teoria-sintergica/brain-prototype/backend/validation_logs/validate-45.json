@@ -1,0 +1,116 @@
+{
+  "status": "success",
+  "session_id": 45,
+  "validation": {
+    "tests": {
+      "berger_effect": {
+        "test": "berger_effect",
+        "passed": true,
+        "quality": "excellent",
+        "metrics": {
+          "alpha_open": 5.4072,
+          "alpha_closed": 21.3703,
+          "ratio": 3.952,
+          "open_samples": 255,
+          "closed_samples": 381,
+          "open_eog_rejected": 0,
+          "closed_eog_rejected": 0,
+          "estimator": "median"
+        },
+        "thresholds": {
+          "excellent": "> 1.5x",
+          "good": "> 1.2x",
+          "marginal": "> 1.05x"
+        },
+        "reference": "Cannard et al. 2021 \u2014 Muse validated for spectral analysis"
+      },
+      "cognitive_reactivity": {
+        "test": "cognitive_reactivity",
+        "passed": false,
+        "quality": "failed",
+        "metrics": {},
+        "error": "Missing meditation_free/baseline_closed or cognitive_task phases"
+      },
+      "coherence_stability": {
+        "test": "coherence_stability",
+        "passed": true,
+        "quality": "excellent",
+        "metrics": {
+          "autocorrelation_lag1": 0.7415,
+          "mean_coherence": 0.4895,
+          "std_coherence": 0.1774,
+          "coefficient_of_variation": 0.3623,
+          "n_samples": 986
+        },
+        "interpretation": {
+          "> 0.7": "Real neural coherence, excellent signal",
+          "0.5-0.7": "Acceptable, likely real signal",
+          "0.3-0.5": "Marginal, may contain noise",
+          "< 0.3": "Likely noise, check electrode contact"
+        }
+      }
+    },
+    "artifacts": {
+      "has_artifacts": true,
+      "muscle_artifact": {
+        "detected": true,
+        "gamma_rest_mean": 0.1397,
+        "threshold": 0.1,
+        "normal_range": "< 0.05"
+      },
+      "stale_data": {
+        "detected": false,
+        "flat_percent": 0.0
+      },
+      "warnings": [
+        "Muscle artifact detected: gamma=0.140 in rest (threshold: 0.10). Check jaw tension and electrode contact at TP9/TP10."
+      ]
+    },
+    "summary": {
+      "passed": 2,
+      "total": 3,
+      "overall": "acceptable",
+      "usable_for_training": true,
+      "artifact_contaminated": true
+    }
+  },
+  "quality_score": {
+    "total_score": 78.6,
+    "grade": "B",
+    "passes_quality_threshold": true,
+    "components": {
+      "signal_quality": {
+        "score": 60.4,
+        "weight": 0.25,
+        "description": "Average electrode contact quality",
+        "windows_with_quality": 986
+      },
+      "alpha_reactivity": {
+        "score": 100,
+        "weight": 0.25,
+        "description": "Berger effect (eyes closed/open alpha ratio)",
+        "ratio": 3.952,
+        "berger_passed": true
+      },
+      "data_completeness": {
+        "score": 79.9,
+        "weight": 0.25,
+        "description": "% of windows with adequate signal",
+        "total_windows": 986,
+        "clean_windows": 788
+      },
+      "coherence_stability": {
+        "score": 74.2,
+        "weight": 0.25,
+        "description": "Autocorrelation of coherence (real signal vs noise)",
+        "autocorrelation": 0.7415,
+        "coherence_passed": true
+      }
+    },
+    "total_windows": 986,
+    "session_duration_est": 197.2
+  },
+  "markers_found": 7,
+  "metrics_found": 986,
+  "note": "Backfill manual \u2014 datos recuperados con rango ampliado porque el bug de timestamp (ya corregido) dej\u00f3 estos puntos con hora futura."
+}

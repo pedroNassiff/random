@@ -1,61 +1,197 @@
 /**
  * SessionControl - Control de reproducción de sesiones EEG completas
- * 
- * Permite reproducir sesiones longitudinales cronológicamente con controles
- * tipo media player moderno (Spotify/YouTube style).
+ *
+ * EEG timeline: muestra la historia de bandas (δθαβγ + PLV) como waveforms
+ * temporales en el área de la barra de progreso.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useBrainStore, API_BASE }  from '../store';
 import { useAdaRealtimeStore }      from '../../../stores/adaRealtimeStore';
 
+// ── EEG timeline constants ────────────────────────────────────────────────────
+const BAND_CFG = [
+  { key: 'delta', sym: 'δ', color: '#8b5cf6' },
+  { key: 'theta', sym: 'θ', color: '#3b82f6' },
+  { key: 'alpha', sym: 'α', color: '#10b981' },
+  { key: 'beta',  sym: 'β', color: '#f59e0b' },
+  { key: 'gamma', sym: 'γ', color: '#ef4444' },
+  { key: 'plv',   sym: '⌁', color: '#22d3ee' },
+]
+const LABEL_W   = 18
+const BAND_H    = 11
+const TIMELINE_H = BAND_CFG.length * BAND_H + 6
+
+// ── EEG Timeline canvas ───────────────────────────────────────────────────────
+function EEGTimeline({ bandHistoryRef, progressRef, timeline }) {
+  const canvasRef = useRef(null)
+  const rafRef    = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const dpr = window.devicePixelRatio || 1
+    let W = 0
+
+    const resize = () => {
+      const parent = canvas.parentElement
+      if (!parent) return
+      W = parent.offsetWidth
+      canvas.width  = W * dpr
+      canvas.height = TIMELINE_H * dpr
+      canvas.style.width  = W + 'px'
+      canvas.style.height = TIMELINE_H + 'px'
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    resize()
+    const ro = new ResizeObserver(resize)
+    ro.observe(canvas.parentElement)
+
+    const draw = () => {
+      if (!W) { rafRef.current = requestAnimationFrame(draw); return }
+      const H      = TIMELINE_H
+      const chartW = W - LABEL_W
+
+      ctx.clearRect(0, 0, W, H)
+
+      // subtle background
+      ctx.fillStyle = 'rgba(0,8,22,0.45)'
+      ctx.beginPath()
+      ctx.roundRect(0, 0, W, H, 4)
+      ctx.fill()
+
+      const history = bandHistoryRef.current
+      const maxLen  = Math.max(...BAND_CFG.map(b => (history[b.key] || []).length), 2)
+
+      // Phase markers (dashed red verticals)
+      if (timeline?.phases && (timeline.total_duration_seconds || timeline.total_duration)) {
+        const totalDur = timeline.total_duration_seconds || timeline.total_duration
+        ctx.setLineDash([2, 4])
+        ctx.lineWidth = 0.5
+        for (const phase of timeline.phases) {
+          const t = phase.start_time_seconds ?? phase.start_time ?? 0
+          const x = LABEL_W + (t / totalDur) * chartW
+          ctx.strokeStyle = 'rgba(255,80,80,0.35)'
+          ctx.beginPath()
+          ctx.moveTo(x, 0); ctx.lineTo(x, H)
+          ctx.stroke()
+        }
+        ctx.setLineDash([])
+      }
+
+      // Each band waveform
+      BAND_CFG.forEach((band, bi) => {
+        const rowY = bi * BAND_H + 3
+        const midY = rowY + BAND_H / 2
+        const data = history[band.key] || []
+
+        // label
+        ctx.fillStyle = band.color + 'bb'
+        ctx.font = '7.5px "Courier New",monospace'
+        ctx.textAlign = 'right'
+        ctx.fillText(band.sym, LABEL_W - 2, midY + 2.5)
+
+        // baseline
+        ctx.strokeStyle = band.color + '1a'
+        ctx.lineWidth = 0.5
+        ctx.beginPath()
+        ctx.moveTo(LABEL_W, midY); ctx.lineTo(W, midY)
+        ctx.stroke()
+
+        if (data.length < 2) return
+
+        const max = Math.max(...data, 0.001)
+        const amp = (BAND_H - 3) / 2
+
+        // area fill
+        ctx.beginPath()
+        ctx.moveTo(LABEL_W, midY)
+        data.forEach((v, i) => {
+          ctx.lineTo(LABEL_W + (i / (maxLen - 1)) * chartW, midY - (v / max) * amp)
+        })
+        ctx.lineTo(LABEL_W + ((data.length - 1) / (maxLen - 1)) * chartW, midY)
+        ctx.closePath()
+        ctx.fillStyle = band.color + '18'
+        ctx.fill()
+
+        // line
+        ctx.beginPath()
+        data.forEach((v, i) => {
+          const x = LABEL_W + (i / (maxLen - 1)) * chartW
+          const y = midY - (v / max) * amp
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+        })
+        ctx.strokeStyle = band.color + 'cc'
+        ctx.lineWidth = 1
+        ctx.stroke()
+      })
+
+      // Playback cursor
+      const pct     = progressRef.current
+      const cursorX = LABEL_W + (pct / 100) * chartW
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+      ctx.lineWidth = 6
+      ctx.beginPath(); ctx.moveTo(cursorX, 0); ctx.lineTo(cursorX, H); ctx.stroke()
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(cursorX, 0); ctx.lineTo(cursorX, H); ctx.stroke()
+
+      rafRef.current = requestAnimationFrame(draw)
+    }
+
+    rafRef.current = requestAnimationFrame(draw)
+    return () => { cancelAnimationFrame(rafRef.current); ro.disconnect() }
+  }, [timeline]) // refs are stable, timeline is the only real dep
+
+  return (
+    <canvas ref={canvasRef} style={{ display: 'block', borderRadius: 4 }} />
+  )
+}
+
+// ── Progress animation hook ───────────────────────────────────────────────────
 /**
- * Hook que anima la barra de progreso directamente en el DOM (sin setState),
- * evitando 60 re-renders/segundo que freezeíian React.
- *
- * Uso: const fillRef = useProgressAnimation(currentPercent, totalDuration, isPlaying, playbackSpeed)
- * Asigna fillRef al elemento <div> del fill. El hook muta style.width directo.
+ * Anima la barra de progreso directo en el DOM (sin setState) para evitar
+ * 60 re-renders/segundo. También actualiza progressRef para el EEG timeline.
  */
 function useProgressAnimation(serverPercent, totalDuration, isPlaying, playbackSpeed = 1) {
-  const fillRef   = useRef(null);
-  const timeRef   = useRef(null);
-  const anchorRef = useRef({ percent: serverPercent, time: performance.now() });
-  const rafRef    = useRef(null);
+  const fillRef      = useRef(null);
+  const timeRef      = useRef(null);
+  const progressRef  = useRef(serverPercent);
+  const anchorRef    = useRef({ percent: serverPercent, time: performance.now() });
+  const rafRef       = useRef(null);
 
-  // Re-anclar cuando llega un nuevo valor del servidor
   useEffect(() => {
     anchorRef.current = { percent: serverPercent, time: performance.now() };
-    // Actualizar también el texto del tiempo
+    progressRef.current = serverPercent;
     if (timeRef.current && totalDuration > 0) {
       timeRef.current.textContent = formatSeconds((serverPercent / 100) * totalDuration);
     }
   }, [serverPercent, totalDuration]);
 
-  // rAF loop: muta el DOM directamente, sin setState
   useEffect(() => {
     if (!isPlaying || totalDuration <= 0) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       return;
     }
-
     const tick = () => {
-      if (fillRef.current) {
-        const elapsed   = (performance.now() - anchorRef.current.time) / 1000;
-        const increment = (elapsed * playbackSpeed / totalDuration) * 100;
-        const projected = Math.min(anchorRef.current.percent + increment, 100);
-        fillRef.current.style.width = `${projected}%`;
-        if (timeRef.current) {
-          timeRef.current.textContent = formatSeconds((projected / 100) * totalDuration);
-        }
+      const elapsed   = (performance.now() - anchorRef.current.time) / 1000;
+      const increment = (elapsed * playbackSpeed / totalDuration) * 100;
+      const projected = Math.min(anchorRef.current.percent + increment, 100);
+      if (fillRef.current) fillRef.current.style.width = `${projected}%`;
+      progressRef.current = projected;
+      if (timeRef.current) {
+        timeRef.current.textContent = formatSeconds((projected / 100) * totalDuration);
       }
       rafRef.current = requestAnimationFrame(tick);
     };
-
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [isPlaying, totalDuration, playbackSpeed]);
 
-  return { fillRef, timeRef };
+  return { fillRef, timeRef, progressRef };
 }
 
 function formatSeconds(seconds) {
@@ -83,10 +219,15 @@ export default function SessionControl({ isMobile = false }) {
   const progressBarRef = useRef(null);
   // Ref para el último sessionStatus — evita stale closure dentro del setInterval
   const sessionStatusRef = useRef(null);
+  // EEG timeline refs
+  const bandHistoryRef    = useRef({ delta: [], theta: [], alpha: [], beta: [], gamma: [], plv: [] });
+  const lastSampleTimeRef = useRef(0);
+  const isPlayingRef      = useRef(false);
+  const sessionActiveRef  = useRef(false);
 
   // Animación de la barra: muta DOM directamente (sin setState a 60fps)
   const targetProgress = sessionStatus?.progress_percent || 0;
-  const { fillRef: progressFillRef, timeRef: currentTimeRef } = useProgressAnimation(
+  const { fillRef: progressFillRef, timeRef: currentTimeRef, progressRef } = useProgressAnimation(
     targetProgress,
     sessionStatus?.total_duration || 0,
     isPlaying && !isDragging,
@@ -165,7 +306,7 @@ export default function SessionControl({ isMobile = false }) {
   // Cargar playlist al activar
   useEffect(() => {
     if (!sessionActive || !API_BASE) return;
-    
+
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/playlist`);
@@ -178,7 +319,43 @@ export default function SessionControl({ isMobile = false }) {
       }
     })();
   }, [sessionActive]);
-  
+
+  // Sincronizar refs con state (para closures del store subscription)
+  useEffect(() => { isPlayingRef.current = isPlaying }, [isPlaying]);
+  useEffect(() => { sessionActiveRef.current = sessionActive }, [sessionActive]);
+
+  // Limpiar historia al cargar nueva sesión o al detener
+  useEffect(() => {
+    if (isLoadingSession) {
+      bandHistoryRef.current = { delta: [], theta: [], alpha: [], beta: [], gamma: [], plv: [] };
+    }
+  }, [isLoadingSession]);
+  useEffect(() => {
+    if (!sessionActive) {
+      bandHistoryRef.current = { delta: [], theta: [], alpha: [], beta: [], gamma: [], plv: [] };
+    }
+  }, [sessionActive]);
+
+  // Acumular historia de bandas desde Zustand sin causar re-renders
+  useEffect(() => {
+    const MAX = 2700; // 45min @ 1 muestra/seg
+    const unsub = useBrainStore.subscribe((state) => {
+      if (!isPlayingRef.current || !sessionActiveRef.current) return;
+      const now = Date.now();
+      if (now - lastSampleTimeRef.current < 900) return;
+      lastSampleTimeRef.current = now;
+      const h = bandHistoryRef.current;
+      const b = state.bandsDisplay || state.bands || {};
+      for (const k of ['delta', 'theta', 'alpha', 'beta', 'gamma']) {
+        h[k].push(b[k] || 0);
+        if (h[k].length > MAX) h[k].shift();
+      }
+      h.plv.push(state.plv || 0);
+      if (h.plv.length > MAX) h.plv.shift();
+    });
+    return () => unsub();
+  }, []);
+
   const activateSessionMode = async () => {
     if (!API_BASE) {
       setSessionError('Brain backend not configured. Please check environment variables.');
@@ -354,6 +531,7 @@ export default function SessionControl({ isMobile = false }) {
     const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
     setDragPercent(percent);
     setDisplayPercent(percent);
+    progressRef.current = percent;
     if (progressFillRef.current) progressFillRef.current.style.width = `${percent}%`;
   }, [sessionStatus, progressFillRef]);
 
@@ -363,6 +541,7 @@ export default function SessionControl({ isMobile = false }) {
     const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
     setDragPercent(percent);
     setDisplayPercent(percent);
+    progressRef.current = percent;
     if (progressFillRef.current) progressFillRef.current.style.width = `${percent}%`;
   }, [isDragging, progressFillRef]);
 
@@ -469,87 +648,94 @@ export default function SessionControl({ isMobile = false }) {
       right: isMobile ? '0' : '320px',
       zIndex: 100,
       transition: 'left 0.25s ease',
-      background: isMobile 
-        ? 'rgba(0, 0, 0, 1)' 
-        : 'linear-gradient(180deg, rgba(18, 18, 18, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%)',
-      backdropFilter: isMobile ? 'none' : 'blur(20px)',
-      borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-      padding: '12px 20px 16px',
+      background: isMobile
+        ? 'rgba(0, 0, 0, 1)'
+        : 'rgba(0, 8, 22, 0.82)',
+      backdropFilter: isMobile ? 'none' : 'blur(24px)',
+      borderTop: '1px solid rgba(60, 140, 255, 0.12)',
+      padding: isMobile ? '12px 20px 16px' : '10px 20px 14px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: '#fff'
     }}>
-      {/* Progress bar - Top (Spotify style) */}
+      {/* EEG Timeline progress section */}
       {sessionStatus && (
-        <div style={{ marginBottom: '12px' }}>
-          <div 
-            ref={progressBarRef}
-            style={{
-              width: '100%',
-              height: '4px',
-              background: 'rgba(255, 255, 255, 0.15)',
-              borderRadius: '2px',
-              position: 'relative',
-              cursor: 'pointer',
-            }}
-            onMouseDown={handleProgressMouseDown}
-            onClick={handleProgressClick}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.height = '6px';
-              const knob = e.currentTarget.querySelector('.progress-knob');
-              if (knob) knob.style.opacity = '1';
-            }}
-            onMouseLeave={(e) => {
-              if (!isDragging) {
-                e.currentTarget.style.height = '4px';
-                const knob = e.currentTarget.querySelector('.progress-knob');
-                if (knob) knob.style.opacity = '0';
-              }
-            }}
-          >
-            {/* Progress fill — width controlled directly by rAF hook (no React re-render) */}
+        <div style={{ marginBottom: 10 }}>
+          {!isMobile ? (
+            /* Desktop — EEG waveform timeline */
+            <div style={{ position: 'relative', marginBottom: 4 }}>
+              <EEGTimeline
+                bandHistoryRef={bandHistoryRef}
+                progressRef={progressRef}
+                timeline={timeline}
+              />
+              {/* Invisible seek overlay — starts after the label column */}
+              <div
+                ref={progressBarRef}
+                style={{
+                  position: 'absolute',
+                  left: LABEL_W,
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  cursor: 'pointer',
+                  zIndex: 1,
+                }}
+                onMouseDown={handleProgressMouseDown}
+                onClick={handleProgressClick}
+                onMouseEnter={(e) => {
+                  const k = e.currentTarget.querySelector('.progress-knob');
+                  if (k) k.style.opacity = '1';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isDragging) {
+                    const k = e.currentTarget.querySelector('.progress-knob');
+                    if (k) k.style.opacity = '0';
+                  }
+                }}
+              >
+                <div
+                  className="progress-knob"
+                  style={{
+                    position: 'absolute',
+                    left: `${isDragging ? displayPercent : targetProgress}%`,
+                    top: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 10, height: 10,
+                    background: '#fff',
+                    borderRadius: '50%',
+                    opacity: isDragging ? 1 : 0,
+                    transition: 'opacity 0.15s',
+                    boxShadow: '0 0 8px rgba(255,255,255,0.6)',
+                    cursor: 'grab',
+                    pointerEvents: 'none',
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            /* Mobile — barra tradicional */
             <div
-              ref={progressFillRef}
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: `${targetProgress}%`,
-                height: '100%',
-                background: 'white',
-                borderRadius: '2px',
-              }}
-            />
+              ref={progressBarRef}
+              style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, position: 'relative', cursor: 'pointer' }}
+              onMouseDown={handleProgressMouseDown}
+              onClick={handleProgressClick}
+              onMouseEnter={(e) => { e.currentTarget.style.height = '6px'; const k = e.currentTarget.querySelector('.progress-knob'); if (k) k.style.opacity = '1'; }}
+              onMouseLeave={(e) => { if (!isDragging) { e.currentTarget.style.height = '4px'; const k = e.currentTarget.querySelector('.progress-knob'); if (k) k.style.opacity = '0'; } }}
+            >
+              <div ref={progressFillRef} style={{ position: 'absolute', left: 0, top: 0, width: `${targetProgress}%`, height: '100%', background: 'white', borderRadius: 2 }} />
+              <div className="progress-knob" style={{ position: 'absolute', left: `${isDragging ? displayPercent : targetProgress}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 12, height: 12, background: '#fff', borderRadius: '50%', opacity: isDragging ? 1 : 0, transition: 'opacity 0.15s', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', cursor: 'grab' }} />
+            </div>
+          )}
 
-            {/* Draggable knob */}
-            <div
-              className="progress-knob"
-              style={{
-                position: 'absolute',
-                left: `${isDragging ? displayPercent : targetProgress}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '12px',
-                height: '12px',
-                background: '#fff',
-                borderRadius: '50%',
-                opacity: isDragging ? 1 : 0,
-                transition: 'opacity 0.15s ease',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                cursor: 'grab'
-              }}
-            />
-          </div>
-
-          {/* Time indicators */}
+          {/* Time labels */}
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginTop: '4px',
-            fontSize: '11px',
-            color: 'rgba(255, 255, 255, 0.5)',
-            fontVariantNumeric: 'tabular-nums'
+            display: 'flex', justifyContent: 'space-between',
+            marginTop: 4, fontSize: 10,
+            color: 'rgba(255,255,255,0.38)',
+            fontVariantNumeric: 'tabular-nums',
+            fontFamily: 'monospace',
+            paddingLeft: isMobile ? 0 : LABEL_W + 2,
           }}>
-            {/* ref-driven current time (updated by rAF without React re-render) */}
             <span ref={currentTimeRef}>{formatSeconds((targetProgress / 100) * sessionStatus.total_duration)}</span>
             <span>{formatSeconds(sessionStatus.total_duration)}</span>
           </div>

@@ -8,7 +8,7 @@ Handles high-frequency data:
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 import numpy as np
@@ -136,7 +136,7 @@ class InfluxDBEEGClient:
         if not self._connected:
             self.connect()
         
-        base_timestamp = base_timestamp or datetime.utcnow()
+        base_timestamp = base_timestamp or datetime.now(timezone.utc)
         points = []
         
         for sample in samples:
@@ -178,7 +178,7 @@ class InfluxDBEEGClient:
         if not self._connected:
             self.connect()
         
-        base_timestamp = base_timestamp or datetime.utcnow()
+        base_timestamp = base_timestamp or datetime.now(timezone.utc)
         base_ts = base_timestamp.timestamp()
         points = []
         
@@ -214,7 +214,7 @@ class InfluxDBEEGClient:
         if not self._connected:
             self.connect()
         
-        base_timestamp = base_timestamp or datetime.utcnow()
+        base_timestamp = base_timestamp or datetime.now(timezone.utc)
         points = []
         
         for m in metrics:
@@ -262,7 +262,7 @@ class InfluxDBEEGClient:
         if not self._connected:
             self.connect()
         
-        base_timestamp = base_timestamp or datetime.utcnow()
+        base_timestamp = base_timestamp or datetime.now(timezone.utc)
         ts = base_timestamp.timestamp() + timestamp
         
         point = (

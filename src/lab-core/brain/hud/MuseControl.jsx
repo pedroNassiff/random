@@ -1158,11 +1158,11 @@ export default function MuseControl({ onModeChange }) {
     if (!source) return null;
 
     const bandDefs = [
-      { key: 'delta', label: 'δ Delta',  color: '#6366f1', desc: '1-4 Hz' },
-      { key: 'theta', label: 'θ Theta',  color: '#8b5cf6', desc: '4-8 Hz' },
-      { key: 'alpha', label: 'α Alpha',  color: '#00ff88', desc: '8-13 Hz' },
-      { key: 'beta',  label: 'β Beta',   color: '#00aaff', desc: '13-30 Hz' },
-      { key: 'gamma', label: 'γ Gamma',  color: '#ff6b35', desc: '30-50 Hz' },
+      { key: 'delta', label: 'δ Delta',  color: '#8b5cf6', desc: '1-4 Hz' },
+      { key: 'theta', label: 'θ Theta',  color: '#3b82f6', desc: '4-8 Hz' },
+      { key: 'alpha', label: 'α Alpha',  color: '#10b981', desc: '8-13 Hz' },
+      { key: 'beta',  label: 'β Beta',   color: '#f59e0b', desc: '13-30 Hz' },
+      { key: 'gamma', label: 'γ Gamma',  color: '#ef4444', desc: '30-50 Hz' },
     ];
 
     return (

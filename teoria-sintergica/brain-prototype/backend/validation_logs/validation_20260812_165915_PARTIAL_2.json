@@ -1,0 +1,101 @@
+{
+  "metadata": {
+    "name": "oscar-1",
+    "notes": "",
+    "time_of_day": "",
+    "sleep_quality": 0,
+    "caffeine": false,
+    "prior_meditation_min": 0,
+    "subjective_pre": 0,
+    "subjective_post": 0
+  },
+  "protocol_start": 1786564545.8381498,
+  "protocol_start_iso": "2026-08-12T16:55:45.838150",
+  "phases_completed": 2,
+  "total_phases": 3,
+  "total_events": 7,
+  "events": [
+    {
+      "time": 1786564545.854861,
+      "time_iso": "2026-08-12T16:55:45.854861",
+      "elapsed": 0.01674628257751465,
+      "event": "protocol_start",
+      "data": {
+        "name": "oscar-1",
+        "total_phases": 3,
+        "total_duration": 210
+      }
+    },
+    {
+      "time": 1786564545.894218,
+      "time_iso": "2026-08-12T16:55:45.894219",
+      "elapsed": 0.05607724189758301,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_open",
+        "label": "BASELINE",
+        "duration": 60,
+        "instruction": "Ojos abiertos"
+      }
+    },
+    {
+      "time": 1786564606.048081,
+      "time_iso": "2026-08-12T16:56:46.048082",
+      "elapsed": 60.20993733406067,
+      "event": "phase_end",
+      "data": {
+        "phase": "baseline_open",
+        "elapsed": 60.15086793899536,
+        "expected_duration": 60,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1786564606.050588,
+      "time_iso": "2026-08-12T16:56:46.050588",
+      "elapsed": 60.21244025230408,
+      "event": "phase_start",
+      "data": {
+        "phase": "baseline_closed",
+        "label": "BASELINE",
+        "duration": 90,
+        "instruction": "Cerr\u00e1 los ojos"
+      }
+    },
+    {
+      "time": 1786564696.07878,
+      "time_iso": "2026-08-12T16:58:16.078781",
+      "elapsed": 150.24063515663147,
+      "event": "phase_end",
+      "data": {
+        "phase": "baseline_closed",
+        "elapsed": 90.02798295021057,
+        "expected_duration": 90,
+        "auto_advanced": true
+      }
+    },
+    {
+      "time": 1786564696.081882,
+      "time_iso": "2026-08-12T16:58:16.081883",
+      "elapsed": 150.24373507499695,
+      "event": "phase_start",
+      "data": {
+        "phase": "recovery",
+        "label": "RECUPERACI\u00d3N",
+        "duration": 60,
+        "instruction": "Volv\u00e9 al cuerpo"
+      }
+    },
+    {
+      "time": 1786564755.4777641,
+      "time_iso": "2026-08-12T16:59:15.477766",
+      "elapsed": 209.63963913917542,
+      "event": "protocol_stop",
+      "data": {
+        "completed_phases": 2,
+        "total_phases": 3,
+        "total_elapsed": 209.6396050453186
+      }
+    }
+  ]
+}

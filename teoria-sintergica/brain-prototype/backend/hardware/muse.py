@@ -15,6 +15,9 @@ Dependencies:
     pip install muselsl pylsl bleak
 """
 
+import logging
+import os
+from pathlib import Path
 import numpy as np
 from collections import deque
 from threading import Thread, Lock, Event
@@ -96,7 +99,39 @@ class MuseConnector(EEGDevice):
         
         # LSL inlet
         self._inlet = None
+
+        # Session file logger (configurado en connect())
+        self._log: Optional[logging.Logger] = None
+        self._log_path: Optional[Path] = None
         
+    def _setup_logger(self) -> None:
+        """Crea un logger que escribe a stdout Y a un archivo .log en validation_logs/."""
+        import datetime
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = Path(__file__).parent.parent / "validation_logs"
+        log_dir.mkdir(exist_ok=True)
+        self._log_path = log_dir / f"muse_{ts}.log"
+
+        logger = logging.getLogger(f"muse.{ts}")
+        logger.setLevel(logging.DEBUG)
+        logger.propagate = False
+
+        fmt = logging.Formatter("%(asctime)s.%(msecs)03d  %(levelname)-7s  %(message)s",
+                                datefmt="%H:%M:%S")
+
+        # Console handler (igual que antes)
+        ch = logging.StreamHandler()
+        ch.setFormatter(fmt)
+        logger.addHandler(ch)
+
+        # File handler
+        fh = logging.FileHandler(self._log_path, encoding="utf-8")
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+
+        self._log = logger
+        print(f"📋 Muse log: {self._log_path}")
+
     def discover(self, timeout: float = 10.0) -> List[DeviceInfo]:
         """
         Descubre dispositivos Muse disponibles via BleakScanner directamente.
@@ -167,17 +202,18 @@ class MuseConnector(EEGDevice):
         Inicia muselsl stream como proceso background.
         """
         try:
+            self._setup_logger()
             self._status = DeviceStatus.CONNECTING
-            print(f"🔌 Conectando a Muse: {address}")
+            self._log.info(f"🔌 Conectando a Muse: {address}")
             
             # Leer batería ANTES de iniciar muselsl — el Muse solo acepta una conexión BLE
             # a la vez. Si leemos batería y muselsl se conectan en paralelo, uno falla.
-            print(f"[connect] Leyendo batería de {address}...")
+            self._log.info(f"[connect] Leyendo batería de {address}...")
             battery = self.read_battery(address)
             if battery is not None:
-                print(f"[connect] Batería: {battery}%")
+                self._log.info(f"[connect] Batería: {battery}%")
             else:
-                print(f"[connect] Batería: no disponible")
+                self._log.warning("[connect] Batería: no disponible")
 
             # Iniciar muselsl stream en background.
             # En macOS el address es un UUID con guiones (6D5F179A-C0AF-...) — formato CoreBluetooth.
@@ -203,6 +239,7 @@ class MuseConnector(EEGDevice):
                 stderr = self._muselsl_process.stderr.read().decode()
                 self._error_message = f"muselsl falló: {stderr}"
                 self._status = DeviceStatus.ERROR
+                self._log.error(f"[connect] muselsl falló: {stderr}")
                 return False
 
             # Guardar info del dispositivo (incluyendo batería)
@@ -214,7 +251,7 @@ class MuseConnector(EEGDevice):
             )
 
             self._status = DeviceStatus.CONNECTED
-            print(f"✅ Conectado a Muse 2: {address}")
+            self._log.info(f"✅ Conectado a Muse 2: {address}")
             return True
 
         except FileNotFoundError:
@@ -254,17 +291,26 @@ class MuseConnector(EEGDevice):
         for line in iter(proc.stderr.readline, b''):
             text = line.decode('utf-8', errors='ignore').strip()
             if text:
-                print(f"[muselsl-stderr] {text}")
+                if self._log:
+                    self._log.warning(f"[muselsl] {text}")
+                else:
+                    print(f"[muselsl-stderr] {text}")
         
         # El pipe se cerró = muselsl murió
         exit_code = proc.poll()
-        print(f"⚠️ [muselsl] Proceso terminó (exit code: {exit_code})")
+        msg = f"⚠️ [muselsl] Proceso terminó (exit code: {exit_code})"
+        if self._log:
+            self._log.error(msg)
+        else:
+            print(msg)
         
         # Auto-restart si no fue un stop intencional
         if not self._stop_event.is_set() and self._device_info:
             address = self._device_info.address
             if address and address != "LSL-EXTERNAL":
-                print(f"🔄 [muselsl] Auto-reiniciando stream para {address}...")
+                msg_restart = f"🔄 [muselsl] Auto-reiniciando stream para {address}..."
+                if self._log: self._log.warning(msg_restart)
+                else: print(msg_restart)
                 time.sleep(3)  # esperar a que BLE se libere
                 try:
                     self._muselsl_process = subprocess.Popen(
@@ -275,8 +321,10 @@ class MuseConnector(EEGDevice):
                     )
                     # Re-lanzar logger de stderr
                     Thread(target=self._log_muselsl_stderr, daemon=True).start()
-                    print(f"✅ [muselsl] Proceso reiniciado (PID: {self._muselsl_process.pid})")
-                    
+                    msg_pid = f"✅ [muselsl] Proceso reiniciado (PID: {self._muselsl_process.pid})"
+                    if self._log: self._log.info(msg_pid)
+                    else: print(msg_pid)
+
                     # Esperar y reconectar inlet
                     time.sleep(5)
                     if not self._stop_event.is_set():
@@ -285,20 +333,24 @@ class MuseConnector(EEGDevice):
                         if streams:
                             self._inlet = StreamInlet(streams[0])
                             self._last_sample_time = time.time()
-                            # Reiniciar el thread de datos si murió (agotó max_reconnect)
                             if self._stream_thread is None or not self._stream_thread.is_alive():
                                 self._status = DeviceStatus.STREAMING
                                 self._stop_event.clear()
-                                from threading import Thread
                                 self._stream_thread = Thread(target=self._stream_loop, daemon=True)
                                 self._stream_thread.start()
-                                print(f"✅ [muselsl] Auto-restart completo (stream+thread reiniciados): {streams[0].name()}")
+                                msg_ok = f"✅ [muselsl] Auto-restart completo (stream+thread reiniciados): {streams[0].name()}"
                             else:
-                                print(f"✅ [muselsl] LSL stream reconectado: {streams[0].name()}")
+                                msg_ok = f"✅ [muselsl] LSL stream reconectado: {streams[0].name()}"
+                            if self._log: self._log.info(msg_ok)
+                            else: print(msg_ok)
                         else:
-                            print("⚠️ [muselsl] Proceso reinició pero no aparece stream LSL")
+                            msg_no = "⚠️ [muselsl] Proceso reinició pero no aparece stream LSL"
+                            if self._log: self._log.warning(msg_no)
+                            else: print(msg_no)
                 except Exception as e:
-                    print(f"❌ [muselsl] Error en auto-restart: {e}")
+                    msg_err = f"❌ [muselsl] Error en auto-restart: {e}"
+                    if self._log: self._log.error(msg_err)
+                    else: print(msg_err)
     
     def connect_to_existing_stream(self) -> bool:
         """
@@ -502,7 +554,8 @@ class MuseConnector(EEGDevice):
                 if sample:
                     reconnect_attempts = 0  # reset on successful read
                     if stale_logged:
-                        print("✅ Stream recuperado — datos fluyendo de nuevo")
+                        if self._log: self._log.info("✅ Stream recuperado — datos fluyendo de nuevo")
+                        else: print("✅ Stream recuperado — datos fluyendo de nuevo")
                         stale_logged = False
                         # Audio: señal de recuperación (distinto al alerta de pérdida)
                         subprocess.Popen(["afplay", "/System/Library/Sounds/Glass.aiff"],
@@ -522,7 +575,8 @@ class MuseConnector(EEGDevice):
                     if self._last_sample_time > 0:
                         gap = time.time() - self._last_sample_time
                         if gap > self._stale_threshold and not stale_logged:
-                            print(f"⚠️ Stream stale: {gap:.1f}s sin datos EEG. Posible desconexión BLE.")
+                            if self._log: self._log.warning(f"⚠️ Stream stale: {gap:.1f}s sin datos EEG. Posible desconexión BLE.")
+                            else: print(f"⚠️ Stream stale: {gap:.1f}s sin datos EEG. Posible desconexión BLE.")
                             stale_logged = True
                             # Audio alert — grave y urgente, claramente distinto a Glass de fases
                             subprocess.Popen(["afplay", "/System/Library/Sounds/Basso.aiff"],
@@ -531,22 +585,22 @@ class MuseConnector(EEGDevice):
                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                         
                         if gap > 15.0:
-                            # Más de 15s sin datos: intentar reconectar LSL (da tiempo a muselsl de reconectar BLE)
+                            # Más de 15s sin datos: intentar reconectar LSL
                             reconnect_attempts += 1
                             if reconnect_attempts > max_reconnect:
-                                print("❌ Stream loop: máximo de reconexiones alcanzado.")
-                                # Si muselsl sigue vivo, mantener CONNECTED (no ERROR) para que
-                                # el frontend pueda recuperar la UI y reintentar el stream.
-                                # Si ya murió, el auto-restart de _log_muselsl_stderr se encarga.
+                                if self._log: self._log.error("❌ Stream loop: máximo de reconexiones alcanzado.")
+                                else: print("❌ Stream loop: máximo de reconexiones alcanzado.")
                                 if self._muselsl_process and self._muselsl_process.poll() is None:
                                     self._status = DeviceStatus.CONNECTED
-                                    print("⚠️ muselsl aún vivo → estado CONNECTED (UI puede recuperar)")
+                                    if self._log: self._log.warning("⚠️ muselsl aún vivo → estado CONNECTED")
+                                    else: print("⚠️ muselsl aún vivo → estado CONNECTED (UI puede recuperar)")
                                 else:
                                     self._status = DeviceStatus.ERROR
-                                    self._error_message = "BLE desconectado — sin datos por >8s tras 5 intentos"
+                                    self._error_message = "BLE desconectado — sin datos por >15s tras 15 intentos"
                                 break
-                            
-                            print(f"🔄 Reconectando LSL stream (intento {reconnect_attempts}/{max_reconnect})...")
+
+                            if self._log: self._log.warning(f"🔄 Reconectando LSL stream (intento {reconnect_attempts}/{max_reconnect})...")
+                            else: print(f"🔄 Reconectando LSL stream (intento {reconnect_attempts}/{max_reconnect})...")
                             try:
                                 from pylsl import StreamInlet, resolve_byprop
                                 streams = resolve_byprop('type', 'EEG', timeout=5)
@@ -554,11 +608,14 @@ class MuseConnector(EEGDevice):
                                     self._inlet = StreamInlet(streams[0])
                                     self._last_sample_time = time.time()  # reset timer
                                     stale_logged = False
-                                    print(f"✅ Reconectado a LSL stream: {streams[0].name()}")
+                                    if self._log: self._log.info(f"✅ Reconectado a LSL stream: {streams[0].name()}")
+                                    else: print(f"✅ Reconectado a LSL stream: {streams[0].name()}")
                                 else:
-                                    print("⚠️ No se encontró stream LSL. muselsl puede estar reconectando BLE...")
+                                    if self._log: self._log.warning("⚠️ No se encontró stream LSL. muselsl puede estar reconectando BLE...")
+                                    else: print("⚠️ No se encontró stream LSL. muselsl puede estar reconectando BLE...")
                             except Exception as re_err:
-                                print(f"⚠️ Error en reconexión LSL: {re_err}")
+                                if self._log: self._log.warning(f"⚠️ Error en reconexión LSL: {re_err}")
+                                else: print(f"⚠️ Error en reconexión LSL: {re_err}")
                         
             except Exception as e:
                 if self._stop_event.is_set():

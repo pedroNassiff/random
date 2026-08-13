@@ -268,9 +268,10 @@ class ValidationProtocol:
             "total_elapsed": time.time() - self.protocol_start_time,
         })
 
+        recorder_summary = None
         if self.recorder:
             try:
-                self.recorder.stop()
+                recorder_summary = self.recorder.stop()
             except Exception as e:
                 print(f"⚠️ [ValidationProtocol] Recorder stop failed: {e}")
 
@@ -280,6 +281,7 @@ class ValidationProtocol:
             "status": "success",
             "completed_phases": self.current_phase_idx,
             "log_path": log_path,
+            "recording_id": recorder_summary.get('recording_id') if recorder_summary else None,
         }
 
     def pause(self):
