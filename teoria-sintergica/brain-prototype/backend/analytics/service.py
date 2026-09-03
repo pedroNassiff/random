@@ -348,7 +348,7 @@ class AnalyticsService:
                 SELECT 
                     COUNT(DISTINCT user_id) as unique_visitors,
                     COUNT(*) as total_sessions,
-                    SUM(pageviews) as total_pageviews,
+                    COALESCE(SUM(pageviews), 0) as total_pageviews,
                     COALESCE(AVG(duration), 0) as avg_session_duration,
                     COALESCE(AVG(total_scroll_depth), 0) as avg_scroll_depth,
                     COALESCE((COUNT(CASE WHEN bounce THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)), 0) as bounce_rate

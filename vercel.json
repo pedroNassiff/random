@@ -5,19 +5,19 @@
   "rewrites": [
     {
       "source": "/api/analytics/:path*",
-      "destination": "https://api.random-lab.es/analytics/:path*"
+      "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/analytics/:path*"
     },
     {
       "source": "/api/automation/:path*",
-      "destination": "https://api.random-lab.es/automation/:path*"
+      "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/automation/:path*"
     },
     {
       "source": "/prospecting/:path*",
-      "destination": "https://api.random-lab.es/prospecting/:path*"
+      "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/prospecting/:path*"
     },
     {
       "source": "/tracking/:path*",
-      "destination": "https://api.random-lab.es/tracking/:path*"
+      "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/tracking/:path*"
     },
     {
       "source": "/(.*)",
@@ -44,7 +44,7 @@
         { "key": "Permissions-Policy",        "value": "geolocation=(), microphone=(self), camera=(self)" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.random-lab.es wss://api.random-lab.es https://raw.githack.com https://raw.githubusercontent.com https://cdn.jsdelivr.net; worker-src blob:; frame-ancestors 'none';"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://brain-prototype-api-v53upqslva-uc.a.run.app wss://brain-prototype-api-v53upqslva-uc.a.run.app https://raw.githack.com https://raw.githubusercontent.com https://cdn.jsdelivr.net; worker-src blob:; frame-ancestors 'none';"
         },
         { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
       ]
