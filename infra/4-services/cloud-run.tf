@@ -60,6 +60,20 @@ resource "google_cloud_run_v2_service" "brain_backend" {
           }
         }
       }
+
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+    }
+
+    # Cloud SQL Auth Proxy nativo de Cloud Run — expone el socket Unix que
+    # usa DATABASE_URL (?host=/cloudsql/...) sin salir a la red pública.
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.postgres.connection_name]
+      }
     }
   }
 
