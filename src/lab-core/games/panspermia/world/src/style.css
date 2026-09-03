@@ -1,0 +1,67 @@
+*
+{
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body
+{
+    overflow: hidden;
+}
+
+/* ---- Satellite tooltip ---- */
+.sat-info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-left: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
+    font-size: 9px;
+    font-family: sans-serif;
+    font-weight: bold;
+    cursor: default;
+    position: relative;
+    flex-shrink: 0;
+    vertical-align: middle;
+    user-select: none;
+    transition: background 0.15s;
+}
+
+.sat-info-btn:hover {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+}
+
+.sat-info-btn:hover .sat-tooltip {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.sat-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 10;
+    width: 230px;
+    background: rgba(18, 18, 28, 0.96);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 9px 11px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.82);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.18s, transform 0.18s;
+    z-index: 9999;
+    white-space: normal;
+    text-align: left;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}

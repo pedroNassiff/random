@@ -1,0 +1,23 @@
+# Cloud Run (prod) dependency set.
+#
+# Deliberately excludes the EEG/hardware/ML stack (torch, mne, scikit-learn,
+# pandas, pooch, scipy, muselsl, pylsl, bleak) — those are only needed for
+# local Muse 2 sessions and model training (see ai/inference.py, hardware/).
+# main.py degrades gracefully when they're missing (HARDWARE_AVAILABLE=False),
+# serving only the Analytics + Prospecting CRM endpoints.
+#
+# Keep this file's non-hardware packages in sync with requirements.txt.
+
+fastapi>=0.68.0
+uvicorn>=0.15.0
+websockets>=10.0
+pydantic>=1.8.0
+
+# Database - Analytics
+asyncpg>=0.29.0
+
+# Automation & AI
+python-dotenv>=1.0.0
+anthropic>=0.18.0
+httpx>=0.24.0
+beautifulsoup4>=4.12.0

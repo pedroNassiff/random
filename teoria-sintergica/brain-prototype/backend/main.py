@@ -18,8 +18,22 @@ from security import SecurityMiddleware
 load_dotenv()
 
 from models import SyntergicState, FrequencyBands, Vector3
-from ai.inference import SyntergicBrain
-from hardware import MuseConnector, MuseToSyntergicAdapter, EOGDetector
+
+# EEG/hardware stack (torch, mne, muselsl, pylsl, bleak) is heavy and only
+# needed for local Muse sessions + model training — deliberately absent from
+# the Cloud Run image (requirements-cloud.txt). Degrade gracefully instead of
+# crashing on import so the CRM/analytics endpoints still boot in prod.
+try:
+    from ai.inference import SyntergicBrain
+    from hardware import MuseConnector, MuseToSyntergicAdapter, EOGDetector
+    HARDWARE_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  EEG/hardware stack not available ({e}) — running in cloud/CRM-only mode")
+    SyntergicBrain = None
+    MuseConnector = None
+    MuseToSyntergicAdapter = None
+    EOGDetector = None
+    HARDWARE_AVAILABLE = False
 # Legacy SQLite (for backward compatibility)
 from database import get_database, get_recorder, SessionRecorder
 # New PostgreSQL + InfluxDB
@@ -99,11 +113,11 @@ class CopilotChatResponse(BaseModel):
 print("=" * 60)
 print("SYNTERGIC BRAIN API - Initializing...")
 print("=" * 60)
-brain = SyntergicBrain()
+brain = SyntergicBrain() if HARDWARE_AVAILABLE else None
 
 # Inicializar conector Muse 2 (hardware)
 print("✓ Initializing Muse 2 connector...")
-muse_connector = MuseConnector()
+muse_connector = MuseConnector() if HARDWARE_AVAILABLE else None
 
 # Inicializar recorder v2 (PostgreSQL + InfluxDB)
 session_recorder: Optional[SessionRecorderV2] = None
@@ -117,17 +131,21 @@ print("✓ Initializing validation protocol...")
 validation_protocol = ValidationProtocol(recorder=None)  # recorder set when Muse connects
 print("=" * 60)
 
-# Allow CORS for frontend
+# Allow CORS for frontend (dinámico desde env CORS_ORIGINS o lista por defecto)
+_cors_env = os.getenv("CORS_ORIGINS", "")
+_default_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://random-studio.io",
+    "https://www.random-studio.io",
+    "https://random-lab.es",
+    "https://www.random-lab.es"
+]
+_allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()] if _cors_env else _default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://random-studio.io",
-        "https://www.random-studio.io",
-        "https://random-lab.es",
-        "https://www.random-lab.es"
-    ],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -147,6 +165,7 @@ app.add_middleware(
         "localhost",
         "127.0.0.1",
         "*.trycloudflare.com",
+        "*.run.app",
         *_extra_hosts,
     ],
 )
@@ -157,15 +176,23 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     """Initialize analytics database connection pool"""
-    analytics_pool = await asyncpg.create_pool(
-        host=os.getenv("ANALYTICS_DB_HOST", "localhost"),
-        port=int(os.getenv("ANALYTICS_DB_PORT", "5432")),
-        user=os.getenv("ANALYTICS_DB_USER", "analytics_user"),
-        password=os.getenv("ANALYTICS_DB_PASSWORD", "random_sanyi_mapuche"),
-        database=os.getenv("ANALYTICS_DB_NAME", "random_analytics"),
-        min_size=10,
-        max_size=20,
-    )
+    analytics_dsn = os.getenv("ANALYTICS_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if analytics_dsn:
+        analytics_pool = await asyncpg.create_pool(
+            dsn=analytics_dsn,
+            min_size=2,
+            max_size=10,
+        )
+    else:
+        analytics_pool = await asyncpg.create_pool(
+            host=os.getenv("ANALYTICS_DB_HOST", "localhost"),
+            port=int(os.getenv("ANALYTICS_DB_PORT", "5432")),
+            user=os.getenv("ANALYTICS_DB_USER", "analytics_user"),
+            password=os.getenv("ANALYTICS_DB_PASSWORD", "random_sanyi_mapuche"),
+            database=os.getenv("ANALYTICS_DB_NAME", "random_analytics"),
+            min_size=2,
+            max_size=10,
+        )
     app.state.analytics_pool = analytics_pool
     app.state.db_pool = analytics_pool  # Alias para automation service
     app.state.analytics_service = AnalyticsService(analytics_pool)

@@ -8,3 +8,14 @@ dist/
 
 docs/outputs-promts/
 outputs-promts/*
+
+# Terraform — provider binaries and local state never belong in git.
+# State lives in the GCS bucket provisioned by infra/0-bootstrap/main.tf.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!example.tfvars

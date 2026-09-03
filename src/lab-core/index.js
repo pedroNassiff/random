@@ -5,6 +5,7 @@ import BrainModel from './brain/BrainModel'
 import RetratatarteModel from './retratarte/RetratatarteModel'
 import TesseractModel from './tesseract/TesseractModel'
 import GalaxyModel from './galaxy/GalaxyModel'
+import PanspermiaPreview from './games/panspermia/PanspermiaPreview'
 
 /**
  * LAB_EXPERIMENTS - Registry de experimentos del Lab
@@ -60,6 +61,19 @@ export const LAB_EXPERIMENTS = {
       primary: '#FF6030',
       secondary: '#1B3984'
     }
+  },
+
+  panspermia: {
+    id: 'panspermia',
+    name: 'PANSPERMIA',
+    description: 'Reencarnación galáctica por exoplanetas reales (juego)',
+    component: PanspermiaPreview,
+    link: null,
+    tags: ['game', 'engine', 'exoplanets'],
+    colors: {
+      primary: '#70C1FF',
+      secondary: '#3040FF'
+    }
   }
 }
 
@@ -76,6 +90,6 @@ export const getExperiment = (id) => LAB_EXPERIMENTS[id]
 /**
  * IDs disponibles en orden
  */
-export const EXPERIMENT_IDS = ['brain', 'retratarte', 'tesseract', 'galaxy']
+export const EXPERIMENT_IDS = ['brain', 'retratarte', 'tesseract', 'galaxy', 'panspermia']
 
 export default LAB_EXPERIMENTS
