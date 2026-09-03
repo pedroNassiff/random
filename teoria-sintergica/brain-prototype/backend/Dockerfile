@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-cloud.txt .
-RUN pip install --no-cache-dir -r requirements-cloud.txt
+# --retries/--timeout: PyPI downloads occasionally read-timeout on CI
+# runners' network; retry instead of failing the whole build on a blip.
+RUN pip install --no-cache-dir --retries 5 --timeout 60 -r requirements-cloud.txt
 
 COPY . .
 
