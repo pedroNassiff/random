@@ -16,6 +16,10 @@ if (!fs.existsSync(brainModelPath) && fs.existsSync(brainModelSource)) {
 
 export default {
     root: 'src/',
+    // root is src/, but .env.production / .env.development live at the repo
+    // root (where Vercel and local `vite` are invoked from) — without this,
+    // Vite looks for them under src/ and silently never finds them.
+    envDir: resolve(__dirname, '.'),
     publicDir: '../static/',
     base: '/',
     server:
