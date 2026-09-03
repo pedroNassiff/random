@@ -1,7 +1,7 @@
 # 🧠 Prototipo Sintérgico - Documentación Técnica
 
 ## 📋 Tabla de Contenidos
-
+# force push
 1. [Introducción](#introducción)
 2. [Fundamentos Teóricos](#fundamentos-teóricos)
 3. [Arquitectura del Sistema](#arquitectura-del-sistema)
