@@ -9,6 +9,7 @@ import TesseractModel from '../lab-core/tesseract/TesseractModel'
 import GalaxyModel from '../lab-core/galaxy/GalaxyModel'
 import RetratarteDetail from './RetratarteDetail'
 import BrainDetail from './BrainDetail'
+import PanspermiaDetail from './PanspermiaDetail'
 import { EditorPanel, SourceButton, EDITOR_STYLES } from '../components/CodeEditor'
 
 
@@ -689,6 +690,9 @@ export default function LabDetail() {
 
   // Brain viewer — WebSocket to Syntergic VAE
   if (id === 'brain') return <BrainDetail />
+
+  // Panspermia — engine propio (GameStore/SceneManager), ver lab-core/engine
+  if (id === 'panspermia') return <PanspermiaDetail />
 
   // Placeholder (none currently)
   if (PLACEHOLDER_IDS.includes(id)) return <ComingSoon id={id} onBack={back} />

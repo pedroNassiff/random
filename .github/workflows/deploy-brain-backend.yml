@@ -1,0 +1,62 @@
+name: Build & Push brain-backend (GCP)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'teoria-sintergica/brain-prototype/backend/**'
+      - '.github/workflows/deploy-brain-backend.yml'
+  workflow_dispatch: {}
+
+env:
+  PROJECT_ID: random-507414
+  REGION: us-central1
+  REPOSITORY: random-repo
+  IMAGE: brain-backend
+  # infra/2-iam/workload-identity.tf → output "workload_identity_provider"
+  WORKLOAD_IDENTITY_PROVIDER: projects/53137921056/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+  SERVICE_ACCOUNT: sa-random-cicd@random-507414.iam.gserviceaccount.com
+
+permissions:
+  contents: read
+  id-token: write # requerido por Workload Identity Federation
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: teoria-sintergica/brain-prototype/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Autenticar en GCP (Workload Identity Federation, sin claves JSON)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configurar Docker para Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & push imagen
+        run: |
+          IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}"
+          docker build -t "$IMAGE_URI:${{ github.sha }}" -t "$IMAGE_URI:latest" .
+          docker push "$IMAGE_URI:${{ github.sha }}"
+          docker push "$IMAGE_URI:latest"
+
+      - name: Deploy a Cloud Run
+        run: |
+          gcloud run deploy brain-prototype-api \
+            --project="${{ env.PROJECT_ID }}" \
+            --region="${{ env.REGION }}" \
+            --image="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}" \
+            --quiet

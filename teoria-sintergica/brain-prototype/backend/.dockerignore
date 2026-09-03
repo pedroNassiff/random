@@ -1,0 +1,16 @@
+venv/
+__pycache__/
+*.pyc
+ds003969/
+data/
+calibration_logs/
+validation_logs/
+.env
+.env.*
+*.pth
+*.pt
+*.ckpt
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
