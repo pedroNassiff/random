@@ -352,7 +352,7 @@ FASE 3 — Código Terraform (IaC Modular)
 
 FASE 4 — Despliegue & Integración CI/CD (Vercel + GCP)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[ ] Configurar Cloud Build / GitHub Actions para auto-deploy a Cloud Run.
+[ ] Configurar Cloud Build / GitHub Actions para auto-deploy a Cloud Run. (hasta acá estamos, chequamos con nuevo commit y seguimos configurando, el service de CR esta down tdv)
 [ ] Configurar variables de entorno en Vercel apuntando al endpoint HTTPS de Cloud Run.
 [ ] Ejecutar pruebas de integración (Health Check + EEG Processing + Analytics + Prospecting CRM endpoints).
 ```
