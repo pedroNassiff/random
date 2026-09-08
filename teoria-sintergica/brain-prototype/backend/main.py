@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
@@ -169,6 +170,19 @@ app.add_middleware(
         *_extra_hosts,
     ],
 )
+
+
+# Starlette's built-in error handling returns unhandled exceptions as a 500
+# from ServerErrorMiddleware, which sits above CORSMiddleware and never
+# re-enters it — so the response has no Access-Control-Allow-Origin header
+# and the browser reports a CORS failure instead of the real 500. Catching
+# it here turns it into a normal handled response that flows back through
+# CORSMiddleware like any other.
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    print(f"✗ Unhandled exception on {request.method} {request.url.path}: {exc}")
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 
 # ============================================
 # Analytics Integration

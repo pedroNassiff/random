@@ -17,8 +17,11 @@ asyncpg>=0.29.0
 python-dotenv>=1.0.0
 anthropic>=0.18.0
 beautifulsoup4>=4.12.0
+google-genai>=0.3.0
+
 
 # Hardware - Muse 2 EEG
 muselsl>=2.2.0
 pylsl>=1.16.0
 bleak>=0.21.0
+

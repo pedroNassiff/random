@@ -47,6 +47,14 @@ resource "google_project_iam_member" "runner_logging" {
   member  = "serviceAccount:${google_service_account.backend_runner.email}"
 }
 
+# Vertex AI (Gemini nativo para ai/copilot_labs_service.py) — solo
+# aiplatform.user, no admin: alcanza para invocar modelos, nada más.
+resource "google_project_iam_member" "runner_vertex_ai" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
 # 2. Service Account para CI/CD (Cloud Build / GitHub Actions)
 resource "google_service_account" "cicd" {
   account_id   = "sa-random-cicd"

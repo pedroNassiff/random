@@ -61,6 +61,18 @@ resource "google_cloud_run_v2_service" "brain_backend" {
         }
       }
 
+      # Vertex AI nativo (ai/vertex_client.py) — no son credenciales, solo
+      # identificadores de proyecto/región, no necesitan Secret Manager.
+      env {
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
+      }
+
+      env {
+        name  = "GCP_VERTEX_LOCATION"
+        value = var.region
+      }
+
       volume_mounts {
         name       = "cloudsql"
         mount_path = "/cloudsql"

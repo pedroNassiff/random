@@ -374,8 +374,14 @@ class CopilotLabsService:
         if model_pref == "claude":
             model_cfg = {"model": "claude-3-haiku-20240307", "max_tokens": 1024, "display_name": "Claude 3 Haiku", "provider": "claude"}
         elif model_pref == "gemini":
-            from .llm_router import OPENROUTER_MODELS
-            model_cfg = {**OPENROUTER_MODELS[complexity], "provider": "openrouter"}
+            # Vertex AI nativo (sa-random-backend-runner via ADC) — reemplaza
+            # la llamada indirecta a Gemini vía OpenRouter.
+            model_cfg = {
+                "model": "gemini-2.5-flash",
+                "max_tokens": 1024,
+                "display_name": "Gemini 2.5 Flash (Vertex AI)",
+                "provider": "vertex",
+            }
         else:
             model_cfg = self.router.select(complexity)
 
@@ -391,6 +397,8 @@ class CopilotLabsService:
 
         if model_cfg.get("provider") == "claude":
             text = await self._call_claude(messages)
+        elif model_cfg.get("provider") == "vertex":
+            text = await self._call_vertex(messages, model_cfg)
         else:
             text = await self._call_llm_with_fallback(messages, model_cfg, complexity)
         widgets = self._maybe_build_widgets(session_context)
@@ -561,6 +569,26 @@ class CopilotLabsService:
         except Exception as exc:
             logger.exception("Claude error: %s", exc)
             return "❌ Error inesperado con Claude. Revisa los logs."
+
+    async def _call_vertex(self, messages: List[Dict], model_cfg: Dict, max_tokens: int = 1024) -> str:
+        """Llama a Gemini vía Vertex AI nativo (misma SA que corre el backend, sin API key)."""
+        from .vertex_client import call_vertex_gemini
+
+        system_msg = next((m["content"] for m in messages if m["role"] == "system"), None)
+        user_content = "\n\n".join(m["content"] for m in messages if m["role"] != "system")
+
+        try:
+            return await call_vertex_gemini(
+                user_content,
+                system_instruction=system_msg,
+                model=model_cfg["model"],
+                max_tokens=model_cfg.get("max_tokens", max_tokens),
+            )
+        except KeyError:
+            return "🔑 Falta `GCP_PROJECT_ID` en el entorno para usar Vertex AI."
+        except Exception as exc:
+            logger.exception("Vertex AI error: %s", exc)
+            return "❌ Error inesperado con Vertex AI. Revisa los logs."
 
     async def _call_llm_with_fallback(
         self, messages: List[Dict], model_cfg: Dict, complexity: "QueryComplexity"

@@ -19,3 +19,4 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 !example.tfvars
+.aider*
