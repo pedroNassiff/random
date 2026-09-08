@@ -1,0 +1,47 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = [
+    "venv",
+    "data",
+    "ds003969",
+    "calibration_logs",
+    "validation_logs",
+    "database/migrations",
+    "analytics/migrations",
+]
+
+[tool.ruff.lint]
+# C901 = complejidad ciclomática (gate #6). E/F/W = pycodestyle+pyflakes base.
+select = ["E", "F", "W", "C901"]
+mccabe = { max-complexity = 10 }
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+exclude = [
+    "venv",
+    "data",
+    "ds003969",
+    "scripts",
+    "database/migrations",
+    "analytics/migrations",
+]
+# Terceros sin stubs — no bloquean el gate por falta de tipado ajeno.
+[[tool.mypy.overrides]]
+module = [
+    "muselsl.*", "pylsl.*", "bleak.*", "mne.*", "torch.*",
+    "influxdb_client.*", "psycopg2.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+norecursedirs = ["venv", "data", "ds003969", "calibration_logs", "validation_logs", "scripts"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "venv/*", "data/*", "ds003969/*", "calibration_logs/*", "validation_logs/*",
+    "scripts/*", "test_*.py", "*/migrations/*", "MAIN_INTEGRATION_EXAMPLE.py",
+]
