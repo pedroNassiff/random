@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home.jsx';
 import Work from './pages/Work.jsx';
@@ -18,6 +18,7 @@ import PlanningProspeccion from './components/PlanningProspeccion.jsx';
 import PageTransition from './components/PageTransition.jsx';
 import { AnalyticsProvider } from './lib/useAnalytics.jsx';
 import { ExpandTransitionProvider } from './lib/useExpandTransition.jsx';
+const VacaFutbolera = lazy(() => import('./vaca-futbolera/VacaFutbolera'));
 import './index.css';
 
 function AppRoutes() {
@@ -42,6 +43,7 @@ function AppRoutes() {
         <Route path="/sanji" element={<SanjiBitacora />} />
         <Route path="/sanji/dashboard" element={<SanjiDashboard />} />
         <Route path="/sanji/dia/:date" element={<SanjiDayDetail />} />
+        <Route path="/vaca-futbolera/*" element={<Suspense fallback={null}><VacaFutbolera /></Suspense>} />
         <Route path="/planning-house" element={<Navigate to="/planning-prospeccion" replace />} />
         <Route path="/lanalisis-datasets" element={<Navigate to="/analisis-datasets" replace />} />
       </Routes>

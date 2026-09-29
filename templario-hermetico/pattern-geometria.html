@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Frecuencia → Patrón Geométrico</title>
+<style>
+  :root {
+    --bg: #0a0a12;
+    --panel: #12121c;
+    --accent: #ffd700;
+    --text: #e0e0e0;
+    --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(circle at 50% 30%, #1a1a2e, #05050a 70%);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(255,215,0,0.4);
+  }
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+    text-align: center;
+    max-width: 600px;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    padding: 16px 24px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+  }
+  label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  input[type=range] {
+    width: 240px;
+    accent-color: var(--accent);
+  }
+  .freq-display {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 130px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 15px rgba(255,215,0,0.5);
+  }
+  .freq-display small {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  select, button {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  select:hover, button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  button.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .canvas-wrap {
+    position: relative;
+    width: min(90vw, 560px);
+    height: min(90vw, 560px);
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow:
+      0 0 60px rgba(255,215,0,0.15),
+      0 0 120px rgba(100,100,255,0.1),
+      inset 0 0 60px rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+  .info {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    max-width: 700px;
+    width: 100%;
+  }
+  .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 12px 16px;
+  }
+  .card .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .card .value {
+    font-size: 1rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .card .value.small { font-size: 0.85rem; color: var(--text); font-weight: 400; }
+  .legend {
+    margin-top: 20px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    max-width: 640px;
+    line-height: 1.6;
+  }
+  .legend b { color: var(--accent); }
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<h1>✦ FRECUENCIA → PATRÓN ✦</h1>
+<p class="subtitle">
+  Cada frecuencia genera una geometría distinta: mandalas, geometría sagrada,
+  espirales de Fibonacci y figuras nodales tipo Chladni.
+</p>
+
+<div class="controls">
+  <label>
+    Frecuencia (Hz)
+    <input type="range" id="freq" min="0.5" max="100" step="0.1" value="10">
+  </label>
+  <div class="freq-display" id="freqDisplay">10.0 <small>Hz</small></div>
+</div>
+
+<div class="presets" id="presets"></div>
+
+<div class="canvas-wrap">
+  <canvas id="canvas" width="800" height="800"></canvas>
+</div>
+
+<div class="info">
+  <div class="card">
+    <div class="label">Banda EEG</div>
+    <div class="value" id="bandName">Alpha</div>
+  </div>
+  <div class="card">
+    <div class="label">Estado mental</div>
+    <div class="value small" id="stateName">Meditación</div>
+  </div>
+  <div class="card">
+    <div class="label">Tipo de patrón</div>
+    <div class="value small" id="patternType">Mandala polar</div>
+  </div>
+  <div class="card">
+    <div class="label">Simetría</div>
+    <div class="value" id="symmetry">n = 10</div>
+  </div>
+  <div class="card">
+    <div class="label">Modo Chladni</div>
+    <div class="value" id="chladni">(m,n) = (3,2)</div>
+  </div>
+  <div class="card">
+    <div class="label">Razón áurea</div>
+    <div class="value small" id="golden">φ ≈ 1.618</div>
+  </div>
+</div>
+
+<p class="legend">
+  <b>Delta</b> (0.5–4 Hz) · <b>Theta</b> (4–8 Hz) · <b>Alpha</b> (8–13 Hz) ·
+  <b>Beta</b> (13–30 Hz) · <b>Gamma</b> (30–100 Hz)<br>
+  La geometría emerge de la interferencia de ondas: <i>f · λ = v</i> y
+  <i>f<sub>mn</sub> ∝ (m² + n²)</i> (Chladni).
+</p>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const CX = W / 2, CY = H / 2;
+
+const freqSlider = document.getElementById('freq');
+const freqDisplay = document.getElementById('freqDisplay');
+const bandNameEl = document.getElementById('bandName');
+const stateNameEl = document.getElementById('stateName');
+const patternTypeEl = document.getElementById('patternType');
+const symmetryEl = document.getElementById('symmetry');
+const chladniEl = document.getElementById('chladni');
+const goldenEl = document.getElementById('golden');
+const presetsEl = document.getElementById('presets');
+
+const PHI = (1 + Math.sqrt(5)) / 2; // 1.618...
+
+// ---- Bandas EEG ----
+function getBand(f) {
+  if (f < 4)  return { name: 'Delta', state: 'Sueño profundo', color: '#3a2a7a', pattern: 'Ondas lentas concéntricas' };
+  if (f < 8)  return { name: 'Theta', state: 'Meditación profunda', color: '#7a3a9a', pattern: 'Mandala polar' };
+  if (f < 13) return { name: 'Alpha', state: 'Relajación / flow', color: '#d4af37', pattern: 'Geometría sagrada (Flor de la Vida)' };
+  if (f < 30) return { name: 'Beta',  state: 'Concentración activa', color: '#2a7ad4', pattern: 'Espiral de Fibonacci' };
+  return       { name: 'Gamma', state: 'Insight / síntesis', color: '#d42a7a', pattern: 'Figuras de Chladni' };
+}
+
+// ---- Presets ----
+const presets = [
+  { f: 2,   label: '2 Hz · Delta' },
+  { f: 6,   label: '6 Hz · Theta' },
+  { f: 10,  label: '10 Hz · Alpha' },
+  { f: 20,  label: '20 Hz · Beta' },
+  { f: 40,  label: '40 Hz · Gamma' },
+  { f: 7.83, label: '7.83 Hz · Schumann' },
+  { f: 432, label: '432 Hz · Afinación' },
+  { f: 528, label: '528 Hz · ADN' },
+];
+presets.forEach(p => {
+  const btn = document.createElement('button');
+  btn.textContent = p.label;
+  btn.onclick = () => { freqSlider.value = Math.min(p.f, 100); update(); };
+  presetsEl.appendChild(btn);
+});
+
+// ---- Fibonacci ----
+function fib(n) {
+  const s = [1, 1];
+  for (let i = 2; i < n; i++) s.push(s[i-1] + s[i-2]);
+  return s;
+}
+
+// ---- Dibujo principal ----
+function draw(f) {
+  const band = getBand(f);
+
+  // Fondo con gradiente
+  const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, W/2);
+  grad.addColorStop(0, '#1a1a2e');
+  grad.addColorStop(0.7, '#0a0a12');
+  grad.addColorStop(1, '#000');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Parámetros derivados
+  const n = Math.max(3, Math.round(f));          // simetría radial
+  const m = Math.max(1, Math.round(f / 3));      // modo radial
+  const k = Math.max(1, Math.round(f / 5));      // anillos
+  const rot = f * 0.02;                          // rotación
+
+  ctx.save();
+  ctx.translate(CX, CY);
+  ctx.rotate(rot);
+
+  // Color principal según banda
+  const mainColor = band.color;
+
+  // ---- Capa 1: Círculos concéntricos (ondas estacionarias) ----
+  for (let i = 1; i <= k + 5; i++) {
+    const r = (i / (k + 5)) * (W/2 - 20);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.strokeStyle = hexA(mainColor, 0.06 + 0.02 * Math.sin(i + f));
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // ---- Capa 2: Mandala polar (n pétalos) ----
+  const petals = n;
+  ctx.strokeStyle = hexA(mainColor, 0.55);
+  ctx.lineWidth = 1.2;
+  for (let p = 0; p < petals; p++) {
+    const angle = (p / petals) * Math.PI * 2;
+    ctx.save();
+    ctx.rotate(angle);
+    // Pétalo: curva paramétrica
+    ctx.beginPath();
+    const petalLen = (W/2 - 40) * (0.5 + 0.5 * Math.sin(f * 0.1));
+    for (let t = 0; t <= 1; t += 0.02) {
+      const x = t * petalLen * Math.cos(t * Math.PI * m);
+      const y = t * petalLen * Math.sin(t * Math.PI * m);
+      if (t === 0) ctx.moveTo(0, 0);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---- Capa 3: Geometría sagrada (Flor de la Vida) para Alpha ----
+  if (band.name === 'Alpha') {
+    const rings = 3;
+    const baseR = (W/2 - 60) / (rings + 1);
+    ctx.strokeStyle = hexA('#ffd700', 0.35);
+    ctx.lineWidth = 1;
+    for (let ring = 0; ring < rings; ring++) {
+      const count = ring === 0 ? 1 : ring * 6;
+      const radius = ring * baseR;
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        const x = Math.cos(a) * radius;
+        const y = Math.sin(a) * radius;
+        ctx.beginPath();
+        ctx.arc(x, y, baseR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ---- Capa 4: Espiral de Fibonacci para Beta ----
+  if (band.name === 'Beta') {
+    const fibs = fib(Math.max(8, Math.round(f)));
+    ctx.strokeStyle = hexA('#2a7ad4', 0.5);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 400; i++) {
+      const a = i * 0.15;
+      const r = Math.pow(PHI, a / (Math.PI/2)) * 0.5;
+      const x = r * Math.cos(a);
+      const y = r * Math.sin(a);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // Cuadrados de Fibonacci
+    let fx = 0, fy = 0, dir = 0;
+    const size = baseFibSize(f);
+    for (let i = 0; i < Math.min(fibs.length, 12); i++) {
+      const s = fibs[i] * size;
+      ctx.strokeStyle = hexA('#2a7ad4', 0.25);
+      ctx.strokeRect(fx - s/2, fy - s/2, s, s);
+      // avanzar
+      const step = s;
+      if (dir === 0) { fx += step; }
+      else if (dir === 1) { fy += step; }
+      else if (dir === 2) { fx -= step; }
+      else { fy -= step; }
+      dir = (dir + 1) % 4;
+    }
+  }
+
+  // ---- Capa 5: Chladni para Gamma ----
+  if (band.name === 'Gamma') {
+    const mn = Math.max(2, Math.round(f / 10));
+    const nn = Math.max(2, Math.round(f / 15));
+    const img = ctx.createImageData(W, H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const u = (x - CX) / (W/2);
+        const v = (y - CY) / (H/2);
+        // Función de Chladni simplificada
+        const z =
+          Math.sin(mn * Math.PI * u) * Math.sin(nn * Math.PI * v) +
+          0.5 * Math.sin((mn + nn) * Math.PI * u) * Math.cos(nn * Math.PI * v);
+        const val = Math.abs(z);
+        const intensity = Math.pow(val, 3) * 255;
+        const idx = (y * W + x) * 4;
+        img.data[idx]   = 212 * (intensity/255);
+        img.data[idx+1] = 42  * (intensity/255);
+        img.data[idx+2] = 122 * (intensity/255);
+        img.data[idx+3] = intensity * 0.8;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // ---- Capa 6: Nodos radiales (líneas) ----
+  ctx.strokeStyle = hexA('#ffffff', 0.08);
+  ctx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * (W/2 - 20), Math.sin(a) * (W/2 - 20));
+    ctx.stroke();
+  }
+
+  // ---- Capa 7: Punto focal ----
+  const pulse = 8 + 4 * Math.sin(f * 0.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, pulse, 0, Math.PI * 2);
+  ctx.fillStyle = hexA('#ffffff', 0.9);
+  ctx.shadowColor = mainColor;
+  ctx.shadowBlur = 30;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+function baseFibSize(f) {
+  return Math.max(2, 30 / Math.sqrt(f));
+}
+
+// ---- Utilidad: hex + alpha ----
+function hexA(hex, a) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ---- Actualizar UI ----
+function update() {
+  const f = parseFloat(freqSlider.value);
+  const band = getBand(f);
+
+  freqDisplay.innerHTML = `${f.toFixed(1)} <small>Hz</small>`;
+  bandNameEl.textContent = band.name;
+  stateNameEl.textContent = band.state;
+  patternTypeEl.textContent = band.pattern;
+  symmetryEl.textContent = `n = ${Math.round(f)}`;
+  chladniEl.textContent = `(m,n) = (${Math.round(f/3)},${Math.round(f/5)})`;
+  goldenEl.textContent = `φ ≈ ${PHI.toFixed(3)}`;
+
+  draw(f);
+}
+
+freqSlider.addEventListener('input', update);
+update();
+</script>
+</body>
+</html>
