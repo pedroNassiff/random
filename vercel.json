@@ -8,6 +8,10 @@
       "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/analytics/:path*"
     },
     {
+      "source": "/api/futbol/:path*",
+      "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/futbol/:path*"
+    },
+    {
       "source": "/api/automation/:path*",
       "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/automation/:path*"
     },

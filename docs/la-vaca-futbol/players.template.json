@@ -1,0 +1,185 @@
+{
+  "rated_by": "signal@random-lab.es",
+  "players": [
+    {
+      "display_name": "Thomas",
+      "nickname": "Thomas",
+      "email": "thomas@example.com",
+      "preferred_position": "DEL",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 9,
+        "technique": 9,
+        "passing": 9,
+        "defending": 5,
+        "dribbling": 9,
+        "finishing": 9,
+        "pace": 7,
+        "stamina": 8,
+        "goalkeeping": 3
+      }
+    },
+    {
+      "display_name": "Felipe",
+      "nickname": "Felipe",
+      "email": "felipe@example.com",
+      "preferred_position": "DEF",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 8,
+        "technique": 8,
+        "passing": 6,
+        "defending": 8,
+        "dribbling": 7,
+        "finishing": 8,
+        "pace": 6,
+        "stamina": 7,
+        "goalkeeping": 3
+      }
+    },
+    {
+      "display_name": "Alex",
+      "nickname": "Alex",
+      "email": "alex@example.com",
+      "preferred_position": "MED",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 8,
+        "technique": 8,
+        "passing": 7,
+        "defending": 7,
+        "dribbling": 8,
+        "finishing": 8,
+        "pace": 6,
+        "stamina": 6,
+        "goalkeeping": 3
+      }
+    },
+    {
+      "display_name": "Menoufi",
+      "nickname": "Menoufi",
+      "email": "menoufi@example.com",
+      "preferred_position": "DEL",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 7,
+        "technique": 6,
+        "passing": 7,
+        "defending": 5,
+        "dribbling": 6,
+        "finishing": 7,
+        "pace": 6,
+        "stamina": 8,
+        "goalkeeping": 3
+      }
+    },
+    {
+      "display_name": "Giuliano",
+      "nickname": "Giuliano",
+      "email": "giuliano@example.com",
+      "preferred_position": "DEF",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 8,
+        "technique": 7,
+        "passing": 7,
+        "defending": 8,
+        "dribbling": 7,
+        "finishing": 7,
+        "pace": 6,
+        "stamina": 8,
+        "goalkeeping": 3
+      }
+    },
+    {
+      "display_name": "Arjen",
+      "nickname": "Arjen",
+      "email": "arjen@example.com",
+      "preferred_position": "DEL",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 7,
+        "technique": 7,
+        "passing": 7,
+        "defending": 5,
+        "dribbling": 6,
+        "finishing": 7,
+        "pace": 6,
+        "stamina": 8,
+        "goalkeeping": 3
+      }
+    },
+    {
+      "display_name": "Mauro",
+      "nickname": "Mauro",
+      "email": "mauro@example.com",
+      "preferred_position": "DEL",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 5,
+        "technique": 5,
+        "passing": 5,
+        "defending": 5,
+        "dribbling": 5,
+        "finishing": 5,
+        "pace": 5,
+        "stamina": 5,
+        "goalkeeping": 3
+      }
+    },
+    {
+      "display_name": "Quentin",
+      "nickname": "Quentin",
+      "email": "quentin@example.com",
+      "preferred_position": "DEL",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 5,
+        "technique": 5,
+        "passing": 5,
+        "defending": 5,
+        "dribbling": 5,
+        "finishing": 5,
+        "pace": 5,
+        "stamina": 5,
+        "goalkeeping": 5
+      }
+    },
+    {
+      "display_name": "Dimitri",
+      "nickname": "Dimitri",
+      "email": "dimitri@example.com",
+      "preferred_position": "DEL",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 7,
+        "technique": 7,
+        "passing": 7,
+        "defending": 8,
+        "dribbling": 6,
+        "finishing": 6,
+        "pace": 6,
+        "stamina": 5,
+        "goalkeeping": 3
+      }
+    },
+     {
+      "display_name": "Lino",
+      "nickname": "Lino",
+      "email": "lino@example.com",
+      "preferred_position": "DEL",
+      "can_play_gk": false,
+      "skills": {
+        "overall": 7,
+        "technique": 7,
+        "passing": 7,
+        "defending": 6,
+        "dribbling": 7,
+        "finishing": 7,
+        "pace": 6,
+        "stamina": 8,
+        "goalkeeping": 3
+      }
+    }
+  ]
+}

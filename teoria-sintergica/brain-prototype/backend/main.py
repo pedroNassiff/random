@@ -58,6 +58,8 @@ from prospecting_analysis import router as analysis_router
 from prospecting_pitch import router as pitch_router
 from prospecting_groups import router as groups_router
 from audit.router import router as audit_router
+from futbol.infrastructure.api import router as futbol_router
+from futbol.infrastructure.wiring import build_services as build_futbol_services
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -212,6 +214,9 @@ async def startup():
     app.state.analytics_service = AnalyticsService(analytics_pool)
     print("Analytics database pool created")
 
+    app.state.futbol = build_futbol_services(app.state.db_pool)
+    print("Futbol Vaquero services initialized")
+
     app.state.automation_service = AutomationService(app.state.db_pool)
     print("Automation service initialized")
 
@@ -250,6 +255,9 @@ app.include_router(groups_router)
 
 # Audit Express
 app.include_router(audit_router)
+
+# Fútbol Vaquero (/vaca-futbolera)
+app.include_router(futbol_router)
 
 # ============================================
 # Copilot Labs Endpoint

@@ -2,10 +2,24 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import './PageTransition.css'
 
+// Aplicaciones internas: sin transición de barras al entrar, navegar dentro ni recargar.
+// La transición queda solo para el sitio público (home, work, lab…).
+const APP_PREFIXES = [
+  '/vaca-futbolera',
+  '/analytics',
+  '/automation',
+  '/audit',
+  '/sanji',
+  '/planning-prospeccion',
+]
+
+export const isAppRoute = (pathname) =>
+  APP_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+
 const PageTransition = ({ children }) => {
   const location = useLocation()
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const [showContent, setShowContent] = useState(false)
+  const [showContent, setShowContent] = useState(() => isAppRoute(location.pathname))
   const prevLocationRef = useRef(location.pathname)
   const isInitialMount = useRef(true)
 
@@ -13,6 +27,7 @@ const PageTransition = ({ children }) => {
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
+      if (isAppRoute(location.pathname)) return
       setIsTransitioning(true)
       
       // Mostrar contenido cuando las barras cubren todo
@@ -37,8 +52,8 @@ const PageTransition = ({ children }) => {
     if (!isInitialMount.current && location.pathname !== prevLocationRef.current) {
       // Si viene del expand de un proyecto, saltar animación de barras
       const skip = sessionStorage.getItem('skipPageTransition')
-      if (skip) {
-        sessionStorage.removeItem('skipPageTransition')
+      if (skip || isAppRoute(location.pathname)) {
+        if (skip) sessionStorage.removeItem('skipPageTransition')
         prevLocationRef.current = location.pathname
         setIsTransitioning(false)
         setShowContent(true)

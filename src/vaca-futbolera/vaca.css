@@ -1,0 +1,666 @@
+/* Fútbol Vaquero — tokens de DESIGN.md §2. Scoped a .vaca para no filtrar al resto del SPA (Tailwind v3). */
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Roboto:wght@400;700&family=Silkscreen:wght@400;700&display=swap');
+
+.vaca {
+  --bg: #e6e6e6;
+  --surface: #fff;
+  --ink: #000;
+  --ink-soft: #2c2c2c;
+  --night: #121212;
+  --sun: #fde761;
+  --arcade: #8a10de;
+  --arcade-deep: #5a0a96;
+  --dot: #3fd4ff;
+  --link: #006dff;
+  --alarm: #d40000;
+  --border: 3px solid var(--ink);
+  --font-display: 'Andes', 'Baloo 2', system-ui, sans-serif;
+  --font-body: 'Roboto', Arial, sans-serif;
+  /* Placeholder libre de DePixel hasta verificar su licencia (DESIGN §2). */
+  --font-pixel: 'DePixel', 'Silkscreen', ui-monospace, monospace;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.vaca *,
+.vaca *::before,
+.vaca *::after {
+  border-radius: 0;
+  box-sizing: border-box;
+}
+.vaca :focus-visible {
+  outline: 3px solid var(--link);
+  outline-offset: 3px;
+}
+.vf-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.vf-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  margin: 0 0 16px;
+}
+.vf-muted {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.vf-dotted {
+  border-bottom: 3px dotted var(--ink);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+.vf-card {
+  background: var(--surface);
+  border: var(--border);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.vf-error {
+  color: var(--alarm);
+  font-weight: 700;
+}
+.vf-input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: var(--border);
+  background: var(--surface);
+  font: inherit;
+}
+.vf-label {
+  display: block;
+  font-weight: 700;
+  margin: 12px 0 4px;
+}
+.vf-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.vf-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+/* Extrusión (DESIGN §2, versión simple) */
+.vf-extrude {
+  border: var(--border);
+  background: var(--surface);
+  box-shadow: 6px 6px 0 var(--ink);
+  transition:
+    transform 80ms,
+    box-shadow 80ms;
+}
+.vf-extrude:active:not(:disabled) {
+  transform: translate(6px, 6px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+/* Button */
+.vf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 24px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+.vf-btn--block {
+  width: 100%;
+}
+.vf-btn--secondary {
+  background: var(--ink);
+  color: #fff;
+  box-shadow: none;
+  border: var(--border);
+}
+.vf-btn:disabled {
+  border-style: dotted;
+  box-shadow: none;
+  color: var(--ink-soft);
+  cursor: not-allowed;
+}
+
+/* Links: negro con subrayado; resaltado amarillo al pasar (sin azul de navegador). */
+.vaca a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.vaca a:hover,
+.vf-link:hover {
+  background: var(--sun);
+}
+.vaca a.vf-btn,
+.vaca a.vf-tab,
+.vaca a.vf-header__brand {
+  text-decoration: none;
+}
+.vaca a.vf-tab[aria-current='page'] {
+  color: #fff;
+}
+.vaca a.vf-tab[aria-current='page']:hover {
+  background: var(--ink);
+}
+
+/* Equipos (admin) */
+.vf-teams {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin: 16px 0;
+}
+.vf-team__head {
+  margin: 0;
+  padding: 8px 12px;
+  border: var(--border);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+.vf-team__list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: grid;
+  gap: 8px;
+}
+.vf-team__list .vf-chip {
+  flex: 1;
+}
+.vf-team__foot {
+  font-weight: 700;
+}
+.vf-move {
+  min-height: 44px;
+  padding: 4px 8px;
+  border: var(--border);
+  background: var(--surface);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.vf-move:hover {
+  background: var(--sun);
+}
+.vf-winbar {
+  display: flex;
+  height: 28px;
+  border: var(--border);
+}
+.vf-winbar__a,
+.vf-winbar__b {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 14px;
+  overflow: hidden;
+}
+.vf-winbar__a {
+  background: #fff;
+  color: #000;
+}
+.vf-winbar__b {
+  background: #000;
+  color: #fff;
+  justify-content: flex-end;
+}
+button.vf-tab {
+  background: none;
+  border: none;
+  border-right: var(--border);
+  font: inherit;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+button.vf-tab[aria-current='page'] {
+  background: var(--ink);
+  color: #fff;
+}
+
+.vf-badge {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 2px 10px;
+  border: var(--border);
+  background: var(--sun);
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.vf-player-goals {
+  width: 64px;
+  min-height: 44px;
+  text-align: center;
+}
+.vf-goals {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vf-score input {
+  font-size: 28px;
+  max-width: 120px;
+}
+
+/* Anotados: la ✕ en la esquina saca al jugador (admin). */
+.vf-signup {
+  position: relative;
+  display: flex;
+}
+.vf-remove {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 3px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.vf-remove::before {
+  /* Área táctil de 44 px (DESIGN §3) sin agrandar el botón visible. */
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.vf-remove:hover {
+  background: var(--alarm);
+  color: #fff;
+}
+
+/* Encabezado: título · marca centrada · cuenta a la derecha */
+.vf-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px;
+}
+.vf-header__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  text-transform: uppercase;
+}
+.vf-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  color: var(--ink);
+  text-decoration: none;
+  font-family: var(--font-geist-pixel-square, var(--font-pixel));
+  font-size: 20px;
+}
+.vf-header__brand img {
+  display: block;
+}
+.vf-header__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 560px) {
+  .vf-header {
+    grid-template-columns: auto 1fr;
+  }
+  .vf-header__title {
+    display: none;
+  }
+  .vf-header__brand {
+    font-size: 16px;
+  }
+}
+.vf-sheet__row img.vf-cow {
+  border-radius: 50%;
+  border: 3px solid #000;
+  background: #fff;
+  object-fit: contain;
+}
+
+/* NavTabs */
+.vf-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 0;
+  border-bottom: var(--border);
+  background: var(--surface);
+}
+.vf-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-right: var(--border);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vf-tab[aria-current='page'] {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* SectionHeader */
+.vf-section-header {
+  background: var(--ink);
+  color: #fff;
+  padding: 16px 24px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  text-transform: uppercase;
+}
+
+/* PlayerChip */
+.vf-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px 8px 20px;
+  border: var(--border);
+  background: var(--surface);
+  border-left: 8px solid var(--ink-soft);
+}
+.vf-chip--a {
+  border-left-color: var(--sun);
+}
+.vf-chip--b {
+  border-left-color: var(--arcade);
+}
+.vf-chip--button {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vf-chip--button:hover {
+  background: var(--sun);
+}
+.vf-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: var(--border);
+  border-top: none;
+  font-size: 14px;
+}
+.vf-table caption {
+  caption-side: bottom;
+  text-align: left;
+  padding: 8px 12px;
+}
+.vf-table th,
+.vf-table td {
+  padding: 6px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--bg);
+}
+.vf-table thead th {
+  border-bottom: 3px dotted var(--ink);
+}
+.vf-chip__pos {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+/* SkillPicker */
+.vf-picker {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+}
+.vf-picker__cell {
+  width: 24px;
+  height: 44px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 0;
+  cursor: pointer;
+}
+.vf-picker__cell--on {
+  background: var(--ink);
+}
+.vf-picker__cell--selected {
+  background: var(--sun);
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 3px var(--ink);
+}
+
+/* Toast */
+.vf-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: var(--night);
+  color: #fff;
+  border: var(--border);
+  padding: 12px 24px;
+}
+
+.vf-link {
+  background: none;
+  border: none;
+  padding: 0;
+  min-height: 44px;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.vf-match__meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  text-transform: uppercase;
+}
+.vf-match__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+.vf-signups {
+  list-style: none;
+  padding: 10px 10px 0 0;
+  margin: 12px 0 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.vf-signups .vf-chip {
+  flex: 1;
+}
+
+/* Tarjeta de formación para compartir (spec §7). Colores y fuentes explícitos: se exporta como imagen.
+   Roboto (y no Baloo 2) porque html2canvas dibuja corrido hacia abajo el texto con métricas verticales altas.
+   Tamaños con variables: en pantallas chicas se achica, pero la imagen se genera siempre a 720 px. */
+.vf-sheet {
+  --sheet-avatar: 52px;
+  --sheet-name: 17px;
+  --sheet-pos: 13px;
+  --sheet-pad: 16px;
+  --sheet-gap: 8px;
+  --sheet-vs: 32px;
+  background: #8a10de;
+  border: 6px dotted #3fd4ff;
+  outline: 3px solid #000;
+  padding: var(--sheet-pad);
+  color: #000;
+  max-width: 720px;
+  font-family: 'Roboto', Arial, sans-serif;
+}
+.vf-sheet__heading {
+  margin: 0 0 12px;
+  text-align: center;
+  color: #fff;
+  font-size: 18px;
+  line-height: 24px;
+}
+.vf-sheet__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--sheet-gap);
+  align-items: start;
+}
+.vf-sheet__team--left {
+  grid-column: 1;
+}
+.vf-sheet__team--right {
+  grid-column: 3;
+}
+.vf-sheet__vs {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  color: #fde761;
+  font-size: var(--sheet-vs);
+  line-height: 1;
+  text-shadow: 3px 3px 0 #000;
+}
+.vf-sheet__name {
+  margin: 0 0 var(--sheet-gap);
+  padding: 8px 12px;
+  border: 3px solid #000;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: calc(var(--sheet-name) + 3px);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.vf-sheet__team--right .vf-sheet__name {
+  text-align: right;
+}
+.vf-sheet__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.vf-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vf-sheet__row--mirror {
+  flex-direction: row-reverse;
+}
+.vf-sheet__row .vf-cow {
+  width: var(--sheet-avatar);
+  height: var(--sheet-avatar);
+}
+.vf-sheet__pill {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: 6px 12px;
+  border: 3px solid #000;
+}
+.vf-sheet__pill strong,
+.vf-sheet__pill span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.vf-sheet__row--mirror .vf-sheet__pill {
+  text-align: right;
+}
+.vf-sheet__pill strong {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--sheet-name);
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+.vf-sheet__pill span {
+  font-size: var(--sheet-pos);
+  line-height: 1.3;
+}
+.vf-sheet__pill--light {
+  background: #fff;
+  color: #000;
+}
+.vf-sheet__pill--dark {
+  background: #000;
+  color: #fff;
+}
+@media (max-width: 560px) {
+  .vf-sheet {
+    --sheet-avatar: 30px;
+    --sheet-name: 12px;
+    --sheet-pos: 10px;
+    --sheet-pad: 8px;
+    --sheet-gap: 4px;
+    --sheet-vs: 18px;
+    border-width: 4px;
+  }
+  .vf-sheet__heading {
+    font-size: 13px;
+  }
+  .vf-sheet__name,
+  .vf-sheet__pill {
+    padding: 4px 6px;
+    border-width: 2px;
+  }
+  .vf-sheet__row {
+    gap: 3px;
+  }
+  .vf-sheet__row img.vf-cow {
+    border-width: 2px;
+  }
+}
+.vf-sheet__actions {
+  margin: 12px 0;
+}
+.vf-cow {
+  flex: none;
+}
+
+.vf-pixel {
+  font-family: var(--font-pixel);
+}

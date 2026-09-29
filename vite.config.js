@@ -32,6 +32,11 @@ export default {
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/api\/analytics/, '/analytics')
             },
+            '/api/futbol': {
+                target: 'http://localhost:8000',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api\/futbol/, '/futbol')
+            },
             '/api/automation': {
                 target: 'http://localhost:8000',
                 changeOrigin: true,
