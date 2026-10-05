@@ -23,3 +23,7 @@ crash.*.log
 
 # vitest coverage
 coverage/
+
+# Bytecode de Python
+__pycache__/
+*.pyc
