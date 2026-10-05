@@ -16,8 +16,8 @@ La Vaca usa un estilo **neo-brutalista con toques retro-arcade**:
 Tomamos ese lenguaje y lo aplicamos a nuestro contenido. El toque arcade encaja natural con un marcador y una pantalla de "versus".
 
 > **Marca.** Permiso de uso del logo de La Vaca confirmado por el grupo (29/09/2026): `static/lavaca.png`
-> (versión liviana `static/lavaca-256.png`). Se usa en el encabezado, como `.RANDOM(🐄)` al centro con la cuenta
-> a la derecha (círculo con la inicial que despliega Cambiar contraseña y Salir), y como avatar de cada jugador en la tarjeta de formación. La mascota y el juego
+> (versión liviana `static/lavaca-256.png`). Se usa en el encabezado como `.RANDOM(🐄)`; la cuenta va al final
+> de la barra de pestañas (círculo con la inicial que despliega Cambiar contraseña y Salir), y como avatar de cada jugador en la tarjeta de formación. La mascota y el juego
 > del hero del sitio de La Vaca siguen sin usarse.
 
 ## 2. Tokens
