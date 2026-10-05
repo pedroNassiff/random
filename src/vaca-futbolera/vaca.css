@@ -328,6 +328,70 @@ button.vf-tab[aria-current='page'] {
   align-items: center;
   gap: 12px;
 }
+/* Cuenta: círculo con la inicial y menú desplegable (cambiar contraseña, salir) */
+.vf-account {
+  position: relative;
+}
+.vf-account__avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: var(--border);
+  border-radius: 50%;
+  background: var(--sun);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.vf-account__avatar:hover,
+.vf-account__avatar[aria-expanded='true'] {
+  background: var(--ink);
+  color: var(--sun);
+}
+.vf-account__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 220px;
+  background: var(--surface);
+  border: var(--border);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+.vf-account__email {
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 3px dotted var(--ink);
+  color: var(--ink-soft);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.vf-account__item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.vf-account__item + .vf-account__item {
+  border-top: 1px solid var(--ink);
+}
+.vf-account__item:hover,
+.vf-account__item:focus-visible {
+  background: var(--sun);
+  outline: none;
+}
 @media (max-width: 560px) {
   .vf-header {
     grid-template-columns: auto 1fr;

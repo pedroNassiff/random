@@ -17,7 +17,7 @@ Tomamos ese lenguaje y lo aplicamos a nuestro contenido. El toque arcade encaja 
 
 > **Marca.** Permiso de uso del logo de La Vaca confirmado por el grupo (29/09/2026): `static/lavaca.png`
 > (versión liviana `static/lavaca-256.png`). Se usa en el encabezado, como `.RANDOM(🐄)` al centro con la cuenta
-> (Contraseña, Salir) a la derecha, y como avatar de cada jugador en la tarjeta de formación. La mascota y el juego
+> a la derecha (círculo con la inicial que despliega Cambiar contraseña y Salir), y como avatar de cada jugador en la tarjeta de formación. La mascota y el juego
 > del hero del sitio de La Vaca siguen sin usarse.
 
 ## 2. Tokens
