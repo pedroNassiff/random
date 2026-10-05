@@ -50,7 +50,7 @@ omit = [
 ]
 
 [tool.importlinter]
-root_packages = ["replay", "futbol"]
+root_packages = ["replay", "futbol", "accounts"]
 
 [[tool.importlinter.contracts]]
 name = "replay core never imports infrastructure (GCS / bootstrap)"
@@ -65,3 +65,14 @@ name = "futbol layers: domain <- application <- infrastructure"
 type = "layers"
 layers = ["futbol.infrastructure", "futbol.application", "futbol.domain"]
 ignore_imports = []
+
+[[tool.importlinter.contracts]]
+name = "accounts layers: application <- infrastructure"
+type = "layers"
+layers = ["accounts.infrastructure", "accounts.application"]
+
+[[tool.importlinter.contracts]]
+name = "shared accounts never depend on the apps that use them"
+type = "forbidden"
+source_modules = ["accounts"]
+forbidden_modules = ["futbol"]
