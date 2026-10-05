@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import asdict
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Cookie, Response
 from pydantic import BaseModel, Field
 
-from futbol.application.auth_service import SESSION_TTL
+from accounts.infrastructure.api import SESSION_COOKIE, set_session_cookie
 from futbol.application.errors import FutbolError
 from futbol.application.ports import Actor
 from futbol.application.roster_service import PlayerListing
@@ -21,7 +20,8 @@ from futbol.infrastructure.deps import CurrentActor, Services, Svc, current_acto
 
 __all__ = ["Services", "current_actor", "http_error", "router"]
 
-COOKIE = "futbol_session"
+# La sesión es compartida con el resto de páginas con login (ver `accounts`).
+COOKIE = SESSION_COOKIE
 
 router = APIRouter(prefix="/futbol", tags=["Fútbol Vaquero"])
 
@@ -78,15 +78,7 @@ def _me(actor: Actor) -> dict[str, Any]:
 
 
 def _set_session_cookie(response: Response, session: str) -> None:
-    response.set_cookie(
-        COOKIE,
-        session,
-        max_age=int(SESSION_TTL.total_seconds()),
-        httponly=True,
-        secure=os.getenv("FUTBOL_COOKIE_SECURE", "1") == "1",
-        samesite="lax",
-        path="/",
-    )
+    set_session_cookie(response, session)
 
 
 def _listing(item: PlayerListing) -> dict[str, Any]:

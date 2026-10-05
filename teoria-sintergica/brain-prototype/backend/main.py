@@ -61,6 +61,8 @@ from prospecting_groups import router as groups_router
 from audit.router import router as audit_router
 from futbol.infrastructure.api import router as futbol_router
 from futbol.infrastructure.wiring import build_services as build_futbol_services
+from accounts.infrastructure.api import router as accounts_router
+from accounts.infrastructure.wiring import build_session_service
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -226,6 +228,9 @@ async def startup():
     app.state.futbol = build_futbol_services(app.state.db_pool)
     print("Futbol Vaquero services initialized")
 
+    app.state.accounts = build_session_service(app.state.db_pool)
+    print("Shared session initialized")
+
     app.state.automation_service = AutomationService(app.state.db_pool)
     print("Automation service initialized")
 
@@ -267,6 +272,9 @@ app.include_router(audit_router)
 
 # Fútbol Vaquero (/vaca-futbolera)
 app.include_router(futbol_router)
+
+# Sesión compartida por las páginas con login (/auth): Fútbol Vaquero y /dashboard
+app.include_router(accounts_router)
 
 # ============================================
 # Copilot Labs Endpoint
