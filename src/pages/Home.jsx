@@ -459,7 +459,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       <section id="proyectos" ref={projectsRef} className="relative w-full min-h-[2400px] md:min-h-[4000px] lg:min-h-[4200px] bg-[#F8F8F7] px-6 md:px-16 py-24 pb-32 md:pb-24 max-w-[1600px] mx-auto mt-20">
         {/* Title */}
         <div className="absolute top-0 left-6 md:left-16">
-          <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.work_title')}</h2>
+          {/* <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.work_title')}</h2> */}
         </div>
   
         {/* Project 1 - ADA */}
@@ -548,7 +548,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       {/* Services Section */}
       <section id="servicios" ref={servicesRef} className="w-full px-6 md:px-16 py-10 md:py-[10px] mt-[80px] md:mt-0 max-w-[1600px] mx-auto">
         <div className="flex items-center gap-3 mb-12 md:mb-16 pl-0 md:pl-4">
-          <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.services_title')}</h2>
+          {/* <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.services_title')}</h2> */}
         </div>
 
         {/* Services Grid */}
@@ -628,7 +628,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       {/* Lab Section */}
       <section id="lab" ref={labRef} className="w-full px-6 md:px-16 py-20 md:py-[120px] max-w-[1600px] mx-auto">
         <div className="flex items-center justify-start md:justify-end gap-3 mb-12 md:mb-16 pr-0 md:pr-4">
-          <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.lab_title')}</h2>
+          {/* <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.lab_title')}</h2> */}
         </div>
 
         {/* Lab Grid - 4 Different Experiments */}
@@ -706,7 +706,7 @@ const [shouldRenderMatrix, setShouldRenderMatrix] = useState(false);
       {/* About Section */}
       <section id="about" ref={aboutRef} className="w-full px-6 md:px-16 py-20 md:py-[120px] max-w-[1400px] mx-auto">
         <div className="flex items-center gap-3 mb-12 md:mb-16 pl-0 md:pl-4">
-          <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.about_title')}</h2>
+          {/* <h2 className="text-[40px] md:text-[50px] font-semibold text-[#1A1A1A]">{t('home.about_title')}</h2> */}
         </div>
         
         <div className="flex flex-col gap-12">
