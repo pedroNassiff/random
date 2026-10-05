@@ -76,6 +76,8 @@ class AuthService:
             raise Unauthorized(_BAD_CREDENTIALS)
         if not verify_password(password, stored):
             raise Unauthorized(_BAD_CREDENTIALS)
+        # Si el admin cargó después un jugador con este email, queda vinculado en este ingreso.
+        await self._repo.link_player_by_email(await self._repo.default_group_id(), user_id, normalize_email(email))
         return await self._open_session(user_id, self._clock())
 
     async def set_password(self, actor: Actor, password: str) -> Actor:

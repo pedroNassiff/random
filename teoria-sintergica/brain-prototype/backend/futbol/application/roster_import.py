@@ -115,11 +115,12 @@ class RosterImporter:
     async def run(self, group_id: str, data: Any, *, dry_run: bool = False) -> ImportReport:
         skills = {s.key: s.id for s in await self._repo.list_skills(group_id) if s.is_active}
         roster = parse_roster(data, set(skills))
-        rater_id = await self._rater(roster.rated_by)
         existing = await self._repo.list_players(group_id)
+        user_id, linked = await self._rater(roster, existing)  # valida antes de escribir nada
         report = ImportReport()
-        for seed in roster.players:
-            player = await self._upsert(group_id, seed, existing, report, dry_run)
+        upserted = [(seed, await self._upsert(group_id, seed, existing, report, dry_run)) for seed in roster.players]
+        rater_id = linked or await self._link_rater(group_id, user_id, roster.rated_by, upserted, existing, dry_run)
+        for seed, player in upserted:
             if player.id == rater_id and seed.skills:
                 report.warnings.append(f"{seed.display_name}: es el mismo admin que puntúa, cuenta como autoevaluación")
             values = {skills[k]: v for k, v in seed.skills.items()}
@@ -128,16 +129,36 @@ class RosterImporter:
             report.ratings += len(values)
         return report
 
-    async def _rater(self, email: str) -> str:
+    async def _rater(self, roster: RosterFile, existing: list[Player]) -> tuple[str, str | None]:
+        """(user_id del admin que puntúa, su player_id si ya está vinculado).
+
+        Si no está vinculado, alcanza con que haya un jugador con su email (en el archivo o en la base):
+        el import lo vincula. Así no hace falta volver a entrar por magic link."""
+        email = roster.rated_by
         found = await self._repo.password_hash_for(email)
         actor = await self._repo.actor_for_user(found[0]) if found else None
         if actor is None or not actor.is_admin:
             raise Invalid(f"rated_by '{email}' tiene que ser un admin que ya entró a la app.")
-        if actor.player_id is None:
+        has_player = any(p.email == email for p in roster.players) or any(p.email == email for p in existing)
+        if actor.player_id is None and not has_player:
             raise Invalid(
-                f"rated_by '{email}' no está vinculado a un jugador: cargá un jugador con ese email y volvé a entrar."
+                f"rated_by '{email}' no está vinculado a un jugador: agregá al archivo un jugador con ese email."
             )
-        return actor.player_id
+        return actor.user_id, actor.player_id
+
+    async def _link_rater(
+        self,
+        group_id: str,
+        user_id: str,
+        email: str,
+        upserted: list[tuple[PlayerSeed, Player]],
+        existing: list[Player],
+        dry_run: bool,
+    ) -> str:
+        player = next(p for p in [*(p for _, p in upserted), *existing] if p.email == email)
+        if not dry_run:
+            await self._repo.link_player_by_email(group_id, user_id, email)
+        return player.id
 
     async def _upsert(
         self, group_id: str, seed: PlayerSeed, existing: list[Player], report: ImportReport, dry_run: bool

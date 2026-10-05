@@ -58,3 +58,53 @@ def test_build_services_uses_smtp_when_configured(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("FUTBOL_SMTP_HOST", "smtp.x")
     svc = build_services(object())
     assert isinstance(svc.auth._mailer, SmtpMailer)
+
+
+async def test_smtp_failure_is_logged_with_the_link_and_not_raised(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    class FailingSMTP:
+        def __init__(self, *_a: object, **_k: object) -> None:
+            raise smtplib.SMTPAuthenticationError(535, b"authentication failed")
+
+    monkeypatch.setattr(smtplib, "SMTP", FailingSMTP)
+    with caplog.at_level(logging.ERROR, logger="futbol.mailer"):
+        await SmtpMailer("smtp.x", 587, "u", "p", "f@x.com").send_magic_link("a@x.com", "https://x/entrar?token=abc")
+    assert "SMTPAuthenticationError" in caplog.text and "https://x/entrar?token=abc" in caplog.text
+
+
+def test_request_link_answers_202_even_if_email_sending_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sin enumeración de usuarios: mismo 202 para un email conocido con SMTP caído que para uno desconocido."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from futbol.application.auth_service import AuthService
+    from futbol.application.match_service import MatchService
+    from futbol.application.results_service import ResultsService
+    from futbol.application.roster_service import RosterService
+    from futbol.application.teams_service import TeamsService
+    from futbol.infrastructure.api import Services, router
+    from tests.futbol.fakes import FakeMatchRepo, FakeRepo, FakeResultsRepo, FakeTeamsRepo
+
+    def boom(*_a: object, **_k: object) -> None:
+        raise OSError("sin red")
+
+    monkeypatch.setattr(smtplib, "SMTP", boom)
+    repo, matches = FakeRepo(), FakeMatchRepo()
+    teams = FakeTeamsRepo(matches)
+    auth = AuthService(
+        repo, SmtpMailer("smtp.x", 587, "u", "p", "f@x.com"), base_url="https://x", admin_emails=["boss@x.com"]
+    )
+    app = FastAPI()
+    app.include_router(router)
+    app.state.futbol = Services(
+        auth,
+        RosterService(repo),
+        MatchService(matches, repo),
+        TeamsService(teams, matches, repo),
+        ResultsService(FakeResultsRepo(matches, teams), matches, teams, repo),
+    )
+    client = TestClient(app)
+    known = client.post("/futbol/auth/request", json={"email": "boss@x.com"})
+    unknown = client.post("/futbol/auth/request", json={"email": "nadie@x.com"})
+    assert known.status_code == unknown.status_code == 202 and known.json() == unknown.json()

@@ -95,6 +95,7 @@ contraseña) y para **"olvidé mi contraseña"**.
   tiempo constante. Cuando el email no existe, se calcula igual un hash, para que el tiempo de
   respuesta no lo delate.
 - ⏳ Pendiente: límite de intentos de login y cerrar las otras sesiones al cambiar la contraseña.
+- Si el envío del mail falla, se registra el error con el link en los logs y la respuesta sigue siendo 202.
 
 ### Primer ingreso en local
 
@@ -288,31 +289,38 @@ integración usan la base `futbol_test` y se saltan si falta `FUTBOL_TEST_DSN`.
 
 ---
 
-## 7. Deploy a producción (pendiente)
+## 7. Producción
 
-1. **Commit** en una rama propia (hoy todo está sin commitear en `feature-templario-hermetico`,
-   mezclado con otros cambios).
-2. **Migración** `001_futbol_schema.sql` en la BBDD de producción, y permisos del usuario de la
-   app sobre el schema `futbol`.
-3. **Variables en Cloud Run** (Secret Manager para las sensibles):
+Estado al 29/09/2026: **en producción** en https://random-lab.es/vaca-futbolera.
 
-   | Variable | Valor en prod |
-   |---|---|
-   | `FUTBOL_ADMIN_EMAILS` | emails de los admins |
-   | `FUTBOL_BASE_URL` | dominio público de Random |
-   | `FUTBOL_COOKIE_SECURE` | `1` (default) |
-   | `FUTBOL_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `FUTBOL_MAIL_FROM` | proveedor SMTP. **Sin esto, nadie recibe el link en prod** |
-   | `FUTBOL_CRON_SECRET` | secreto largo aleatorio (Secret Manager) |
+| Pieza | Estado |
+|---|---|
+| Base (Cloud SQL `random-postgres`, base `random_analytics`) | Migraciones 001–010 aplicadas con el runner (registradas en `futbol.schema_migrations`) |
+| Cloud Run `brain-prototype-api` | `FUTBOL_ADMIN_EMAILS`, `FUTBOL_BASE_URL`, `FUTBOL_SMTP_*` y el secreto `futbol-smtp-password` |
+| Mail | SMTP de Hostinger desde `signal@random-lab.es` (mismo buzón que el CRM; el SPF del dominio ya autoriza a Hostinger) |
+| Terraform | `cloud-run.tf` y `secret-manager.tf` declaran lo anterior. Las variables se aplicaron con `gcloud` porque el plan tenía cambios ajenos pendientes (Vertex AI, `REPLAY_BUNDLE_URI`) |
+| Cron | ⏳ Falta Cloud Scheduler → `POST /futbol/cron/tick` (hasta entonces, la pestaña Partido corre el tick al cargar) |
 
-   **Cron:** `POST /futbol/cron/tick` cada 15 min con `Authorization: Bearer $FUTBOL_CRON_SECRET`.
-   Recomendado **Cloud Scheduler** (3 jobs gratis) → Cloud Run, vía Terraform. Vercel Cron en plan
-   Hobby solo corre una vez por día. Hasta que exista, la pestaña Partido corre el tick al cargar,
-   así que abrir y cerrar inscripciones funciona igual.
+### Migraciones
 
-4. **Deploy del backend** (Cloud Run) y del frontend (Vercel). El rewrite `/api/futbol/:path*`
-   ya está en `vercel.json`.
+```bash
+cd teoria-sintergica/brain-prototype/backend
+# Prod: proxy a Cloud SQL con una cuenta con acceso al proyecto
+cloud-sql-proxy --token "$(gcloud auth print-access-token --account signal@random-lab.es)" \
+  --port 5434 random-507414:us-central1:random-postgres &
+venv/bin/python -m futbol.infrastructure.migrate --dsn "postgresql://random_app:<pass>@127.0.0.1:5434/random_analytics" --dry-run
+venv/bin/python -m futbol.infrastructure.migrate --dsn "…"   # aplica solo las que falten
+```
 
----
+La contraseña está en el secreto `random-database-url`. Leerla sin imprimirla.
+
+### Gotchas
+
+- Tu `~/.zshrc` exporta `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` de otro proyecto: hacé `unset` antes de usar
+  `gcloud`/`terraform` contra `random-507414`.
+- Cloud Run lee los secretos al arrancar la instancia: después de cambiar un secreto, forzá una revisión nueva.
+- Si el SMTP falla, la API igual responde 202 (para no revelar qué emails existen) y el link queda en los logs de
+  Cloud Run con el error: `gcloud logging read '… textPayload:"no se pudo mandar el mail"'`.
 
 ## 8. Pendientes y problemas conocidos
 

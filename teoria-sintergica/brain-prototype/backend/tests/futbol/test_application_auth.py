@@ -163,3 +163,14 @@ async def test_forgot_password_magic_link_still_works_and_allows_changing_it() -
     await svc.login("juan@x.com", "clave-nueva-456")
     with pytest.raises(Unauthorized):
         await svc.login("juan@x.com", "clave-vieja-123")
+
+
+async def test_password_login_links_a_player_created_later_with_the_same_email() -> None:
+    svc, repo, mailer, _ = make()
+    await svc.request_link("boss@x.com")
+    _, admin = await svc.verify(mailer.last_token)
+    await svc.set_password(admin, "clave-segura-1")
+    assert admin.player_id is None
+    player = repo.add_player("Boss", email="boss@x.com")  # el admin se carga como jugador después
+    _, again = await svc.login("boss@x.com", "clave-segura-1")
+    assert again.player_id == player.id
