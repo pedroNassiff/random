@@ -63,6 +63,15 @@ from futbol.infrastructure.api import router as futbol_router
 from futbol.infrastructure.wiring import build_services as build_futbol_services
 from accounts.infrastructure.api import router as accounts_router
 from accounts.infrastructure.wiring import build_session_service
+from fiscal.infrastructure.api import router as fiscal_router
+from fiscal.infrastructure.wiring import (
+    build_agent as build_fiscal_agent,
+    build_clients as build_fiscal_clients,
+    build_documents as build_fiscal_documents,
+    build_invoices as build_fiscal_invoices,
+    build_movements as build_fiscal_movements,
+    build_service as build_fiscal_service,
+)
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -229,7 +238,15 @@ async def startup():
     print("Futbol Vaquero services initialized")
 
     app.state.accounts = build_session_service(app.state.db_pool)
-    print("Shared session initialized")
+    app.state.fiscal = build_fiscal_service(app.state.db_pool)
+    app.state.fiscal_documents = build_fiscal_documents(app.state.db_pool)
+    app.state.fiscal_invoices = build_fiscal_invoices(app.state.db_pool)
+    app.state.fiscal_clients = build_fiscal_clients(app.state.db_pool)
+    app.state.fiscal_movements = build_fiscal_movements(app.state.db_pool)
+    app.state.fiscal_agent = build_fiscal_agent(
+        app.state.fiscal, app.state.fiscal_documents, app.state.fiscal_invoices, app.state.fiscal_clients
+    )
+    print("Shared session + Gestor Autónomo services initialized")
 
     app.state.automation_service = AutomationService(app.state.db_pool)
     print("Automation service initialized")
@@ -273,8 +290,9 @@ app.include_router(audit_router)
 # Fútbol Vaquero (/vaca-futbolera)
 app.include_router(futbol_router)
 
-# Sesión compartida por las páginas con login (/auth): Fútbol Vaquero y /dashboard
+# Sesión compartida por las páginas con login (/auth) y Gestor Autónomo (/dashboard → /fiscal)
 app.include_router(accounts_router)
+app.include_router(fiscal_router)
 
 # ============================================
 # Copilot Labs Endpoint
