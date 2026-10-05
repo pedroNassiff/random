@@ -310,6 +310,8 @@ button.vf-tab[aria-current='page'] {
   text-transform: uppercase;
 }
 .vf-header__brand {
+  /* Siempre en la columna del medio de la grilla 1fr auto 1fr: centrado en cualquier ancho. */
+  grid-column: 2;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -393,9 +395,6 @@ button.vf-tab[aria-current='page'] {
   outline: none;
 }
 @media (max-width: 560px) {
-  .vf-header {
-    grid-template-columns: auto 1fr;
-  }
   .vf-header__title {
     display: none;
   }
