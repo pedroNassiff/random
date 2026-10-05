@@ -36,7 +36,7 @@ function Shell() {
   ]
   return (
     <>
-      <AppHeader onLogout={() => void logout()} />
+      <AppHeader email={me.email} onLogout={() => void logout()} />
       <NavTabs tabs={tabs} />
       <Outlet />
     </>
