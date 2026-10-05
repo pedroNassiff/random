@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Sequence
@@ -19,12 +21,21 @@ sys.path.insert(0, str(BACKEND_DIR))
 from replay.exporter import MIN_RECORDED_ID, build_manifest, export_doc_snapshots, export_frames, write_manifest  # noqa: E402
 
 
-def fetch_json(url: str) -> bytes:
+def fetch_json(url: str, retries: int = 8) -> bytes:
+    """GET con reintentos: el rate limiter del backend local (429) corta las ráfagas de snapshots."""
     if not url.startswith(("http://", "https://")):
         raise ValueError(f"unsupported URL scheme: {url}")
-    with urllib.request.urlopen(url, timeout=120) as response:  # nosec B310
-        data: bytes = response.read()
-    return data
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as response:  # nosec B310
+                data: bytes = response.read()
+            return data
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429 or attempt == retries:
+                raise
+            wait = int(exc.headers.get("Retry-After") or 0) or min(60, 2**attempt * 2)
+            time.sleep(wait)
+    raise AssertionError("unreachable")
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

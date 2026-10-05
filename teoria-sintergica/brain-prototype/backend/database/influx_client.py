@@ -22,6 +22,8 @@ INFLUX_URL = os.getenv('INFLUXDB_URL', os.getenv('INFLUX_URL', 'http://localhost
 INFLUX_TOKEN = os.getenv('INFLUXDB_TOKEN', os.getenv('INFLUX_TOKEN', 'my-super-secret-auth-token'))
 INFLUX_ORG = os.getenv('INFLUXDB_ORG', os.getenv('INFLUX_ORG', 'teoria-sintergica'))
 INFLUX_BUCKET = os.getenv('INFLUXDB_BUCKET', os.getenv('INFLUX_BUCKET', 'eeg-data'))
+# Las consultas filtran siempre por recording_id y leen todo el histórico (range(start: 0)): con una
+# ventana de -30d, las sesiones de más de un mes aparecían sin datos aunque estuvieran guardadas.
 
 
 @dataclass
@@ -309,7 +311,7 @@ class InfluxDBEEGClient:
         # Build Flux query
         query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_sample")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -345,7 +347,7 @@ class InfluxDBEEGClient:
         
         query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_metrics")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -389,7 +391,7 @@ class InfluxDBEEGClient:
 
         query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_event")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -423,7 +425,7 @@ class InfluxDBEEGClient:
         # which causes 'unsupported input type for mean aggregate: boolean'
         avg_query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_metrics")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> filter(fn: (r) => r["_field"] != "blink_contaminated")
@@ -433,7 +435,7 @@ class InfluxDBEEGClient:
         # Peak coherence
         peak_query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_metrics")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> filter(fn: (r) => r["_field"] == "coherence")
@@ -483,7 +485,7 @@ class InfluxDBEEGClient:
         
         query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_sample")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> filter(fn: (r) => r["_field"] == "tp9")
@@ -581,7 +583,7 @@ class InfluxDBEEGClient:
 
         query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> sort(columns: ["_time"])
@@ -653,7 +655,7 @@ class InfluxDBEEGClient:
         # 1. Average raw alpha (µV²/Hz) per channel (→ Postgres alpha_*_avg columns)
         avg_norm_query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> filter(fn: (r) => r["band"] == "alpha")
@@ -665,7 +667,7 @@ class InfluxDBEEGClient:
         # 2. All per-window alpha raw values (for FAA + posterior asymmetry)
         raw_query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> filter(fn: (r) => r["band"] == "alpha")
@@ -794,7 +796,7 @@ class InfluxDBEEGClient:
         # 2. Pull all per-channel raw band powers with timestamps
         raw_query = f'''
         from(bucket: "{INFLUX_BUCKET}")
-            |> range(start: -30d)
+            |> range(start: 0)
             |> filter(fn: (r) => r["_measurement"] == "eeg_band_power")
             |> filter(fn: (r) => r["recording_id"] == "{recording_id}")
             |> filter(fn: (r) => r["_field"] == "value_raw")
