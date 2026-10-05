@@ -2,7 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import GlitchButton from './GlitchButton';
+import TypedArgument from './TypedArgument';
+import useActiveSection from '../hooks/useActiveSection';
 import { Menu, X, BarChart3 } from 'lucide-react';
+
+// Secciones del home (id del <section>) y la clave de su título, que es lo que aparece en el logo.
+const HOME_SECTIONS = [
+  { id: 'proyectos', title: 'home.work_title' },
+  { id: 'servicios', title: 'home.services_title' },
+  { id: 'lab', title: 'home.lab_title' },
+  { id: 'about', title: 'home.about_title' },
+];
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -12,6 +22,10 @@ export default function Navbar() {
   const isProjectPage = location.pathname.startsWith('/work/');
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // En el home, el logo muestra dentro de los paréntesis la sección que se está viendo: .RANDOMMM(work)
+  const activeSection = useActiveSection(HOME_SECTIONS.map((s) => s.id), isHome);
+  const section = HOME_SECTIONS.find((s) => s.id === activeSection);
+  const logoArg = section ? t(section.title).toLowerCase() : '';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -51,8 +65,11 @@ export default function Navbar() {
             isScrolled ? 'text-[#1A1A1A]' : (isProjectPage ? 'text-white' : 'text-[#1A1A1A]')
           }`}
           style={{ fontFamily: 'var(--font-geist-pixel-square)' }}
+          aria-label={logoArg ? `.RANDOMMM(${logoArg})` : '.RANDOMMM()'}
         >
-          .RANDOM()
+          <span aria-hidden="true">
+            .RANDOM(<TypedArgument text={logoArg} />)
+          </span>
         </div>
         
         {/* Desktop Nav */}
