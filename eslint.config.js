@@ -3,10 +3,10 @@ import jsxA11y from 'eslint-plugin-jsx-a11y'
 import reactHooks from 'eslint-plugin-react-hooks'
 import tseslint from 'typescript-eslint'
 
-// Gate de Track 2 acotado a la feature Fútbol Vaquero (el JSX legacy no se lintea aún).
+// Gate de Track 2 acotado a las features en TypeScript: Fútbol Vaquero y el dashboard (el JSX legacy no se lintea aún).
 export default tseslint.config(
   {
-    files: ['src/vaca-futbolera/**/*.{ts,tsx}'],
+    files: ['src/vaca-futbolera/**/*.{ts,tsx}', 'src/dashboard/**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.strict, jsxA11y.flatConfigs.recommended],
     plugins: { 'react-hooks': reactHooks },
     rules: {
