@@ -55,7 +55,7 @@ describe('sesión y guardas', () => {
     expect(await screen.findByRole('heading', { name: 'Próximo partido' })).toBeInTheDocument()
   })
 
-  it('admin ve la pestaña Skills; el encabezado tiene la marca al centro y la cuenta a la derecha', async () => {
+  it('admin ve la pestaña Skills; la marca va en el encabezado y la cuenta al final de la barra', async () => {
     mockApi({ 'GET /me': { body: ADMIN }, 'GET /matches/current': { body: { match: null } } })
     renderApp('/vaca-futbolera')
     expect(await screen.findByRole('link', { name: 'Skills' })).toBeInTheDocument()
@@ -66,6 +66,11 @@ describe('sesión y guardas', () => {
     // La cuenta es un círculo con la inicial; sus opciones no se ven hasta abrirlo.
     const account = screen.getByRole('button', { name: 'Cuenta de boss@x.com' })
     expect(account).toHaveTextContent('B')
+    // En la misma barra que las pestañas, después de ellas y fuera de la zona que se desplaza.
+    const bar = screen.getByRole('navigation', { name: 'Secciones' }).parentElement
+    expect(bar).toContainElement(account)
+    expect(screen.getByRole('navigation', { name: 'Secciones' })).not.toContainElement(account)
+    expect(screen.getByRole('banner')).not.toContainElement(account)
     expect(screen.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Contraseña' })).not.toBeInTheDocument()
   })

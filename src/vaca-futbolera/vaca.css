@@ -335,8 +335,8 @@ button.vf-tab[aria-current='page'] {
 .vf-account__avatar {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border: var(--border);
   border-radius: 50%;
   background: var(--sun);
@@ -411,12 +411,25 @@ button.vf-tab[aria-current='page'] {
 }
 
 /* NavTabs */
-.vf-tabs {
+/* Barra: pestañas (se desplazan si no entran) + la cuenta fija a la derecha */
+.vf-navbar {
   display: flex;
-  overflow-x: auto;
-  gap: 0;
+  align-items: stretch;
   border-bottom: var(--border);
   background: var(--surface);
+}
+.vf-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  gap: 0;
+}
+.vf-navbar__trailing {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 0 16px;
 }
 .vf-tab {
   flex: none;

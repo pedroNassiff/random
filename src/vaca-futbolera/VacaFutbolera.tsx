@@ -1,5 +1,6 @@
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
+import { AccountMenu } from './components/AccountMenu'
 import { AppHeader } from './components/AppHeader'
 import { NavTabs, type Tab } from './components/NavTabs'
 import { DevUiPage } from './pages/DevUiPage'
@@ -36,8 +37,8 @@ function Shell() {
   ]
   return (
     <>
-      <AppHeader email={me.email} onLogout={() => void logout()} />
-      <NavTabs tabs={tabs} />
+      <AppHeader />
+      <NavTabs tabs={tabs} trailing={<AccountMenu email={me.email} onLogout={() => void logout()} />} />
       <Outlet />
     </>
   )

@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom'
 import { BASE, LAVACA_LOGO } from '../routes'
-import { AccountMenu } from './AccountMenu'
 
-/** Marca al centro (.RANDOM(🐄), como el Navbar de Random) y la cuenta en un círculo con menú a la derecha. */
-export function AppHeader({ email, onLogout }: { email: string; onLogout: () => void }) {
+/** Marca .RANDOM(🐄), como el Navbar de Random. La cuenta vive en la barra de pestañas. */
+export function AppHeader() {
   return (
     <header className="vf-header">
       {/* <span className="vf-header__title">Fútbol Vaquero</span> */}
@@ -12,9 +11,6 @@ export function AppHeader({ email, onLogout }: { email: string; onLogout: () => 
         <img src={LAVACA_LOGO} alt="" width={40} height={31} />
         <span aria-hidden="true">)</span>
       </Link>
-      <div className="vf-header__actions">
-        <AccountMenu email={email} onLogout={onLogout} />
-      </div>
     </header>
   )
 }
