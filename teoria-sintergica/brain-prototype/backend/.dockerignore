@@ -14,3 +14,6 @@ validation_logs/
 .mypy_cache/
 .coverage
 htmlcov/
+replay_bundle/
+tests/
+*.db
