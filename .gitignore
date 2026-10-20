@@ -20,3 +20,6 @@ crash.*.log
 *.tfvars.json
 !example.tfvars
 .aider*
+
+# vitest coverage
+coverage/

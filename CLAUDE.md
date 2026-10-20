@@ -9,12 +9,12 @@ Random Studio / Random Lab es una plataforma de biocomputación (procesamiento E
 - **Principios FinOps:** Frugalidad extrema, maximización de GCP Always Free Tier (costo $0 inactivo).
 
 ## 📚 Estructura de Documentación & Gobernanza
-- [docs/00-landing-zone-spec.md](file:///Users/pedronassiff/Desktop/proyectos/random/docs/00-landing-zone-spec.md): Especificación principal de Landing Zone Lite, IAM y FinOps.
-- [docs/01-architecture-overview.md](file:///Users/pedronassiff/Desktop/proyectos/random/docs/01-architecture-overview.md): Visión general de arquitectura y flujos Vercel ↔ GCP.
-- [docs/02-services/](file:///Users/pedronassiff/Desktop/proyectos/random/docs/02-services/): Documentación individual de microservicios, bases de datos y almacenamiento.
-- [docs/03-iam-model.md](file:///Users/pedronassiff/Desktop/proyectos/random/docs/03-iam-model.md): Modelo IAM de mínimo privilegio y service accounts.
-- [docs/04-network-model.md](file:///Users/pedronassiff/Desktop/proyectos/random/docs/04-network-model.md): Modelo de red, CORS e integración HTTPS/WSS.
-- [docs/05-decisions/](file:///Users/pedronassiff/Desktop/proyectos/random/docs/05-decisions/): Architecture Decision Records (ADRs).
+- [docs/00-landing-zone-spec.md](docs/00-landing-zone-spec.md): Especificación principal de Landing Zone Lite, IAM y FinOps.
+- [docs/01-architecture-overview.md](docs/01-architecture-overview.md): Visión general de arquitectura y flujos Vercel ↔ GCP.
+- [docs/02-services/](docs/02-services/): Documentación individual de microservicios, bases de datos y almacenamiento.
+- [docs/03-iam-model.md](docs/03-iam-model.md): Modelo IAM de mínimo privilegio y service accounts.
+- [docs/04-network-model.md](docs/04-network-model.md): Modelo de red, CORS e integración HTTPS/WSS.
+- [docs/05-decisions/](docs/05-decisions/): Architecture Decision Records (ADRs).
 
 ## 🤖 Subagentes de Claude Code (.claude/agents/)
 - `pri-infra`: Gestión de Terraform e infraestructura en GCP.

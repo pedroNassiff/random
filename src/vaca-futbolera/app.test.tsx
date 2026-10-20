@@ -55,7 +55,7 @@ describe('sesión y guardas', () => {
     expect(await screen.findByRole('heading', { name: 'Próximo partido' })).toBeInTheDocument()
   })
 
-  it('admin ve la pestaña Skills; el encabezado tiene la marca al centro y la cuenta a la derecha', async () => {
+  it('admin ve la pestaña Skills; la marca va en el encabezado y la cuenta al final de la barra', async () => {
     mockApi({ 'GET /me': { body: ADMIN }, 'GET /matches/current': { body: { match: null } } })
     renderApp('/vaca-futbolera')
     expect(await screen.findByRole('link', { name: 'Skills' })).toBeInTheDocument()
@@ -63,8 +63,16 @@ describe('sesión y guardas', () => {
     expect(brand).toHaveAttribute('href', '/vaca-futbolera')
     expect(brand.querySelector('img')).toHaveAttribute('src', '/lavaca-256.png')
     expect(brand).toHaveTextContent('.RANDOM()')
-    const actions = screen.getByRole('button', { name: 'Salir' }).parentElement
-    expect(actions).toContainElement(screen.getByRole('link', { name: 'Contraseña' }))
+    // La cuenta es un círculo con la inicial; sus opciones no se ven hasta abrirlo.
+    const account = screen.getByRole('button', { name: 'Cuenta de boss@x.com' })
+    expect(account).toHaveTextContent('B')
+    // En la misma barra que las pestañas, después de ellas y fuera de la zona que se desplaza.
+    const bar = screen.getByRole('navigation', { name: 'Secciones' }).parentElement
+    expect(bar).toContainElement(account)
+    expect(screen.getByRole('navigation', { name: 'Secciones' })).not.toContainElement(account)
+    expect(screen.getByRole('banner')).not.toContainElement(account)
+    expect(screen.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Contraseña' })).not.toBeInTheDocument()
   })
   it('una ruta desconocida vuelve al inicio', async () => {
     mockApi({ 'GET /me': { body: MEMBER } })
@@ -75,7 +83,8 @@ describe('sesión y guardas', () => {
   it('Salir cierra la sesión y manda a /entrar', async () => {
     const calls = mockApi({ 'GET /me': { body: MEMBER }, 'POST /auth/logout': { status: 204 } })
     renderApp('/vaca-futbolera')
-    await userEvent.click(await screen.findByRole('button', { name: 'Salir' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cuenta de juan@x.com' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Salir' }))
     expect(await screen.findByRole('heading', { name: 'Entrar a Fútbol Vaquero' })).toBeInTheDocument()
     expect(calls.map((c) => c.key)).toContain('POST /auth/logout')
   })

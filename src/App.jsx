@@ -19,6 +19,7 @@ import PageTransition from './components/PageTransition.jsx';
 import { AnalyticsProvider } from './lib/useAnalytics.jsx';
 import { ExpandTransitionProvider } from './lib/useExpandTransition.jsx';
 const VacaFutbolera = lazy(() => import('./vaca-futbolera/VacaFutbolera'));
+const Dashboard = lazy(() => import('./dashboard/Dashboard'));
 import './index.css';
 
 function AppRoutes() {
@@ -44,6 +45,7 @@ function AppRoutes() {
         <Route path="/sanji/dashboard" element={<SanjiDashboard />} />
         <Route path="/sanji/dia/:date" element={<SanjiDayDetail />} />
         <Route path="/vaca-futbolera/*" element={<Suspense fallback={null}><VacaFutbolera /></Suspense>} />
+        <Route path="/dashboard/*" element={<Suspense fallback={null}><Dashboard /></Suspense>} />
         <Route path="/planning-house" element={<Navigate to="/planning-prospeccion" replace />} />
         <Route path="/lanalisis-datasets" element={<Navigate to="/analisis-datasets" replace />} />
       </Routes>

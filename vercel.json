@@ -12,6 +12,14 @@
       "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/futbol/:path*"
     },
     {
+      "source": "/api/auth/:path*",
+      "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/auth/:path*"
+    },
+    {
+      "source": "/api/fiscal/:path*",
+      "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/fiscal/:path*"
+    },
+    {
       "source": "/api/automation/:path*",
       "destination": "https://brain-prototype-api-v53upqslva-uc.a.run.app/automation/:path*"
     },

@@ -176,3 +176,27 @@ body {
     text-shadow: -2px 0 red, 2px 0 cyan;
 }
 
+
+/* Logo del navbar: argumento de .RANDOMMM(…) que se tipea según la sección del home */
+.random-arg {
+  white-space: pre;
+}
+.random-caret {
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: random-caret-blink 0.8s steps(1) infinite;
+}
+@keyframes random-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .random-caret {
+    animation: none;
+  }
+}

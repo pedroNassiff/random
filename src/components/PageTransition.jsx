@@ -6,6 +6,7 @@ import './PageTransition.css'
 // La transición queda solo para el sitio público (home, work, lab…).
 const APP_PREFIXES = [
   '/vaca-futbolera',
+  '/dashboard',
   '/analytics',
   '/automation',
   '/audit',

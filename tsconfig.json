@@ -14,5 +14,5 @@
     "isolatedModules": true,
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src/vaca-futbolera"]
+  "include": ["src/vaca-futbolera", "src/dashboard"]
 }

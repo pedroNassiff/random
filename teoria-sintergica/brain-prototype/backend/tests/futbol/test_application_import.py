@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -102,7 +103,7 @@ async def test_rating_the_admin_himself_warns_self_evaluation() -> None:
     assert "autoevaluación" in report.warnings[0]
 
 
-async def test_rater_must_be_a_linked_admin() -> None:
+async def test_rater_must_be_an_admin_with_a_player_in_file_or_db() -> None:
     importer, repo = world()
     with pytest.raises(Invalid, match="tiene que ser un admin"):
         await importer.run(GROUP, roster(JUAN, rated_by="nadie@x.com"))
@@ -111,5 +112,28 @@ async def test_rater_must_be_a_linked_admin() -> None:
         await importer.run(GROUP, roster(JUAN))
     repo.members["u-boss"] = "admin"
     repo.player_user.clear()
-    with pytest.raises(Invalid, match="no está vinculado"):
+    boss = next(p for p in repo.players.values() if p.email == "boss@x.com")
+    repo.players[boss.id] = replace(boss, email=None)
+    with pytest.raises(Invalid, match="agregá al archivo un jugador con ese email"):
         await importer.run(GROUP, roster(JUAN))
+    assert len(repo.players) == 1  # validó antes de escribir
+
+
+async def test_import_links_the_rater_when_a_player_has_its_email() -> None:
+    importer, repo = world()
+    repo.player_user.clear()  # admin sin jugador vinculado (como en prod recién migrado)
+    boss_id = next(p.id for p in repo.players.values() if p.email == "boss@x.com")
+    simulated = await importer.run(GROUP, roster(JUAN), dry_run=True)
+    assert simulated.ratings == 1 and repo.player_user == {}
+    await importer.run(GROUP, roster(JUAN))
+    assert repo.player_user == {boss_id: "u-boss"}
+    assert {r.rater_player_id for r in await repo.list_group_ratings(GROUP)} == {boss_id}
+
+
+async def test_import_links_the_rater_from_a_new_player_in_the_file() -> None:
+    importer, repo = world()
+    repo.player_user.clear()
+    repo.players.clear()
+    report = await importer.run(GROUP, roster({"display_name": "Boss", "email": "boss@x.com"}, JUAN))
+    boss = next(p for p in repo.players.values() if p.display_name == "Boss")
+    assert report.created == ["Boss", "Juan"] and repo.player_user == {boss.id: "u-boss"}

@@ -340,3 +340,35 @@ async def test_results_repository_against_postgres(pool: asyncpg.Pool) -> None:
     assert await results.goal_rates(group, 10) == {scorer: 2.5}
     assert await results.goal_rates(group, 1) == {scorer: 4.0}  # solo el más reciente
     assert len(await results.history(group, 1)) == 1
+
+
+async def test_migration_runner_applies_once_and_supports_baseline(pool: asyncpg.Pool, tmp_path: Path) -> None:
+    import asyncio
+
+    from futbol.infrastructure import migrate as runner
+
+    assert DSN is not None
+    await pool.execute("DROP SCHEMA futbol CASCADE")
+    assert await runner.migrate(DSN, dry_run=True) == [f.name for f in runner.migration_files()]
+    applied = await runner.migrate(DSN)
+    assert applied[0] == "001_futbol_schema.sql" and len(applied) == len(runner.migration_files())
+    assert await pool.fetchval("SELECT count(*) FROM futbol.skills") == 9
+    assert await runner.migrate(DSN) == []  # no repite nada
+
+    extra = tmp_path / "999_extra.sql"
+    extra.write_text("CREATE TABLE futbol.never_created (id int);")
+    assert await runner.migrate(DSN, baseline=True, files=[extra]) == ["999_extra.sql"]
+    assert await pool.fetchval("SELECT to_regclass('futbol.never_created')") is None
+
+    assert await asyncio.to_thread(runner.main, ["--dsn", DSN, "--dry-run"]) == 0
+    assert await asyncio.to_thread(runner.main, ["--dsn", DSN]) == 0
+    assert await asyncio.to_thread(runner.main, ["--dsn", "postgresql://nadie:x@localhost:1/nada"]) == 1
+
+
+def test_migration_runner_needs_a_dsn(monkeypatch: pytest.MonkeyPatch) -> None:
+    from futbol.infrastructure import migrate as runner
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("ANALYTICS_DATABASE_URL", raising=False)
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
+    assert runner.main([]) == 2

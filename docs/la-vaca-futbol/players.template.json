@@ -148,7 +148,7 @@
     {
       "display_name": "Dimitri",
       "nickname": "Dimitri",
-      "email": "dimitri@example.com",
+      "email": "dimitri@lavacacoworking.com",
       "preferred_position": "DEL",
       "can_play_gk": false,
       "skills": {
@@ -163,7 +163,7 @@
         "goalkeeping": 3
       }
     },
-     {
+    {
       "display_name": "Lino",
       "nickname": "Lino",
       "email": "lino@example.com",
@@ -180,6 +180,14 @@
         "stamina": 8,
         "goalkeeping": 3
       }
+    },
+    {
+      "display_name": "Pedro",
+      "nickname": null,
+      "email": "signal@random-lab.es",
+      "preferred_position": "DEF",
+      "can_play_gk": false,
+      "skills": {}
     }
   ]
 }

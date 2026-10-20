@@ -31,4 +31,11 @@ class SmtpMailer:
             smtp.send_message(msg)
 
     async def send_magic_link(self, email: str, link: str) -> None:
-        await asyncio.to_thread(self._send, email, link)
+        """Si el envío falla, no se propaga: un 500 solo para emails conocidos revelaría quién está en el grupo.
+        Se registra el error con el link, así un admin lo puede rescatar de los logs."""
+        try:
+            await asyncio.to_thread(self._send, email, link)
+        except (smtplib.SMTPException, OSError) as exc:
+            logger.error(
+                "[futbol] no se pudo mandar el mail a %s (%s: %s). Magic link: %s", email, type(exc).__name__, exc, link
+            )

@@ -53,6 +53,7 @@ from ai.sanji_copilot_service import SanjiCopilotService
 from recording.validation_protocol import ValidationProtocol
 from recording.validation import run_all_tests, SessionQualityScore
 from prospecting_router import router as prospecting_router
+from replay.bootstrap import build_cloud_runtime
 
 from prospecting_analysis import router as analysis_router
 from prospecting_pitch import router as pitch_router
@@ -60,6 +61,17 @@ from prospecting_groups import router as groups_router
 from audit.router import router as audit_router
 from futbol.infrastructure.api import router as futbol_router
 from futbol.infrastructure.wiring import build_services as build_futbol_services
+from accounts.infrastructure.api import router as accounts_router
+from accounts.infrastructure.wiring import build_session_service
+from fiscal.infrastructure.api import router as fiscal_router
+from fiscal.infrastructure.wiring import (
+    build_agent as build_fiscal_agent,
+    build_clients as build_fiscal_clients,
+    build_documents as build_fiscal_documents,
+    build_invoices as build_fiscal_invoices,
+    build_movements as build_fiscal_movements,
+    build_service as build_fiscal_service,
+)
 
 app = FastAPI(title="Syntergic Brain API v0.4")
 
@@ -116,7 +128,15 @@ class CopilotChatResponse(BaseModel):
 print("=" * 60)
 print("SYNTERGIC BRAIN API - Initializing...")
 print("=" * 60)
-brain = SyntergicBrain() if HARDWARE_AVAILABLE else None
+# Local (full EEG stack): the live SyntergicBrain. Cloud Run (no torch/mne): a replay of the
+# bundle exported from local data, plus static snapshots for /lab/brain/doc.
+doc_snapshots = None
+if HARDWARE_AVAILABLE:
+    brain = SyntergicBrain()
+else:
+    _cloud = build_cloud_runtime(os.getenv("REPLAY_BUNDLE_URI"))
+    brain = _cloud.brain
+    doc_snapshots = _cloud.docs
 
 # Inicializar conector Muse 2 (hardware)
 print("✓ Initializing Muse 2 connector...")
@@ -217,6 +237,17 @@ async def startup():
     app.state.futbol = build_futbol_services(app.state.db_pool)
     print("Futbol Vaquero services initialized")
 
+    app.state.accounts = build_session_service(app.state.db_pool)
+    app.state.fiscal = build_fiscal_service(app.state.db_pool)
+    app.state.fiscal_documents = build_fiscal_documents(app.state.db_pool)
+    app.state.fiscal_invoices = build_fiscal_invoices(app.state.db_pool)
+    app.state.fiscal_clients = build_fiscal_clients(app.state.db_pool)
+    app.state.fiscal_movements = build_fiscal_movements(app.state.db_pool)
+    app.state.fiscal_agent = build_fiscal_agent(
+        app.state.fiscal, app.state.fiscal_documents, app.state.fiscal_invoices, app.state.fiscal_clients
+    )
+    print("Shared session + Gestor Autónomo services initialized")
+
     app.state.automation_service = AutomationService(app.state.db_pool)
     print("Automation service initialized")
 
@@ -258,6 +289,10 @@ app.include_router(audit_router)
 
 # Fútbol Vaquero (/vaca-futbolera)
 app.include_router(futbol_router)
+
+# Sesión compartida por las páginas con login (/auth) y Gestor Autónomo (/dashboard → /fiscal)
+app.include_router(accounts_router)
+app.include_router(fiscal_router)
 
 # ============================================
 # Copilot Labs Endpoint
@@ -391,6 +426,8 @@ async def set_mode(mode: str):
     - 'session': Reproducción cronológica de sesión completa
     - 'muse': Hardware Muse 2 en vivo (requiere conexión activa)
     """
+    if mode == 'muse' and muse_connector is None:
+        return {"status": "error", "message": "Muse 2 mode requires the local hardware stack (not available in cloud)."}
     # Muse mode requires passing the connector
     if mode == 'muse':
         if not muse_connector.is_streaming:
@@ -1242,6 +1279,8 @@ async def doc_dashboard():
     Returns sessions list, validation results, and project stats.
     Auto-computes validation for sessions that don't have a file yet.
     """
+    if doc_snapshots is not None:
+        return doc_snapshots.dashboard() or {"status": "error", "message": "Dashboard snapshot not available"}
     try:
         # 1. Sessions from PostgreSQL
         pg = get_postgres_client_sync()
@@ -1342,6 +1381,8 @@ async def doc_session_detail(session_id: int):
     """
     Detailed data for a single session: recording info, validation, protocol log, metrics summary.
     """
+    if doc_snapshots is not None:
+        return doc_snapshots.session(session_id) or {"status": "error", "message": f"Session {session_id} not found"}
     try:
         result = {"status": "success", "session_id": session_id}
 
@@ -1610,6 +1651,8 @@ async def get_session_metrics(session_id: int):
     - per_channel: per-channel band power object or null if not available
     - per_channel_version: 0 = no per-channel data, 1 = current schema
     """
+    if doc_snapshots is not None:
+        return doc_snapshots.metrics(session_id) or {"status": "error", "message": f"Session {session_id} not found"}
     try:
         influx = get_influx_client()
         metrics = influx.get_metrics(session_id)

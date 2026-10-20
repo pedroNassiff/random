@@ -50,10 +50,41 @@ omit = [
 ]
 
 [tool.importlinter]
-root_packages = ["futbol"]
+root_packages = ["replay", "futbol", "accounts", "fiscal"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "replay core never imports infrastructure (GCS / bootstrap)"
+type = "forbidden"
+source_modules = [
+    "replay.brain", "replay.format", "replay.docs", "replay.reader", "replay.synthetic", "replay.exporter",
+]
+forbidden_modules = ["replay.gcs", "replay.bootstrap"]
 
 [[tool.importlinter.contracts]]
 name = "futbol layers: domain <- application <- infrastructure"
 type = "layers"
 layers = ["futbol.infrastructure", "futbol.application", "futbol.domain"]
 ignore_imports = []
+
+[[tool.importlinter.contracts]]
+name = "accounts layers: application <- infrastructure"
+type = "layers"
+layers = ["accounts.infrastructure", "accounts.application"]
+
+[[tool.importlinter.contracts]]
+name = "fiscal layers: domain <- application <- infrastructure"
+type = "layers"
+layers = ["fiscal.infrastructure", "fiscal.application", "fiscal.domain"]
+
+[[tool.importlinter.contracts]]
+name = "fiscal domain is pure: no accounts, no futbol, no I/O libraries"
+type = "forbidden"
+source_modules = ["fiscal.domain", "fiscal.application"]
+forbidden_modules = ["accounts", "futbol", "asyncpg", "fastapi", "anthropic"]
+
+[[tool.importlinter.contracts]]
+name = "shared accounts never depend on the apps that use them"
+type = "forbidden"
+source_modules = ["accounts"]
+forbidden_modules = ["futbol", "fiscal"]

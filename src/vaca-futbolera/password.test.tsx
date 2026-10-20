@@ -86,7 +86,8 @@ describe('contraseña', () => {
       },
     })
     renderApp('/vaca-futbolera')
-    await userEvent.click(await screen.findByRole('link', { name: 'Contraseña' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cuenta de juan@x.com' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Cambiar contraseña' }))
     expect(await screen.findByRole('heading', { name: 'Cambiar contraseña' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Seguir sin cambiarla' })).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText(/Contraseña nueva/), 'mi-clave-segura')

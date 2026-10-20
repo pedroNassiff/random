@@ -1,4 +1,4 @@
-# 📊 Analytics Dashboard
+   # 📊 Analytics Dashboard
 
 Dashboard moderno para visualizar las estadísticas de tu portfolio en tiempo real.
 
@@ -16,6 +16,8 @@ Dashboard moderno para visualizar las estadísticas de tu portfolio en tiempo re
 1. **Unique Visitors** 👥 - Visitantes únicos
 2. **Total Sessions** 📊 - Sesiones totales
 3. **Pageviews** 👁️ - Vistas de página
+
+
 4. **Avg Duration** ⏱️ - Duración promedio de sesión
 5. **Bounce Rate** 🎯 - Tasa de rebote
 6. **Return Rate** 🔄 - Tasa de retorno

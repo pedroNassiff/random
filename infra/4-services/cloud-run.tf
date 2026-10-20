@@ -40,6 +40,73 @@ resource "google_cloud_run_v2_service" "brain_backend" {
         value = "*.run.app,api.random-lab.es,api.random-studio.io,localhost,127.0.0.1"
       }
 
+      # Bundle de replay (estados EEG precomputados + snapshots de /lab/brain/doc).
+      # Se publica desde local con backend/scripts/upload_replay_bundle.sh; la SA
+      # del runner ya tiene objectViewer sobre el bucket (storage.tf).
+      env {
+        name  = "REPLAY_BUNDLE_URI"
+        value = "gs://${google_storage_bucket.assets.name}/replay"
+      }
+
+      # Fútbol Vaquero (/vaca-futbolera). Ver docs/la-vaca-futbol/README.md §7.
+      # Sin FUTBOL_ADMIN_EMAILS nadie puede entrar; sin FUTBOL_BASE_URL el magic link apunta a localhost.
+      # Sin FUTBOL_SMTP_HOST el link se escribe en los logs de Cloud Run (solo para arrancar: configurar SMTP).
+      env {
+        name  = "FUTBOL_ADMIN_EMAILS"
+        value = "signal@random-lab.es,dimitri@lavacacoworking.com"
+      }
+
+      env {
+        name  = "FUTBOL_BASE_URL"
+        value = "https://random-lab.es"
+      }
+
+      # Magic links por mail desde signal@random-lab.es (Hostinger, STARTTLS 587; SPF ya autoriza a Hostinger).
+      env {
+        name  = "FUTBOL_SMTP_HOST"
+        value = "smtp.hostinger.com"
+      }
+
+      env {
+        name  = "FUTBOL_SMTP_PORT"
+        value = "587"
+      }
+
+      env {
+        name  = "FUTBOL_SMTP_USER"
+        value = "signal@random-lab.es"
+      }
+
+      env {
+        name  = "FUTBOL_MAIL_FROM"
+        value = "Fútbol Vaquero <signal@random-lab.es>"
+      }
+
+      env {
+        name = "FUTBOL_SMTP_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.futbol_smtp_password.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      # /dashboard (CRM de Random). Allowlist de emails con acceso; la sesión es la misma que la de Fútbol Vaquero.
+      # Sin DASHBOARD_EMAILS nadie entra: los datos fiscales fallan cerrado. No reutiliza FUTBOL_ADMIN_EMAILS
+      # a propósito (los admins del grupo de fútbol no deben ver datos fiscales).
+      env {
+        name  = "DASHBOARD_EMAILS"
+        value = "signal@random-lab.es"
+      }
+
+      # Documentos que se adjuntan al agente fiscal. Sin esta variable el backend escribe en disco local,
+      # que en Cloud Run se pierde con cada instancia.
+      env {
+        name  = "FISCAL_DOCS_BUCKET"
+        value = google_storage_bucket.fiscal_docs.name
+      }
+
       # Secretos inyectados desde GCP Secret Manager
       env {
         name = "DATABASE_URL"

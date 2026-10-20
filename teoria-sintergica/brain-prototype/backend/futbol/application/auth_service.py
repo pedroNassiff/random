@@ -5,27 +5,20 @@ Solo se guardan hashes: SHA-256 para tokens de link/sesión, scrypt para contras
 
 from __future__ import annotations
 
-import hashlib
 import secrets
 from collections.abc import Callable, Collection
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
+from accounts.application.credentials import SESSION_TTL, hash_token, normalize_email
 from futbol.application.errors import Unauthorized
 from futbol.application.passwords import burn_time, hash_password, validate_password, verify_password
 from futbol.application.ports import Actor, FutbolRepository, Mailer
 
+__all__ = ["MAGIC_LINK_TTL", "SESSION_TTL", "AuthService", "hash_token", "normalize_email"]
+
 MAGIC_LINK_TTL = timedelta(minutes=15)
-SESSION_TTL = timedelta(days=30)
 _BAD_CREDENTIALS = "Email o contraseña incorrectos."
-
-
-def hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-def normalize_email(email: str) -> str:
-    return email.strip().lower()
 
 
 class AuthService:
@@ -76,6 +69,8 @@ class AuthService:
             raise Unauthorized(_BAD_CREDENTIALS)
         if not verify_password(password, stored):
             raise Unauthorized(_BAD_CREDENTIALS)
+        # Si el admin cargó después un jugador con este email, queda vinculado en este ingreso.
+        await self._repo.link_player_by_email(await self._repo.default_group_id(), user_id, normalize_email(email))
         return await self._open_session(user_id, self._clock())
 
     async def set_password(self, actor: Actor, password: str) -> Actor:

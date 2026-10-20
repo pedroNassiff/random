@@ -14,7 +14,10 @@
     "vaca:lint": "eslint src/vaca-futbolera",
     "vaca:types": "tsc --noEmit",
     "vaca:test": "vitest run --coverage",
-    "vaca:gauntlet": "npm run vaca:format && npm run vaca:lint && npm run vaca:types && npm run vaca:test"
+    "vaca:gauntlet": "npm run vaca:format && npm run vaca:lint && npm run vaca:types && npm run vaca:test",
+    "dash:format": "prettier --check src/dashboard",
+    "dash:lint": "eslint src/dashboard",
+    "dash:gauntlet": "npm run dash:format && npm run dash:lint && npm run vaca:types && npm run vaca:test"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
