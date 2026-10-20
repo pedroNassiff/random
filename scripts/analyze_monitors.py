@@ -1,7 +1,7 @@
 from PIL import Image
 import os
 
-base = '/Users/pedronassiff/Desktop/proyectos/random/src/img/lab'
+base = '/Users/pedronassiff/proyectos/random/src/img/lab'
 for i in range(1, 6):
     path = os.path.join(base, f'monitor{i}.png')
     img = Image.open(path).convert('RGBA')
