@@ -27,6 +27,11 @@ class ModelTurn:
 
 
 class ChatModel(Protocol):
+    @property
+    def name(self) -> str:
+        """Id del modelo configurado, por ejemplo `claude-haiku-5-5`."""
+        ...
+
     async def complete(
         self, system: str, tools: Sequence[Mapping[str, Any]], messages: Sequence[Mapping[str, Any]]
     ) -> ModelTurn: ...

@@ -35,10 +35,12 @@ function save(proposal: Proposal): Promise<unknown> {
 }
 
 function ChatHeader({
+  model,
   canClear,
   onClear,
   onClose,
 }: {
+  model: string | null
   canClear: boolean
   onClear: () => void
   onClose: () => void
@@ -47,6 +49,7 @@ function ChatHeader({
   return (
     <header className="rd-chat-head">
       <strong>NEO</strong>
+      {model && <span className="rd-chat-model">{model}</span>}
       {canClear && (
         <button
           type="button"
@@ -84,7 +87,17 @@ export function AgentChat({ open, onOpenChange, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const logRef = useRef<HTMLDivElement>(null)
+  const [model, setModel] = useState<string | null>(null)
   const lastId = entries.at(-1)?.id
+
+  // Qué modelo responde; si falla, el encabezado queda sin él.
+  useEffect(() => {
+    if (!open || model) return
+    api.agentModel().then(
+      (m) => setModel(m.nombre),
+      () => undefined,
+    )
+  }, [open, model])
 
   // Baja al final cuando llega algo nuevo o se abre la ventana; no cuando se cargan mensajes viejos arriba.
   useEffect(() => {
@@ -184,7 +197,12 @@ export function AgentChat({ open, onOpenChange, onChanged }: Props) {
       style={{ '--neo-w': `${size.width}px`, '--neo-h': `${size.height}px` } as CSSProperties}
     >
       <ResizeHandle size={size} onResize={resize} />
-      <ChatHeader canClear={entries.length > 0} onClear={clear} onClose={() => onOpenChange(false)} />
+      <ChatHeader
+        model={model}
+        canClear={entries.length > 0}
+        onClear={clear}
+        onClose={() => onOpenChange(false)}
+      />
       <div className="rd-chat-log" role="log" aria-live="polite" ref={logRef} onScroll={onScroll}>
         {hasMore && (
           <button

@@ -47,6 +47,7 @@ class ScriptedModel:
         self.turns = list(turns)
         self.calls: list[list[dict[str, Any]]] = []
         self.systems: list[str] = []
+        self.name = "claude-haiku-5-5"
 
     async def complete(
         self, system: str, tools: Sequence[Mapping[str, Any]], messages: Sequence[Mapping[str, Any]]
