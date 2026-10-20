@@ -19,7 +19,7 @@ from fiscal.application.agent_tools import SYSTEM_PROMPT, TOOLS
 from fiscal.application.errors import AgentUnavailable
 from fiscal.application.service import FiscalService
 from fiscal.infrastructure.api import router
-from fiscal.infrastructure.claude import ClaudeChatModel
+from fiscal.infrastructure.claude import ClaudeChatModel, model_label
 from fiscal.infrastructure.wiring import build_agent
 from tests.accounts.fakes import FakeAccountRepo
 from tests.fiscal.fakes import FakeFiscalRepo, fake_clients, fake_documents, fake_invoices
@@ -188,6 +188,32 @@ class World:
 @pytest.fixture(autouse=True)
 def _insecure_cookie(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SESSION_COOKIE_SECURE", "0")
+
+
+@pytest.mark.parametrize(
+    ("model_id", "label"),
+    [
+        ("claude-haiku-5-5", "Haiku 5.5"),
+        ("claude-opus-4-8", "Opus 4.8"),
+        ("claude-sonnet-5", "Sonnet 5"),
+        ("modelo-propio", "modelo-propio"),
+    ],
+)
+def test_model_label(model_id: str, label: str) -> None:
+    assert model_label(model_id) == label
+
+
+def test_model_name_comes_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FISCAL_AGENT_MODEL", "claude-sonnet-5-5")
+    assert ClaudeChatModel().name == "claude-sonnet-5-5"
+
+
+def test_agent_model_endpoint() -> None:
+    world = World()
+    assert world.client().get("/fiscal/agent/model").status_code == 401
+    assert world.client("ana@x.com").get("/fiscal/agent/model").status_code == 403
+    r = world.client("pedro@x.com").get("/fiscal/agent/model")
+    assert r.status_code == 200 and r.json() == {"id": "claude-haiku-5-5", "nombre": "Haiku 5.5"}
 
 
 def test_chat_requires_session_and_dashboard_access() -> None:

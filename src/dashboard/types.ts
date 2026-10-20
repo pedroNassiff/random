@@ -146,6 +146,12 @@ export interface ChatTurn {
   text: string
 }
 
+/** Modelo que responde en el chat de NEO. */
+export interface AgentModel {
+  id: string
+  nombre: string
+}
+
 export interface AgentReply {
   reply: string
   proposals: Proposal[]

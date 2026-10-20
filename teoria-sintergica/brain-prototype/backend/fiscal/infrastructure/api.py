@@ -24,6 +24,7 @@ from fiscal.application.service import CalendarItem, DeadlineKind, FiscalService
 from fiscal.domain.profile import RegimenIrpf, RegimenIva, TaxProfile
 from fiscal.infrastructure.api_chat import router as chat_router
 from fiscal.infrastructure.api_clients import router as clients_router
+from fiscal.infrastructure.claude import model_label
 from fiscal.infrastructure.api_invoices import router as invoices_router
 from fiscal.infrastructure.api_movements import router as movements_router
 
@@ -197,6 +198,12 @@ async def compute_deadline(body: DeadlineIn, svc: Svc, owner: Owner) -> dict[str
     except FiscalError as exc:
         raise http_error(exc) from exc
     return {"vence": result.vence.isoformat(), "fuente": result.fuente, "traza": list(result.traza)}
+
+
+@router.get("/agent/model")
+async def agent_model(agent: Agent, _owner: Owner) -> dict[str, str]:
+    """Modelo que responde en el chat, para mostrarlo en la UI."""
+    return {"id": agent.model_name, "nombre": model_label(agent.model_name)}
 
 
 @router.post("/agent/chat")

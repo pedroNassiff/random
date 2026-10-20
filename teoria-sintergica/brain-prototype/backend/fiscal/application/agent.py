@@ -118,6 +118,10 @@ class FiscalAgent:
         self._handlers.update(InvoiceTools(invoices, self._new_id).handlers())
         self._handlers.update(ClientTools(clients, self._new_id).handlers())
 
+    @property
+    def model_name(self) -> str:
+        return self._model.name
+
     async def chat(
         self,
         owner_id: str,

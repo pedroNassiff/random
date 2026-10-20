@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
@@ -28,6 +29,15 @@ _FALLBACK_BETA = "server-side-fallback-2026-07-01"
 _FALLBACK_MODELS = ("claude-opus-", "claude-fable-", "claude-sonnet-5-5")
 
 
+def model_label(model: str) -> str:
+    """Nombre para mostrar: `claude-haiku-5-5` → `Haiku 5.5`. Un id con otra forma se muestra tal cual."""
+    m = re.fullmatch(r"claude-([a-z]+)-(\d+)(?:-(\d+))?", model)
+    if m is None:
+        return model
+    family, major, minor = m.groups()
+    return f"{family.capitalize()} {major}" + (f".{minor}" if minor else "")
+
+
 def _fallback_args(model: str) -> dict[str, Any]:
     if model.startswith(_FALLBACK_MODELS):
         return {"betas": [_FALLBACK_BETA], "fallbacks": "default"}
@@ -39,6 +49,10 @@ class ClaudeChatModel:
         self._client = client
         self._model = os.getenv("FISCAL_AGENT_MODEL") or DEFAULT_MODEL
         self._effort = os.getenv("FISCAL_AGENT_EFFORT") or DEFAULT_EFFORT
+
+    @property
+    def name(self) -> str:
+        return self._model
 
     def _get_client(self) -> anthropic.AsyncAnthropic:
         if self._client is None:

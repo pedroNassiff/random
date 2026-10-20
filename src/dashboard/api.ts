@@ -1,5 +1,6 @@
 import { ApiError } from '../vaca-futbolera/api'
 import type {
+  AgentModel,
   AgentReply,
   CalendarItem,
   CalendarView,
@@ -126,6 +127,7 @@ export const api = {
   deleteDocument: async (id: string) => {
     await send(`${FISCAL}/documents/${encodeURIComponent(id)}`, 'DELETE')
   },
+  agentModel: () => request<AgentModel>(`${FISCAL}/agent/model`),
   agentChat: (message: string, history: ChatTurn[], pagina: string, attachments: ChatAttachment[] = []) =>
     request<AgentReply>(`${FISCAL}/agent/chat`, 'POST', { message, history, pagina, attachments }),
 }

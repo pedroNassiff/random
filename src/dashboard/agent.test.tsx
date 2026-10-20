@@ -45,6 +45,28 @@ describe('asistente', () => {
     expect(screen.queryByRole('region', { name: 'NEO, asistente fiscal' })).not.toBeInTheDocument()
   })
 
+  it('muestra el modelo que responde, y sin él igual funciona', async () => {
+    const calls = mockApi({
+      ...BASE,
+      'GET /fiscal/agent/model': { body: { id: 'claude-haiku-5-5', nombre: 'Haiku 5.5' } },
+    })
+    renderApp('/dashboard/impuestos')
+    const chat = await openChat()
+    expect(await within(chat).findByText('Haiku 5.5')).toBeInTheDocument()
+    await userEvent.click(within(chat).getByRole('button', { name: 'Cerrar' }))
+    await openChat()
+    expect(calls.filter((c) => c.key === 'GET /fiscal/agent/model')).toHaveLength(1)
+  })
+
+  it('si no puede leer el modelo, el encabezado queda solo con NEO', async () => {
+    const calls = mockApi(BASE) // sin mock: el endpoint responde 500
+    renderApp('/dashboard/impuestos')
+    const chat = await openChat()
+    await waitFor(() => expect(calls.some((c) => c.key === 'GET /fiscal/agent/model')).toBe(true))
+    expect(within(chat).getByRole('banner')).toHaveTextContent(/^NEOCerrar$/)
+    expect(within(chat).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('no aparece sin sesión', async () => {
     mockApi({ 'GET /auth/me': { status: 401, body: { detail: 'Iniciá sesión.' } } })
     renderApp('/dashboard/impuestos')
