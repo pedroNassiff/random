@@ -184,11 +184,10 @@ async def test_stored_documents_can_be_listed_and_read_again_by_the_agent() -> N
         "type": "document",
         "source": {"type": "base64", "media_type": "application/pdf", "data": pdf.data},
         "title": "036.pdf",
-        "cache_control": {"type": "ephemeral"},
     }
     label, image = model2.results(2)[0]["content"]
     assert label == {"type": "text", "text": "Imagen adjunta: foto.png"}
-    assert image["type"] == "image" and image["cache_control"] == {"type": "ephemeral"}
+    assert image["type"] == "image" and "cache_control" not in image
     missing = model2.results(3)[0]
     assert missing["is_error"] is True and missing["content"] == "Ese documento no existe."
 

@@ -39,6 +39,13 @@ class FakeMessages:
         return self.result
 
 
+USAGE = SimpleNamespace(input_tokens=10, cache_read_input_tokens=900, cache_creation_input_tokens=None, output_tokens=5)
+
+
+def reply(content: list[Any], stop_reason: str | None) -> SimpleNamespace:
+    return SimpleNamespace(content=content, stop_reason=stop_reason, model="claude-haiku-5-5", usage=USAGE)
+
+
 def model_with(result: Any) -> tuple[ClaudeChatModel, FakeMessages]:
     messages = FakeMessages(result)
     client = SimpleNamespace(beta=SimpleNamespace(messages=messages))
@@ -51,7 +58,12 @@ def status_error(cls: type[anthropic.APIStatusError], status: int) -> anthropic.
     return cls("boom", response=response, body=None)
 
 
-async def test_request_shape_and_response_mapping() -> None:
+async def test_request_shape_and_response_mapping(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("FISCAL_AGENT_MODEL", raising=False)
+    monkeypatch.delenv("FISCAL_AGENT_EFFORT", raising=False)
+    caplog.set_level("INFO", logger="fiscal.agent")
     content = [
         SimpleNamespace(type="thinking", thinking=""),
         SimpleNamespace(type="text", text="Miro tu calendario."),
@@ -59,7 +71,7 @@ async def test_request_shape_and_response_mapping() -> None:
         SimpleNamespace(type="tool_use", id="tu_2", name="ver_perfil", input="roto"),
         SimpleNamespace(type="text", text=" Un segundo. "),
     ]
-    model, messages = model_with(SimpleNamespace(content=content, stop_reason="tool_use"))
+    model, messages = model_with(reply(content, "tool_use"))
     history = [{"role": "user", "content": "hola"}]
     turn = await model.complete(SYSTEM_PROMPT, TOOLS, history)
 
@@ -70,16 +82,34 @@ async def test_request_shape_and_response_mapping() -> None:
         content,
     )
     kw = messages.kwargs
-    assert kw["model"] == "claude-opus-5-5" and kw["max_tokens"] == 16000
-    assert kw["betas"] == ["server-side-fallback-2026-07-01"] and kw["fallbacks"] == "default"
-    assert kw["output_config"] == {"effort": "medium"}
+    assert kw["model"] == "claude-haiku-5-5" and kw["max_tokens"] == 16000
+    assert "betas" not in kw and "fallbacks" not in kw  # Haiku no tiene fallback del lado del servidor
+    assert kw["output_config"] == {"effort": "low"}
     assert kw["system"] == [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
+    assert kw["cache_control"] == {"type": "ephemeral"}
     assert kw["tools"] == TOOLS and kw["messages"] == history
     assert "thinking" not in kw and "temperature" not in kw and "tool_choice" not in kw
+    assert caplog.messages == ["agente: model=claude-haiku-5-5 in=10 cache_read=900 cache_write=0 out=5"]
+    assert "hola" not in caplog.text and "calendario" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("model_id", "fallback"),
+    [("claude-opus-5-5", True), ("claude-sonnet-5-5", True), ("claude-haiku-5-5", False)],
+)
+async def test_model_and_effort_come_from_env(monkeypatch: pytest.MonkeyPatch, model_id: str, fallback: bool) -> None:
+    monkeypatch.setenv("FISCAL_AGENT_MODEL", model_id)
+    monkeypatch.setenv("FISCAL_AGENT_EFFORT", "medium")
+    model, messages = model_with(reply([], "end_turn"))
+    await model.complete("s", [], [])
+    kw = messages.kwargs
+    assert kw["model"] == model_id and kw["output_config"] == {"effort": "medium"}
+    assert (kw.get("fallbacks") == "default") is fallback
+    assert (kw.get("betas") == ["server-side-fallback-2026-07-01"]) is fallback
 
 
 async def test_missing_stop_reason_defaults_to_end_turn() -> None:
-    model, _ = model_with(SimpleNamespace(content=[SimpleNamespace(type="text", text="ok")], stop_reason=None))
+    model, _ = model_with(reply([SimpleNamespace(type="text", text="ok")], None))
     assert (await model.complete("s", [], [])).stop_reason == "end_turn"
 
 
