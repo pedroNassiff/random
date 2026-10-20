@@ -212,10 +212,9 @@ class FiscalAgent:
 
     async def _leer_documento(self, owner_id: str, args: Mapping[str, Any]) -> ToolOutput:
         doc, data = await self._documents.read_base64(owner_id, str(args.get("id", "")))
-        blocks = block_for(doc.name, doc.media_type, data)
-        # El documento se reenvía en cada vuelta del loop: con el breakpoint se lee de caché.
-        blocks[-1]["cache_control"] = {"type": "ephemeral"}
-        return ToolOutput(blocks)
+        # Sin breakpoint propio: el caché automático del request ya cubre el documento en las vueltas
+        # siguientes, y un breakpoint por documento pasaría el máximo de 4 con varias lecturas.
+        return ToolOutput(block_for(doc.name, doc.media_type, data))
 
     async def _ver_pasos(self, owner_id: str, _args: Mapping[str, Any]) -> ToolOutput:
         return ToolOutput(to_json(await onboarding_state(self._service, self._invoices, owner_id)))

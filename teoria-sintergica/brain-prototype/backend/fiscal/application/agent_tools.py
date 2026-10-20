@@ -235,50 +235,29 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "proponer_perfil",
-        "description": "Propone crear o modificar el perfil fiscal. Mandá solo los campos que cambian y null "
-        "en los demás (se conservan los actuales). No guarda nada: el usuario ve la propuesta y decide.",
-        "strict": True,
+        "description": "Propone crear o modificar el perfil fiscal. Mandá solo los campos que cambian; los "
+        "que omitas conservan su valor actual. No guarda nada: el usuario ve la propuesta y decide.",
+        # Sin strict: la API limita la complejidad sumada de los esquemas strict y este, con 11 campos
+        # opcionales, la desborda. El handler valida igual cada campo con TaxProfile.
         "input_schema": {
             "type": "object",
             "properties": {
-                "nif": _NULLABLE_STRING,
-                "fecha_alta": {"type": ["string", "null"], "description": "Fecha ISO aaaa-mm-dd."},
-                "iae": {"type": ["string", "null"], "description": "Epígrafe IAE, por ejemplo 763."},
-                "regimen_iva": {
-                    "anyOf": [
-                        {"type": "string", "enum": ["general", "recargo_equivalencia", "exento"]},
-                        {"type": "null"},
-                    ]
-                },
-                "regimen_irpf": {
-                    "anyOf": [
-                        {"type": "string", "enum": ["directa_simplificada", "directa_normal", "objetiva"]},
-                        {"type": "null"},
-                    ]
-                },
-                "roi": {"type": ["boolean", "null"]},
-                "tarifa_plana_hasta": {"type": ["string", "null"], "description": "Fecha ISO aaaa-mm-dd."},
+                "nif": {"type": "string"},
+                "fecha_alta": {"type": "string", "description": "Fecha ISO aaaa-mm-dd."},
+                "iae": {"type": "string", "description": "Epígrafe IAE, por ejemplo 763."},
+                "regimen_iva": {"type": "string", "enum": ["general", "recargo_equivalencia", "exento"]},
+                "regimen_irpf": {"type": "string", "enum": ["directa_simplificada", "directa_normal", "objetiva"]},
+                "roi": {"type": "boolean"},
+                "tarifa_plana_hasta": {"type": "string", "description": "Fecha ISO aaaa-mm-dd."},
                 "quitar_tarifa_plana": {
                     "type": "boolean",
                     "description": "true borra la fecha de fin de tarifa plana del perfil.",
                 },
-                "domicilio_fiscal": _NULLABLE_STRING,
-                "municipio": _NULLABLE_STRING,
-                "comunidad": {"type": ["string", "null"], "description": "Comunidad autónoma, por ejemplo Cataluña."},
+                "domicilio_fiscal": {"type": "string"},
+                "municipio": {"type": "string"},
+                "comunidad": {"type": "string", "description": "Comunidad autónoma, por ejemplo Cataluña."},
             },
-            "required": [
-                "nif",
-                "fecha_alta",
-                "iae",
-                "regimen_iva",
-                "regimen_irpf",
-                "roi",
-                "tarifa_plana_hasta",
-                "quitar_tarifa_plana",
-                "domicilio_fiscal",
-                "municipio",
-                "comunidad",
-            ],
+            "required": [],
             "additionalProperties": False,
         },
     },

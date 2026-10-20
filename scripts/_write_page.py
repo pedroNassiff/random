@@ -1,7 +1,7 @@
 
 import shutil, os
 
-DEST = '/Users/pedronassiff/Desktop/proyectos/random/src/pages/AnalisisDatasets.jsx'
+DEST = '/Users/pedronassiff/proyectos/random/src/pages/AnalisisDatasets.jsx'
 
 NEW_CONTENT = r'''import React, { useState, useCallback } from 'react'
 import { useBrainStore } from '../lab-core/brain/store.js'
