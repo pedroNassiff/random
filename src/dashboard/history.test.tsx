@@ -31,6 +31,33 @@ async function openChat() {
 }
 
 describe('historial de NEO', () => {
+  it('con una conversación larga manda solo los últimos 30 turnos, recortados, para no superar el límite de la API', async () => {
+    const long = Array.from({ length: 65 }, (_, i) => ({
+      id: i + 1,
+      kind: i % 2 ? 'assistant' : 'user',
+      text: i === 64 ? 'x'.repeat(9000) : `mensaje ${i + 1}`,
+      files: [],
+      proposals: [],
+    }))
+    const calls = mockApi({
+      ...BASE,
+      'GET /fiscal/agent/history': page(long),
+      'POST /fiscal/agent/history': { body: { ids: [] } },
+      'POST /fiscal/agent/chat': { body: { reply: 'ok', proposals: [] } },
+    })
+    renderApp('/dashboard/impuestos')
+    const chat = await openChat()
+    await within(chat).findByText('mensaje 63')
+    await userEvent.type(screen.getByLabelText('Mensaje para NEO'), 'hola{Enter}')
+    await within(chat).findByText('ok')
+    const body = calls.find((c) => c.key === 'POST /fiscal/agent/chat')?.body as {
+      history: { role: string; text: string }[]
+    }
+    expect(body.history).toHaveLength(30)
+    expect(body.history[0]).toEqual({ role: 'assistant', text: 'mensaje 36' })
+    expect(body.history[29]?.text).toHaveLength(4000)
+  })
+
   it('al entrar muestra el último bloque de la conversación, lo más reciente abajo', async () => {
     const calls = mockApi({ ...BASE, 'GET /fiscal/agent/history': page(STORED) })
     renderApp('/dashboard/impuestos')

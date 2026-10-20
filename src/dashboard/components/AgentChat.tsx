@@ -13,14 +13,23 @@ const SUGGESTIONS = [
   'Calculá el plazo de una notificación',
 ]
 
+// El agente solo usa los últimos 30 turnos (4000 caracteres cada uno); mandar más hace que la API responda 422.
+const MAX_TURNS = 30
+const MAX_TEXT = 4000
+
 function toHistory(entries: ChatEntry[]): ChatTurn[] {
-  return entries.map((e) => {
-    if (e.kind === 'event') return { role: 'user', text: `[${e.text}]` }
-    if (e.kind === 'user')
-      return { role: 'user', text: [e.text, ...e.files.map((f) => `[Adjunto: ${f}]`)].join('\n') }
-    const shown = e.proposals.map((p) => `[Propuesta mostrada: ${p.proposal.titulo}]`)
-    return { role: 'assistant', text: [e.text, ...shown].join('\n') }
+  return entries.slice(-MAX_TURNS).map((e) => {
+    const turn = toTurn(e)
+    return { ...turn, text: turn.text.slice(0, MAX_TEXT) }
   })
+}
+
+function toTurn(e: ChatEntry): ChatTurn {
+  if (e.kind === 'event') return { role: 'user', text: `[${e.text}]` }
+  if (e.kind === 'user')
+    return { role: 'user', text: [e.text, ...e.files.map((f) => `[Adjunto: ${f}]`)].join('\n') }
+  const shown = e.proposals.map((p) => `[Propuesta mostrada: ${p.proposal.titulo}]`)
+  return { role: 'assistant', text: [e.text, ...shown].join('\n') }
 }
 
 function save(proposal: Proposal): Promise<unknown> {
