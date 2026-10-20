@@ -52,6 +52,8 @@ python scripts/export_replay_bundle.py --out replay_bundle   # frames + snapshot
 DRY_RUN=1 ./scripts/upload_replay_bundle.sh replay_bundle    # revisar
 ./scripts/upload_replay_bundle.sh replay_bundle              # rsync al bucket
 ```
+Atajo: `scripts/push_local_to_prod.sh brain` hace los dos pasos (y `… dashboard` replica los datos fiscales de tu usuario: Postgres vía `cloud-sql-proxy` + documentos al bucket `random-507414-fiscal-docs`, con `fiscal.infrastructure.replicate`). Con `DRY_RUN=1` no escribe nada en prod.
+
 No requiere rebuild de imagen. Los snapshots de `/doc` se refrescan cada 5 min; el `manifest` y los frames del cerebro se cachean por vida de la instancia, así que una sesión nueva aparece en `/playlist` cuando la instancia se recicla (scale-to-zero) o tras un nuevo deploy de revisión.
 
 **Limitaciones:** no hay Muse en vivo ni inferencia nueva en la nube (`/set-mode/muse` responde error); las sesiones nuevas aparecen al republicar el bundle.
