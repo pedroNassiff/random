@@ -1,0 +1,6 @@
+quiero que aca implementemos nuestro lab de verdad, que rompa patrones, que use relamente IA para romper con los limites de lo que se puede hacer. Quiero que razonemos y encontremos la forma, que unamos componentes que no se ha pensado nunca, que diseñemos caminos que antes no se tenia pensado, que usemos razonamiento en base a pruebas, casos simulación
+
+
+quiero que aca implementemos nuestro lab de verdad, que rompa patrones, que use relamente IA para romper con los limites de lo que se puede hacer. Quiero que razonemos y encontremos la forma, que unamos componentes que no se ha pensado nunca, que diseñemos caminos que antes no se tenia pensado, que usemos razonamiento en base a pruebas, casos simulación
+
+En este caso lo vamos a hacer para la vaca futbolera, quiero que vayamos desde el soft al hard, vamos a simular end to end la forma mas eficiente, pero potente, de capturar estos datos mediante una cámara normal, que podamos hacer un seguimiento de la pelota con algun hardware que se use en el tripode y vaya girando segun el movimiento, como enviamos los datos, como capturamos, guardamos. Vamos desde lo básico hasta lo complejo, soluciones innovadoras, no costosas.
