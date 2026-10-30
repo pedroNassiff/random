@@ -259,6 +259,8 @@ def test_quarter_summary_splits_bases_by_operation_with_trace() -> None:
         ("IT01234567890", "Cliente Italia SRL", D("2235.00"))
     ]
     assert (s.ejercicio, s.trimestre, s.con_observaciones) == (2026, 2, 1)
+    assert [(o.factura, len(o.observaciones)) for o in s.observaciones] == [("12/2026 Cliente Italia SRL", 1)]
+    assert "Mención" in s.observaciones[0].observaciones[0]
 
 
 def test_quarter_summary_other_quarters_and_empty() -> None:

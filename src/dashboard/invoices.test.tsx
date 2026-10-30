@@ -88,6 +88,7 @@ const summary = (trimestre: number) => ({
   clientes_ue:
     trimestre === 3 ? [{ tax_id: 'IT01234567890', cliente: 'Cliente Italia SRL', base: '975.00' }] : [],
   con_observaciones: 0,
+  observaciones: [],
 })
 
 const routes = (invoices: Invoice[], numeracion: string[] = []) => ({

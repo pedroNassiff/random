@@ -132,6 +132,7 @@ export interface QuarterSummary {
   operaciones: OperationTotal[]
   clientes_ue: { tax_id: string; cliente: string; base: string }[]
   con_observaciones: number
+  observaciones: { factura: string; observaciones: string[] }[]
 }
 
 /** Cambio que el agente propone y la persona guarda, rehace o descarta. El agente nunca escribe. */
