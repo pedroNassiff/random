@@ -203,6 +203,12 @@ class EuClientTotal:
 
 
 @dataclass(frozen=True)
+class InvoiceObservations:
+    factura: str
+    observaciones: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class QuarterSummary:
     ejercicio: int
     trimestre: int
@@ -210,6 +216,8 @@ class QuarterSummary:
     clientes_ue: tuple[EuClientTotal, ...]
     """Entrada del modelo 349: base del trimestre por cliente intracomunitario."""
     con_observaciones: int
+    observaciones: tuple[InvoiceObservations, ...]
+    """Detalle de cada factura con observaciones, para no mandar a la persona a buscarlas."""
 
 
 def quarter_summary(invoices: Sequence[Invoice], ejercicio: int, trimestre: int) -> QuarterSummary:
@@ -238,10 +246,16 @@ def quarter_summary(invoices: Sequence[Invoice], ejercicio: int, trimestre: int)
             current = by_client.get(i.cliente_tax_id)
             base = i.base + (current.base if current else Decimal("0.00"))
             by_client[i.cliente_tax_id] = EuClientTotal(i.cliente_tax_id, i.cliente, base)
+    observed = tuple(
+        InvoiceObservations(f"{i.numero}/{i.fecha.year} {i.cliente}", issues)
+        for i in selected
+        if (issues := invoice_issues(i))
+    )
     return QuarterSummary(
         ejercicio,
         trimestre,
         tuple(totals),
         tuple(sorted(by_client.values(), key=lambda c: c.tax_id)),
-        sum(1 for i in selected if invoice_issues(i)),
+        len(observed),
+        observed,
     )

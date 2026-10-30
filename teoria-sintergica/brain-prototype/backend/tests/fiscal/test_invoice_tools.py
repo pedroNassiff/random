@@ -111,6 +111,12 @@ async def test_agent_reads_invoices_and_quarter_summary() -> None:
         "facturas": ["11/2026 Client USA Corp"],
     }
     assert summary["clientes_ue"] == [] and summary["con_observaciones"] == 1
+    assert summary["observaciones"] == [
+        {
+            "factura": "11/2026 Client USA Corp",
+            "observaciones": ['Mención incorrecta: debe decir "Operación no sujeta, art. 69.Uno.1º LIVA".'],
+        }
+    ]
     assert model.results(3)[0]["is_error"] and "1, 2, 3 o 4" in model.results(3)[0]["content"]
 
 
