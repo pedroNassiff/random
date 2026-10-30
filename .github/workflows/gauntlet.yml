@@ -1,0 +1,137 @@
+name: Gauntlet
+
+# La muralla de CLAUDE.md en CI. Corre en cada PR y en cada push a main, sin filtros de rutas: los checks son
+# obligatorios en la protección de main y un check que no corre queda pendiente para siempre.
+# Es lo que bloquea el botón "Aprobar" de NEO (spec: docs/sistema-agente-tributario.md/Spec — NEO constructor
+# del dashboard.md): el merge por API solo pasa si esto está en verde.
+#
+# Alcance: los paquetes que ya cumplen la muralla. Todo módulo nuevo entra en estas listas; el código legacy de
+# brain-prototype queda afuera hasta limpiarlo (hoy no pasa ruff).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gauntlet-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PY_PACKAGES: fiscal accounts futbol
+  PY_TESTS: tests
+
+jobs:
+  python:
+    name: Track 1 — Python
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: teoria-sintergica/brain-prototype/backend
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: futbol_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      FUTBOL_TEST_DSN: postgresql://ci:ci@localhost:5432/futbol_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # la misma que la imagen de Cloud Run
+          cache: pip
+          cache-dependency-path: |
+            teoria-sintergica/brain-prototype/backend/requirements-cloud.txt
+            teoria-sintergica/brain-prototype/backend/requirements-dev.txt
+
+      - name: Dependencias
+        run: pip install -r requirements-cloud.txt -r requirements-dev.txt
+
+      - name: Formato (ruff format)
+        run: ruff format --check $PY_PACKAGES $PY_TESTS
+
+      - name: Lint y complejidad (ruff check, C901)
+        run: ruff check $PY_PACKAGES $PY_TESTS
+
+      - name: Tipos (mypy --strict)
+        run: mypy --strict $PY_PACKAGES
+
+      - name: Capas (import-linter)
+        run: lint-imports
+
+      - name: Tests y cobertura (pytest, Postgres real)
+        run: pytest $PY_TESTS -q --cov=fiscal --cov=accounts --cov=futbol --cov-fail-under=90
+
+      - name: Tamaño de módulo (≤ 400 líneas)
+        run: |
+          big=$(find $PY_PACKAGES -name '*.py' -exec wc -l {} + | awk '$2 != "total" && $1 > 400')
+          if [ -n "$big" ]; then echo "Módulos de más de 400 líneas:"; echo "$big"; exit 1; fi
+
+      - name: Seguridad (bandit, severidad alta)
+        run: bandit -q -r $PY_PACKAGES -lll
+
+      - name: Vulnerabilidades de dependencias (pip-audit)
+        run: pip-audit -r requirements-cloud.txt
+
+  frontend:
+    name: Track 2 — Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Dashboard (prettier, eslint, tsc, vitest con cobertura)
+        run: npm run dash:gauntlet
+
+      - name: Vaca Futbolera (prettier, eslint)
+        run: npm run vaca:format && npm run vaca:lint
+
+  terraform:
+    name: Track 4 — Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: Formato
+        run: terraform fmt -check -recursive infra
+
+      - name: Validación y tflint por carpeta
+        run: |
+          for dir in infra/*/; do
+            echo "::group::$dir"
+            (cd "$dir" && terraform init -backend=false -input=false && terraform validate && tflint) || exit 1
+            echo "::endgroup::"
+          done
+
+      - name: Mínimo privilegio (sin roles/editor ni roles/owner)
+        run: |
+          if grep -rnE 'roles/(editor|owner)"' infra --include='*.tf'; then exit 1; fi
+
+  gauntlet:
+    # Único check obligatorio en la protección de main: pasa solo si pasan los tres tracks.
+    name: Gauntlet
+    needs: [python, frontend, terraform]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Gauntlet en verde"

@@ -119,6 +119,16 @@ resource "google_cloud_run_v2_service" "brain_backend" {
       }
 
       env {
+        name = "NEO_DATABASE_URL"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.neo_database_url.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
         name = "ANTHROPIC_API_KEY"
         value_source {
           secret_key_ref {

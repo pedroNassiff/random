@@ -46,6 +46,22 @@ resource "google_secret_manager_secret" "futbol_smtp_password" {
   }
 }
 
+# Conexión de NEO (agente fiscal) con su usuario de solo lectura `neo_reader`. El valor lo escribe
+# database.tf; el usuario lo crea la migración fiscal/009, no Terraform (ver el comentario allí).
+resource "google_secret_manager_secret" "neo_database_url" {
+  secret_id = "random-neo-database-url"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  labels = {
+    purpose    = "neo-readonly-database-connection"
+    managed_by = "terraform"
+  }
+}
+
 # IAM Binding: Otorgar permiso secretAccessor a la Service Account del runner
 resource "google_secret_manager_secret_iam_member" "db_url_access" {
   project   = var.project_id
@@ -57,6 +73,13 @@ resource "google_secret_manager_secret_iam_member" "db_url_access" {
 resource "google_secret_manager_secret_iam_member" "anthropic_key_access" {
   project   = var.project_id
   secret_id = google_secret_manager_secret.anthropic_api_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:sa-random-backend-runner@${var.project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_secret_manager_secret_iam_member" "neo_db_url_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.neo_database_url.secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:sa-random-backend-runner@${var.project_id}.iam.gserviceaccount.com"
 }

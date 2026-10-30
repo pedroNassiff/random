@@ -74,6 +74,29 @@ resource "google_project_iam_member" "cicd_artifact_writer" {
   member  = "serviceAccount:${google_service_account.cicd.email}"
 }
 
+# El pipeline hace un backup bajo demanda de Cloud SQL antes de migrar. Rol custom con solo eso:
+# roles/cloudsql.editor permitiría además modificar o borrar la instancia.
+resource "google_project_iam_custom_role" "cicd_sql_backup" {
+  project     = var.project_id
+  role_id     = "cicdSqlBackup"
+  title       = "CI/CD — backup bajo demanda de Cloud SQL"
+  permissions = ["cloudsql.backupRuns.create", "cloudsql.backupRuns.get", "cloudsql.instances.get"]
+}
+
+resource "google_project_iam_member" "cicd_sql_backup" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.cicd_sql_backup.id
+  member  = "serviceAccount:${google_service_account.cicd.email}"
+}
+
+# Desplegar el servicio y actualizar el Job de migraciones con la SA del runner exige actAs sobre ella.
+# Acotado a esa SA, no a nivel de proyecto.
+resource "google_service_account_iam_member" "cicd_act_as_runner" {
+  service_account_id = google_service_account.backend_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.cicd.email}"
+}
+
 output "backend_runner_sa_email" {
   description = "Email de la Service Account de runtime del backend"
   value       = google_service_account.backend_runner.email
