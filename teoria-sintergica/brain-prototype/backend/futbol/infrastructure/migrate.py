@@ -9,6 +9,7 @@
 
 Registra lo aplicado en `<schema>.schema_migrations`, así una migración no se repite (p. ej. la 006 pisa el
 calendario del grupo). DSN: `--dsn`, o ANALYTICS_DATABASE_URL / DATABASE_URL del entorno o del .env.
+Con `--schema fiscal`, si está NEO_DATABASE_URL, le pone su contraseña al usuario `neo_reader` (fiscal/009).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import asyncpg
 
@@ -53,6 +55,16 @@ async def pending(conn: asyncpg.Connection, files: list[Path], schema: str = "fu
     return [f for f in files if f.name not in done]
 
 
+async def set_neo_password(conn: asyncpg.Connection, neo_dsn: str | None) -> bool:
+    """Le pone a `neo_reader` la contraseña de su DSN. False si no hay DSN, contraseña o rol."""
+    password = urlsplit(neo_dsn).password if neo_dsn else None
+    if not password or not await conn.fetchval("SELECT 1 FROM pg_roles WHERE rolname = 'neo_reader'"):
+        return False
+    # ALTER ROLE no acepta parámetros: format(%L) cita la contraseña como literal.
+    await conn.execute(await conn.fetchval("SELECT format('ALTER ROLE neo_reader PASSWORD %L', $1::text)", password))
+    return True
+
+
 async def migrate(
     dsn: str,
     *,
@@ -60,6 +72,7 @@ async def migrate(
     baseline: bool = False,
     files: list[Path] | None = None,
     schema: str = "futbol",
+    neo_dsn: str | None = None,
 ) -> list[str]:
     """Devuelve los nombres de las migraciones aplicadas (o que se aplicarían, con dry_run)."""
     conn = await asyncpg.connect(dsn)
@@ -77,6 +90,8 @@ async def migrate(
                     f"INSERT INTO {schema}.schema_migrations (version) VALUES ($1)",  # nosec B608
                     f.name,
                 )
+        if schema == "fiscal":
+            await set_neo_password(conn, neo_dsn)
         return [f.name for f in todo]
     finally:
         await conn.close()
@@ -100,7 +115,15 @@ def main(argv: list[str] | None = None) -> int:
         print("Falta --dsn o DATABASE_URL (o ANALYTICS_DATABASE_URL).", file=sys.stderr)
         return 2
     try:
-        names = asyncio.run(migrate(dsn, dry_run=args.dry_run, baseline=args.baseline, schema=args.schema))
+        names = asyncio.run(
+            migrate(
+                dsn,
+                dry_run=args.dry_run,
+                baseline=args.baseline,
+                schema=args.schema,
+                neo_dsn=os.getenv("NEO_DATABASE_URL"),
+            )
+        )
     except (asyncpg.PostgresError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

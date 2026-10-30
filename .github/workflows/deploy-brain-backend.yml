@@ -53,6 +53,27 @@ jobs:
           docker push "$IMAGE_URI:${{ github.sha }}"
           docker push "$IMAGE_URI:latest"
 
+      # Backup bajo demanda antes de migrar: los backups automáticos de Cloud SQL están apagados
+      # (FinOps) y las migraciones pueden venir de módulos que construyó NEO.
+      - name: Backup de Cloud SQL
+        run: |
+          gcloud sql backups create \
+            --project="${{ env.PROJECT_ID }}" \
+            --instance=random-postgres \
+            --description="pre-deploy ${{ github.sha }}"
+
+      - name: Migraciones (Cloud Run Job brain-migrate)
+        run: |
+          gcloud run jobs update brain-migrate \
+            --project="${{ env.PROJECT_ID }}" \
+            --region="${{ env.REGION }}" \
+            --image="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}" \
+            --quiet
+          gcloud run jobs execute brain-migrate \
+            --project="${{ env.PROJECT_ID }}" \
+            --region="${{ env.REGION }}" \
+            --wait
+
       - name: Deploy a Cloud Run
         run: |
           gcloud run deploy brain-prototype-api \

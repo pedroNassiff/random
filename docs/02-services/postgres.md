@@ -13,9 +13,17 @@ PostgreSQL garantiza consistencia ACID, consultas eficientes de series temporale
 ## 4. Identidad y Permisos (IAM)
 - **Service Account de acceso:** `sa-random-backend-runner` posee el rol `roles/cloudsql.client`.
 
+### Usuario de solo lectura de NEO (`neo_reader`)
+- Lo usa el agente fiscal NEO para consultar la base directamente (spec: `docs/sistema-agente-tributario.md/Spec — NEO constructor del dashboard.md`).
+- Lo crea la migración `fiscal/migrations/009_neo_reader.sql`, sin contraseña. El runner de migraciones (`--schema fiscal`) le pone la de `NEO_DATABASE_URL`.
+- No es un `google_sql_user`, porque Cloud SQL lo haría miembro de `cloudsqlsuperuser`.
+- Conexión propia, no `SET ROLE` desde la de la app. Con `SET ROLE`, la consulta podría volver al rol de la app con `set_config('role', session_user, true)`.
+- Solo SELECT, transacción READ ONLY y timeout de 5 s. RLS por `owner_id`, con el dueño en `fiscal.neo_sessions`, que solo escribe la app. Sin el NIF del perfil y sin acceso al schema `futbol`.
+
 ## 5. Configuración & Secretos
 - Secret Manager: `random-database-url` almacena la cadena de conexión formateada:
   `postgresql://analytics_user:PASS@HOST:5432/random_analytics`
+- Secret Manager: `random-neo-database-url`: misma base con el usuario `neo_reader`; llega a Cloud Run como `NEO_DATABASE_URL`.
 
 ## 6. Comportamiento ante fallos & Observabilidad
 - Reconexión automática con pooler `asyncpg` en el backend.

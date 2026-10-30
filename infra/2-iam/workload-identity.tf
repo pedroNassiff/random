@@ -24,9 +24,11 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.ref"        = "assertion.ref"
   }
 
-  # Solo tokens OIDC emitidos para el repo pedroNassiff/random pueden
-  # autenticarse — mínimo privilegio a nivel de origen del token.
-  attribute_condition = "assertion.repository == \"pedroNassiff/random\""
+  # Solo tokens OIDC del repo pedroNassiff/random y de la rama main pueden
+  # autenticarse. Sin la condición de rama, un workflow pusheado en cualquier
+  # rama (p. ej. por el builder de NEO) podría impersonar a sa-random-cicd y
+  # desplegar a producción sin pasar por la gauntlet ni por la aprobación.
+  attribute_condition = "assertion.repository == \"pedroNassiff/random\" && assertion.ref == \"refs/heads/main\""
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"

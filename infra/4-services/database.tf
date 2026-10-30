@@ -73,6 +73,23 @@ resource "google_secret_manager_secret_version" "database_url_value" {
   ])
 }
 
+# Usuario `neo_reader` (solo lectura, RLS por dueño). No es un google_sql_user: Cloud SQL haría a ese
+# usuario miembro de cloudsqlsuperuser. Lo crea la migración fiscal/009 sin contraseña y el runner de
+# migraciones le pone esta (lee NEO_DATABASE_URL).
+resource "random_password" "neo_db_password" {
+  length  = 24
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "neo_database_url_value" {
+  secret = google_secret_manager_secret.neo_database_url.id
+  secret_data = join("", [
+    "postgresql://neo_reader:${random_password.neo_db_password.result}",
+    "@/${google_sql_database.random_analytics.name}",
+    "?host=/cloudsql/${google_sql_database_instance.postgres.connection_name}",
+  ])
+}
+
 output "cloud_sql_connection_name" {
   description = "Connection name para el volume cloud_sql_instance de Cloud Run"
   value       = google_sql_database_instance.postgres.connection_name
