@@ -70,6 +70,7 @@ from fiscal.infrastructure.wiring import (
     build_documents as build_fiscal_documents,
     build_invoices as build_fiscal_invoices,
     build_movements as build_fiscal_movements,
+    build_neo_pool,
     build_service as build_fiscal_service,
 )
 
@@ -243,9 +244,16 @@ async def startup():
     app.state.fiscal_invoices = build_fiscal_invoices(app.state.db_pool)
     app.state.fiscal_clients = build_fiscal_clients(app.state.db_pool)
     app.state.fiscal_movements = build_fiscal_movements(app.state.db_pool)
+    app.state.neo_pool = await build_neo_pool()
     app.state.fiscal_agent = build_fiscal_agent(
-        app.state.fiscal, app.state.fiscal_documents, app.state.fiscal_invoices, app.state.fiscal_clients
+        app.state.fiscal,
+        app.state.fiscal_documents,
+        app.state.fiscal_invoices,
+        app.state.fiscal_clients,
+        app_pool=app.state.db_pool,
+        neo_pool=app.state.neo_pool,
     )
+    print(f"NEO consultar_bd: {'activo' if app.state.neo_pool else 'sin NEO_DATABASE_URL'}")
     print("Shared session + Gestor Autónomo services initialized")
 
     app.state.automation_service = AutomationService(app.state.db_pool)
@@ -264,6 +272,9 @@ async def shutdown():
     if hasattr(app.state, "analytics_pool"):
         await app.state.analytics_pool.close()
         print("✓ Analytics database pool closed")
+
+    if getattr(app.state, "neo_pool", None) is not None:
+        await app.state.neo_pool.close()
 
     if hasattr(app.state, "copilot_service"):
         await app.state.copilot_service.aclose()

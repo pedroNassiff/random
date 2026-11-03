@@ -25,6 +25,7 @@ from fiscal.application.agent_types import (
     ToolOutput,
     to_json,
 )
+from fiscal.application.builder_tools import BuilderTools, NeoReader
 from fiscal.application.client_tools import ClientTools
 from fiscal.application.clients import ClientService
 from fiscal.application.attachments import Attachment, block_for, check_count
@@ -97,6 +98,7 @@ class FiscalAgent:
         invoices: InvoiceService,
         clients: ClientService,
         *,
+        reader: NeoReader | None = None,
         id_factory: Callable[[], str] = lambda: uuid4().hex,
     ) -> None:
         self._service = service
@@ -117,6 +119,7 @@ class FiscalAgent:
         }
         self._handlers.update(InvoiceTools(invoices, self._new_id).handlers())
         self._handlers.update(ClientTools(clients, self._new_id).handlers())
+        self._handlers.update(BuilderTools(reader).handlers())
 
     @property
     def model_name(self) -> str:

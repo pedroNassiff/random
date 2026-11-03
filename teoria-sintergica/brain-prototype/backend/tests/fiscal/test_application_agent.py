@@ -98,6 +98,8 @@ def test_tools_are_strict_and_closed_schemas() -> None:
         "proponer_estado",
         "ver_clientes",
         "proponer_cliente",
+        "ver_modulos",
+        "consultar_bd",
     ]
     unions = 0
     for tool in TOOLS:

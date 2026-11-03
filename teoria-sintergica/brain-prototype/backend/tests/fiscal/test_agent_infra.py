@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import anthropic
+import asyncpg
 import httpx2
 import pytest
 from fastapi import FastAPI
@@ -20,7 +21,8 @@ from fiscal.application.errors import AgentUnavailable
 from fiscal.application.service import FiscalService
 from fiscal.infrastructure.api import router
 from fiscal.infrastructure.claude import ClaudeChatModel, model_label
-from fiscal.infrastructure.wiring import build_agent
+from fiscal.infrastructure.pg_neo import PgNeoReader
+from fiscal.infrastructure.wiring import build_agent, build_neo_pool
 from tests.accounts.fakes import FakeAccountRepo
 from tests.fiscal.fakes import FakeFiscalRepo, fake_clients, fake_documents, fake_invoices
 from tests.fiscal.helpers import PILOTO
@@ -147,10 +149,20 @@ def test_client_is_built_lazily_from_either_key_and_reused(monkeypatch: pytest.M
     documents = fake_documents(datetime(2026, 10, 1, tzinfo=UTC))[0]
     invoices = fake_invoices(datetime(2026, 10, 1, tzinfo=UTC))[0]
     clients = fake_clients(datetime(2026, 10, 1, tzinfo=UTC))[0]
-    agent = build_agent(service, documents, invoices, clients)
+    app_pool = cast(asyncpg.Pool, object())
+    agent = build_agent(service, documents, invoices, clients, app_pool=app_pool, neo_pool=None)
     assert agent._invoices is invoices
     assert isinstance(agent._model, ClaudeChatModel) and agent._service is service
     assert agent._documents is documents
+    neo_pool = cast(asyncpg.Pool, object())
+    with_reader = build_agent(service, documents, invoices, clients, app_pool=app_pool, neo_pool=neo_pool)
+    assert getattr(agent._handlers["consultar_bd"], "__self__")._reader is None
+    assert isinstance(getattr(with_reader._handlers["consultar_bd"], "__self__")._reader, PgNeoReader)
+
+
+async def test_neo_pool_is_off_without_its_dsn(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("NEO_DATABASE_URL", raising=False)
+    assert await build_neo_pool() is None
 
 
 # ── HTTP ────────────────────────────────────────────────────────────────────
