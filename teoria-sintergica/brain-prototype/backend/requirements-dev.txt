@@ -8,3 +8,4 @@ import-linter>=2
 httpx>=0.27
 bandit>=1.7
 pip-audit>=2.7
+claude-agent-sdk>=0.2.177  # builder local de NEO (python -m builder); no va a Cloud Run

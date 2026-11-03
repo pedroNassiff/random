@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PY_PACKAGES: fiscal accounts futbol
+  PY_PACKAGES: fiscal accounts futbol builder
   PY_TESTS: tests
 
 jobs:
@@ -71,7 +71,7 @@ jobs:
         run: lint-imports
 
       - name: Tests y cobertura (pytest, Postgres real)
-        run: python -m pytest $PY_TESTS -q --cov=fiscal --cov=accounts --cov=futbol --cov-fail-under=90
+        run: python -m pytest $PY_TESTS -q --cov=fiscal --cov=accounts --cov=futbol --cov=builder --cov-fail-under=90
 
       - name: Tamaño de módulo (≤ 400 líneas)
         run: |

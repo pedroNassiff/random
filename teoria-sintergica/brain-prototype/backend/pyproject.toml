@@ -50,7 +50,7 @@ omit = [
 ]
 
 [tool.importlinter]
-root_packages = ["replay", "futbol", "accounts", "fiscal"]
+root_packages = ["replay", "futbol", "accounts", "fiscal", "builder"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -82,6 +82,17 @@ name = "fiscal domain is pure: no accounts, no futbol, no I/O libraries"
 type = "forbidden"
 source_modules = ["fiscal.domain", "fiscal.application"]
 forbidden_modules = ["accounts", "futbol", "asyncpg", "fastapi", "anthropic"]
+
+[[tool.importlinter.contracts]]
+name = "builder layers: domain <- application <- infrastructure"
+type = "layers"
+layers = ["builder.infrastructure", "builder.application", "builder.domain"]
+
+[[tool.importlinter.contracts]]
+name = "builder core is pure and never imports the apps it builds"
+type = "forbidden"
+source_modules = ["builder.domain", "builder.application"]
+forbidden_modules = ["claude_agent_sdk", "asyncpg", "fiscal", "accounts", "futbol"]
 
 [[tool.importlinter.contracts]]
 name = "shared accounts never depend on the apps that use them"

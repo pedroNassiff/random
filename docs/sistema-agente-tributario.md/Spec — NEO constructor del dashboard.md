@@ -179,6 +179,52 @@ Característica: NEO construye un módulo en el builder aislado
     Y no borra tablas ni columnas con datos sin pedirme confirmación aparte
 ```
 
+## Builder local (fase 2, primera versión)
+
+El mismo builder que va a correr como Cloud Run Job, lanzado desde la terminal para depurarlo:
+`python -m builder "<módulo>"`. Construye la última versión guardada de la spec.
+
+Dónde va el código: mientras el job de migraciones y la gauntlet de CI cubran solo `futbol` y `fiscal`, un
+módulo nuevo vive dentro de `fiscal` (archivos con el nombre del módulo, migración `fiscal/NNN_*.sql`, permisos
+de `neo_reader`, entrada en `ver_modulos`) y en `src/dashboard` (página, ruta y sidebar), como Specs. Un paquete
+propio por módulo exige cambiar el job de migraciones (Track 4) y queda para después.
+
+```gherkin
+Característica: Builder local
+
+  Escenario: Construir una spec guardada
+    Dado que la spec "Finanzas familiares" está guardada
+    Cuando corro python -m builder "Finanzas familiares"
+    Entonces el builder crea la rama neo/finanzas-familiares en un worktree aparte, desde la rama base
+    Y el agente escribe primero los tests y después la migración, el backend y el frontend
+    Y el builder corre él mismo la gauntlet de los tracks que tocó el agente
+
+  Escenario: La gauntlet pasa
+    Cuando la gauntlet está en verde
+    Entonces el builder commitea, hace push de la rama y abre un PR en draft
+    Y muestra el link del PR, el costo y los intentos
+
+  Escenario: La gauntlet falla
+    Cuando un gate falla
+    Entonces el builder le devuelve el error al agente en la misma sesión para que lo corrija
+    Y si al tercer intento sigue fallando, se detiene sin push y muestra el error
+
+  Escenario: Migración destructiva
+    Cuando una migración nueva borra o renombra una tabla o una columna
+    Entonces el builder se detiene sin push y pide confirmación aparte
+
+  Escenario: Límites del agente
+    Entonces el agente solo lee y escribe dentro del worktree
+    Y no puede tocar .github, infra ni archivos .env
+    Y en Bash solo corre los comandos de tests, lint, tipos y git de lectura
+    Y no hace commit ni push: eso lo hace el builder
+    Y no recibe secretos de producción: corre sin DATABASE_URL ni credenciales de GCP
+
+  Escenario: Spec inexistente
+    Cuando corro el builder con un módulo sin spec guardada
+    Entonces termina con error y no crea la rama
+```
+
 ## Producción
 
 ```gherkin
