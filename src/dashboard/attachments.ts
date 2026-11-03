@@ -2,9 +2,16 @@ import type { ChatAttachment } from './types'
 
 export const MAX_FILES = 3
 export const MAX_BYTES = 5 * 1024 * 1024
-export const ACCEPT_DOCUMENT = 'application/pdf'
+const PDF = 'application/pdf'
+const MARKDOWN = 'text/markdown'
+export const ACCEPT_DOCUMENT = `${PDF},.md,.markdown,${MARKDOWN}`
 export const ACCEPT_IMAGE = 'image/png,image/jpeg,image/webp'
-const ALLOWED = new Set([ACCEPT_DOCUMENT, ...ACCEPT_IMAGE.split(',')])
+const ALLOWED = new Set([PDF, MARKDOWN, ...ACCEPT_IMAGE.split(',')])
+
+/** Los navegadores mandan un .md sin tipo o con tipos distintos: se reconoce por la extensión. */
+function mediaType(file: File): string {
+  return /\.(md|markdown)$/i.test(file.name) ? MARKDOWN : file.type
+}
 
 function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,9 +25,10 @@ function toBase64(file: File): Promise<string> {
 
 /** Valida tipo y tamaño (las mismas reglas que el backend) y devuelve el archivo en base64. */
 export async function readAttachment(file: File): Promise<ChatAttachment> {
-  if (!ALLOWED.has(file.type))
-    throw new Error(`${file.name}: solo se aceptan PDF e imágenes (PNG, JPG o WebP).`)
+  const type = mediaType(file)
+  if (!ALLOWED.has(type))
+    throw new Error(`${file.name}: solo se aceptan PDF, Markdown e imágenes (PNG, JPG o WebP).`)
   if (file.size === 0) throw new Error(`${file.name}: el archivo está vacío.`)
   if (file.size > MAX_BYTES) throw new Error(`${file.name}: pesa más de 5 MB.`)
-  return { name: file.name, media_type: file.type, data: await toBase64(file) }
+  return { name: file.name, media_type: type, data: await toBase64(file) }
 }
