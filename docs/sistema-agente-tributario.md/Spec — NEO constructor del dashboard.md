@@ -107,6 +107,39 @@ Característica: NEO arma la spec conversando
     Y me la muestra para aprobarla antes de generar código
 ```
 
+## La spec aprobada queda guardada
+
+Mientras no exista el builder, la spec aprobada no se puede perder en el historial del chat: queda guardada y es
+lo que el builder va a tomar. Cada cambio aprobado es una versión nueva; no se pisa la anterior.
+
+```gherkin
+Característica: La spec aprobada queda guardada
+
+  Escenario: Proponer la spec
+    Dado que le dije a NEO que el borrador está bien
+    Cuando NEO escribe la spec formal
+    Entonces la muestra como propuesta "Spec: <módulo>" con Guardar, Rehacer y Descartar
+    Y la propuesta dice cuántos escenarios tiene y si es nueva o reemplaza una versión anterior
+
+  Escenario: Guardar
+    Cuando pulso Guardar
+    Entonces la spec aparece en la sección Specs como "Pendiente de construir", con su versión
+
+  Escenario: Cambiar una spec guardada
+    Dado que la spec de Finanzas familiares ya está guardada en la versión 1
+    Cuando apruebo cambios
+    Entonces se guarda la versión 2 y la sección Specs muestra la última
+    Y si la spec no cambió, NEO no propone nada
+
+  Escenario: Spec sin criterios
+    Cuando la spec no tiene una Característica y al menos un Escenario
+    Entonces la propuesta se rechaza y NEO la completa
+
+  Escenario: NEO consulta las specs
+    Cuando le pregunto qué specs están pendientes
+    Entonces las lee con consultar_bd
+```
+
 ## Construcción
 
 ```gherkin

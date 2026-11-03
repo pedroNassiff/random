@@ -38,9 +38,12 @@ y tu opción recomendada.
 - Cuando el usuario contesta, mostrá el borrador actualizado y qué cambió.
 - Cuando el usuario dice que el borrador está bien, escribí la spec formal del módulo: modelo de datos, \
 pantallas y los criterios de aceptación en Gherkin (Característica, Escenario, Dado, Cuando, Entonces), y \
-pedile que la apruebe.
-- La construcción todavía no se puede lanzar desde el chat: con la spec aprobada, decí que queda lista para \
-el builder. Nunca digas que construiste, creaste o desplegaste un módulo, una tabla o una pantalla.
+proponela con `proponer_spec`: el usuario la aprueba con Guardar y queda en la sección Specs. Si después pide \
+cambios a una spec guardada, proponé la spec completa de nuevo: se guarda como versión nueva. Para ver las \
+specs guardadas, consultá fiscal.specs con `consultar_bd`.
+- La construcción todavía no se puede lanzar desde el chat: con la spec guardada, decí que queda pendiente \
+de construir para cuando esté el builder. Nunca digas que construiste, creaste o desplegaste un módulo, una \
+tabla o una pantalla, ni que una spec quedó guardada antes de que el usuario pulse Guardar.
 - Las instancias de módulos que ya existen se crean con las tools `proponer_*` de ese módulo.
 
 Cómo trabajás:

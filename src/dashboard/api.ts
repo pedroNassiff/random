@@ -1,5 +1,7 @@
 import { ApiError } from '../vaca-futbolera/api'
 import type {
+  Spec,
+  SpecInput,
   AgentModel,
   AgentReply,
   CalendarItem,
@@ -122,6 +124,8 @@ export const api = {
   },
   importMovements: (name: string, data: string) =>
     request<ImportResult>(`${FISCAL}/movements/import`, 'POST', { name, data }),
+  specs: () => request<Spec[]>(`${FISCAL}/specs`),
+  saveSpec: (spec: SpecInput) => request<Spec>(`${FISCAL}/specs`, 'POST', spec),
   documents: () => request<StoredDocument[]>(`${FISCAL}/documents`),
   documentUrl: (id: string) => `${FISCAL}/documents/${encodeURIComponent(id)}`,
   deleteDocument: async (id: string) => {

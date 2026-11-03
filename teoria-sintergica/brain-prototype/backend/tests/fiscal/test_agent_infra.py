@@ -24,7 +24,7 @@ from fiscal.infrastructure.claude import ClaudeChatModel, model_label
 from fiscal.infrastructure.pg_neo import PgNeoReader
 from fiscal.infrastructure.wiring import build_agent, build_neo_pool
 from tests.accounts.fakes import FakeAccountRepo
-from tests.fiscal.fakes import FakeFiscalRepo, fake_clients, fake_documents, fake_invoices
+from tests.fiscal.fakes import FakeFiscalRepo, fake_clients, fake_documents, fake_invoices, fake_specs
 from tests.fiscal.helpers import PILOTO
 from tests.fiscal.test_application_agent import ScriptedModel, call, say
 
@@ -150,12 +150,14 @@ def test_client_is_built_lazily_from_either_key_and_reused(monkeypatch: pytest.M
     invoices = fake_invoices(datetime(2026, 10, 1, tzinfo=UTC))[0]
     clients = fake_clients(datetime(2026, 10, 1, tzinfo=UTC))[0]
     app_pool = cast(asyncpg.Pool, object())
-    agent = build_agent(service, documents, invoices, clients, app_pool=app_pool, neo_pool=None)
+    specs = fake_specs(lambda: datetime(2026, 10, 1, tzinfo=UTC))[0]
+    agent = build_agent(service, documents, invoices, clients, specs, app_pool=app_pool, neo_pool=None)
     assert agent._invoices is invoices
     assert isinstance(agent._model, ClaudeChatModel) and agent._service is service
     assert agent._documents is documents
     neo_pool = cast(asyncpg.Pool, object())
-    with_reader = build_agent(service, documents, invoices, clients, app_pool=app_pool, neo_pool=neo_pool)
+    with_reader = build_agent(service, documents, invoices, clients, specs, app_pool=app_pool, neo_pool=neo_pool)
+    assert with_reader._specs is specs
     assert getattr(agent._handlers["consultar_bd"], "__self__")._reader is None
     assert isinstance(getattr(with_reader._handlers["consultar_bd"], "__self__")._reader, PgNeoReader)
 
@@ -186,8 +188,10 @@ class World:
         self.app.state.fiscal_invoices = self.invoices
         self.clients, self.client_repo, self.vies = fake_clients(datetime(2026, 10, 1, 10, tzinfo=UTC))
         self.app.state.fiscal_clients = self.clients
+        self.specs, self.spec_repo = fake_specs(lambda: datetime(2026, 10, 1, 10, tzinfo=UTC))
+        self.app.state.fiscal_specs = self.specs
         self.app.state.fiscal_agent = FiscalAgent(
-            service, self.model, self.documents, self.invoices, self.clients, id_factory=lambda: "p1"
+            service, self.model, self.documents, self.invoices, self.clients, specs=self.specs, id_factory=lambda: "p1"
         )
 
     def client(self, email: str | None = None) -> TestClient:

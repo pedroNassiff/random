@@ -99,7 +99,7 @@ async def test_ver_modulos_lists_the_deployed_modules_with_their_tables() -> Non
     data = json.loads(str(out.content))
     nombres = [m["nombre"] for m in data["modulos"]]
     assert nombres == [m.nombre for m in MODULOS]
-    assert {"Impuestos", "Ingresos y gastos", "Clientes"} <= set(nombres)
+    assert {"Impuestos", "Ingresos y gastos", "Clientes", "Specs"} <= set(nombres)
     assert "Proyectos" not in nombres  # todavía no existe: el pedido de ITEC es primero un módulo
     clientes = next(m for m in data["modulos"] if m["nombre"] == "Clientes")
     assert clientes["tablas"] == ["fiscal.clients"] and clientes["ruta"].startswith("/dashboard")
@@ -108,8 +108,9 @@ async def test_ver_modulos_lists_the_deployed_modules_with_their_tables() -> Non
 
 def test_every_module_table_is_readable_by_neo_reader() -> None:
     """Las tablas que anuncia ver_modulos son las que la migración 009 le abre a neo_reader."""
-    with open("fiscal/migrations/009_neo_reader.sql", encoding="utf-8") as f:
-        migration = f.read()
+    migration = "".join(
+        open(f"fiscal/migrations/{name}", encoding="utf-8").read() for name in ("009_neo_reader.sql", "010_specs.sql")
+    )
     for modulo in MODULOS:
         for tabla in modulo.tablas:
             nombre = tabla.removeprefix("fiscal.")
@@ -134,5 +135,6 @@ def test_prompt_makes_neo_the_dashboard_builder() -> None:
     assert "recomendada" in SYSTEM_PROMPT and "lo que se repite" in SYSTEM_PROMPT
     # Spec cerrada → Gherkin para aprobar; nunca dice que construyó algo.
     assert "Gherkin" in SYSTEM_PROMPT and "nunca digas que" in SYSTEM_PROMPT
+    assert "`proponer_spec`" in SYSTEM_PROMPT and "versión nueva" in SYSTEM_PROMPT
     # Lee él mismo antes de mandar al usuario a revisar.
     assert "`consultar_bd`" in SYSTEM_PROMPT

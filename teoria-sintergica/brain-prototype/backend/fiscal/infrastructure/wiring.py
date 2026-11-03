@@ -13,12 +13,14 @@ from fiscal.application.documents import DocumentService, DocumentStore
 from fiscal.application.invoices import InvoiceService
 from fiscal.application.movements import MovementService
 from fiscal.application.service import FiscalService
+from fiscal.application.specs import SpecService
 from fiscal.infrastructure.claude import ClaudeChatModel
 from fiscal.infrastructure.pg import PgFiscalRepository
 from fiscal.infrastructure.pg_clients import PgClientRepository
 from fiscal.infrastructure.pg_invoices import PgInvoiceRepository
 from fiscal.infrastructure.pg_movements import PgMovementRepository
 from fiscal.infrastructure.pg_neo import PgNeoReader
+from fiscal.infrastructure.pg_specs import PgSpecRepository
 from fiscal.infrastructure.vies import ViesClient
 from fiscal.infrastructure.xlsx import read_xlsx
 from fiscal.infrastructure.storage import GcsDocumentStore, LocalDocumentStore
@@ -48,6 +50,10 @@ def build_clients(pool: asyncpg.Pool) -> ClientService:
     return ClientService(PgClientRepository(pool), ViesClient())
 
 
+def build_specs(pool: asyncpg.Pool) -> SpecService:
+    return SpecService(PgSpecRepository(pool))
+
+
 def build_movements(pool: asyncpg.Pool) -> MovementService:
     return MovementService(PgMovementRepository(pool), read_xlsx)
 
@@ -67,9 +73,10 @@ def build_agent(
     documents: DocumentService,
     invoices: InvoiceService,
     clients: ClientService,
+    specs: SpecService,
     *,
     app_pool: asyncpg.Pool,
     neo_pool: asyncpg.Pool | None,
 ) -> FiscalAgent:
     reader = PgNeoReader(app_pool, neo_pool) if neo_pool is not None else None
-    return FiscalAgent(service, ClaudeChatModel(), documents, invoices, clients, reader=reader)
+    return FiscalAgent(service, ClaudeChatModel(), documents, invoices, clients, reader=reader, specs=specs)

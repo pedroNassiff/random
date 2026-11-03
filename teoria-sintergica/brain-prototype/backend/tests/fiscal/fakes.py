@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from uuid import uuid4
@@ -11,10 +12,12 @@ from fiscal.application.documents import DocumentService, StoredDocument
 from fiscal.application.errors import Invalid, NotFound
 from fiscal.application.invoices import InvoiceService
 from fiscal.application.ports import StoredStatus
+from fiscal.application.specs import SpecService, StoredSpec
 from fiscal.domain.clients import Client
 from fiscal.domain.holidays import Holiday
 from fiscal.domain.invoices import Invoice
 from fiscal.domain.profile import TaxProfile
+from fiscal.domain.specs import Spec
 from tests.fiscal.helpers import seeded_holidays
 
 
@@ -160,3 +163,32 @@ class FakeVies:
 def fake_clients(now: datetime) -> tuple[ClientService, FakeClientRepo, FakeVies]:
     repo, vies = FakeClientRepo(), FakeVies()
     return ClientService(repo, vies, clock=lambda: now), repo, vies
+
+
+@dataclass
+class FakeSpecRepo:
+    rows: dict[str, list[StoredSpec]] = field(default_factory=dict)
+
+    async def add_version(self, owner_id: str, spec: Spec, now: datetime) -> StoredSpec:
+        mine = self.rows.setdefault(owner_id, [])
+        prev = await self.current(owner_id, spec.modulo)
+        stored = StoredSpec(
+            str(uuid4()), spec.modulo, spec.contenido, prev.version + 1 if prev else 1, "pendiente", now
+        )
+        mine.append(stored)
+        return stored
+
+    async def current(self, owner_id: str, modulo: str) -> StoredSpec | None:
+        same = [s for s in self.rows.get(owner_id, []) if s.modulo.lower() == modulo.lower()]
+        return max(same, key=lambda s: s.version, default=None)
+
+    async def latest(self, owner_id: str) -> list[StoredSpec]:
+        last: dict[str, StoredSpec] = {}
+        for s in self.rows.get(owner_id, []):
+            last[s.modulo.lower()] = s
+        return sorted(last.values(), key=lambda s: (-s.created_at.timestamp(), s.modulo))
+
+
+def fake_specs(clock: Callable[[], datetime]) -> tuple[SpecService, FakeSpecRepo]:
+    repo = FakeSpecRepo()
+    return SpecService(repo, clock=clock), repo

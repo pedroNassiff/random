@@ -3,6 +3,7 @@ export const LOGIN = `${BASE}/entrar`
 export const IMPUESTOS = `${BASE}/impuestos`
 export const CLIENTES = `${BASE}/clientes`
 export const MOVIMIENTOS = `${BASE}/ingresos-y-gastos`
+export const SPECS = `${BASE}/specs`
 export const PLAZOS = `${IMPUESTOS}/plazos`
 export const PERFIL = `${IMPUESTOS}/perfil`
 export const FACTURAS = `${IMPUESTOS}/facturas`

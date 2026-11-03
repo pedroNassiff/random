@@ -72,6 +72,7 @@ from fiscal.infrastructure.wiring import (
     build_movements as build_fiscal_movements,
     build_neo_pool,
     build_service as build_fiscal_service,
+    build_specs as build_fiscal_specs,
 )
 
 app = FastAPI(title="Syntergic Brain API v0.4")
@@ -244,12 +245,14 @@ async def startup():
     app.state.fiscal_invoices = build_fiscal_invoices(app.state.db_pool)
     app.state.fiscal_clients = build_fiscal_clients(app.state.db_pool)
     app.state.fiscal_movements = build_fiscal_movements(app.state.db_pool)
+    app.state.fiscal_specs = build_fiscal_specs(app.state.db_pool)
     app.state.neo_pool = await build_neo_pool()
     app.state.fiscal_agent = build_fiscal_agent(
         app.state.fiscal,
         app.state.fiscal_documents,
         app.state.fiscal_invoices,
         app.state.fiscal_clients,
+        app.state.fiscal_specs,
         app_pool=app.state.db_pool,
         neo_pool=app.state.neo_pool,
     )

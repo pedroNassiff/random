@@ -24,7 +24,7 @@ router = APIRouter(prefix="/agent/history")
 
 class ProposalIn(BaseModel):
     id: str = Field(max_length=64)
-    kind: Literal["profile", "status", "invoice", "client"]
+    kind: Literal["profile", "status", "invoice", "client", "spec"]
     titulo: str = Field(max_length=300)
     detalle: list[Annotated[str, Field(max_length=500)]] = Field(max_length=30)
     payload: dict[str, Any]
