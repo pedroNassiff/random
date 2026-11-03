@@ -35,6 +35,7 @@ function toTurn(e: ChatEntry): ChatTurn {
 function save(proposal: Proposal): Promise<unknown> {
   if (proposal.kind === 'profile') return api.saveProfile(proposal.payload)
   if (proposal.kind === 'invoice') return api.addInvoice(proposal.payload)
+  if (proposal.kind === 'spec') return api.saveSpec(proposal.payload)
   if (proposal.kind === 'client') {
     const { id, ...client } = proposal.payload
     return id ? api.updateClient(id, client) : api.createClient(client)

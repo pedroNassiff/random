@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { CLIENTES, IMPUESTOS, MOVIMIENTOS } from '../routes'
+import { CLIENTES, IMPUESTOS, MOVIMIENTOS, SPECS } from '../routes'
 
 interface Section {
   to: string
@@ -11,6 +11,7 @@ const SECTIONS: Section[] = [
   { to: IMPUESTOS, label: 'Putos Impuestos' },
   { to: MOVIMIENTOS, label: 'Ingresos y gastos' },
   { to: CLIENTES, label: 'Clientes' },
+  { to: SPECS, label: 'Specs' },
 ]
 
 export function Sidebar({ email, onLogout }: { email: string; onLogout: () => void }) {

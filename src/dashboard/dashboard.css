@@ -903,3 +903,15 @@ button.rd-tab {
   margin-top: 2px;
   color: var(--ink-soft);
 }
+
+/* Specs guardadas desde NEO */
+.rdash .rd-spec details {
+  margin-top: 0.5rem;
+}
+.rdash .rd-spec-body {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+  max-height: 28rem;
+  overflow: auto;
+}

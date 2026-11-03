@@ -11,7 +11,7 @@ from typing import Any
 from fiscal.application.agent import MAX_TURNS, ChatMessage, FiscalAgent, ModelTurn, ToolCall
 from fiscal.application.agent_tools import SYSTEM_PROMPT, TOOLS
 from fiscal.application.service import FiscalService
-from tests.fiscal.fakes import FakeFiscalRepo, fake_clients, fake_documents, fake_invoices
+from tests.fiscal.fakes import FakeFiscalRepo, fake_clients, fake_documents, fake_invoices, fake_specs
 from tests.fiscal.helpers import PILOTO
 
 PEDRO = "u-pedro"
@@ -77,6 +77,7 @@ async def make(*turns: ModelTurn, with_profile: bool = True) -> tuple[FiscalAgen
         fake_documents(NOW)[0],
         fake_invoices(NOW)[0],
         fake_clients(NOW)[0],
+        specs=fake_specs(lambda: NOW)[0],
         id_factory=lambda: next(ids),
     )
     return agent, model, repo
@@ -100,6 +101,7 @@ def test_tools_are_strict_and_closed_schemas() -> None:
         "proponer_cliente",
         "ver_modulos",
         "consultar_bd",
+        "proponer_spec",
     ]
     unions = 0
     for tool in TOOLS:

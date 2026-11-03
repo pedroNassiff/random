@@ -35,6 +35,7 @@ from fiscal.application.invoice_tools import InvoiceTools
 from fiscal.application.invoices import InvoiceService
 from fiscal.application.onboarding import onboarding_state
 from fiscal.application.service import CalendarItem, DeadlineKind, FiscalService
+from fiscal.application.specs import SpecService
 from fiscal.domain.errors import FiscalRuleError
 from fiscal.domain.profile import TaxProfile, validated
 from fiscal.domain.status import is_closed, validate_status
@@ -99,6 +100,7 @@ class FiscalAgent:
         clients: ClientService,
         *,
         reader: NeoReader | None = None,
+        specs: SpecService | None = None,
         id_factory: Callable[[], str] = lambda: uuid4().hex,
     ) -> None:
         self._service = service
@@ -106,6 +108,7 @@ class FiscalAgent:
         self._invoices = invoices
         self._clients = clients
         self._model = model
+        self._specs = specs
         self._new_id = id_factory
         self._handlers: dict[str, Handler] = {
             "ver_perfil": self._ver_perfil,
@@ -119,7 +122,7 @@ class FiscalAgent:
         }
         self._handlers.update(InvoiceTools(invoices, self._new_id).handlers())
         self._handlers.update(ClientTools(clients, self._new_id).handlers())
-        self._handlers.update(BuilderTools(reader).handlers())
+        self._handlers.update(BuilderTools(reader, specs, self._new_id).handlers())
 
     @property
     def model_name(self) -> str:

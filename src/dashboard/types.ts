@@ -140,6 +140,21 @@ export type Proposal =
   | (ProposalBase & { kind: 'status'; payload: StatusPayload })
   | (ProposalBase & { kind: 'invoice'; payload: InvoiceInput })
   | (ProposalBase & { kind: 'client'; payload: ClientInput & { id: string | null } })
+  | (ProposalBase & { kind: 'spec'; payload: SpecInput })
+
+/** Spec de un módulo aprobada desde NEO. Cada cambio guardado es una versión nueva. */
+export interface SpecInput {
+  modulo: string
+  contenido: string
+}
+
+export interface Spec extends SpecInput {
+  id: string
+  version: number
+  estado: 'pendiente'
+  escenarios: number
+  creada: string
+}
 
 export interface ChatTurn {
   role: 'user' | 'assistant'

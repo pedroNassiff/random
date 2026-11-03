@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
-ProposalKind = Literal["profile", "status", "invoice", "client"]
+ProposalKind = Literal["profile", "status", "invoice", "client", "spec"]
 
 
 @dataclass(frozen=True)

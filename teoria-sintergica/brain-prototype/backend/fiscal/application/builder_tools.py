@@ -6,11 +6,14 @@ Spec: docs/sistema-agente-tributario.md/Spec — NEO constructor del dashboard.m
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
+from uuid import uuid4
 
-from fiscal.application.agent_types import Handler, ToolOutput, to_json
+from fiscal.application.agent_types import PROPOSED, Handler, Proposal, ToolOutput, to_json
+from fiscal.application.specs import SpecService
+from fiscal.domain.specs import escenarios
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,12 @@ MODULOS: tuple[Modulo, ...] = (
         ("fiscal.movements",),
     ),
     Modulo("Clientes", "/dashboard/clientes", "Clientes a los que se factura.", ("fiscal.clients",)),
+    Modulo(
+        "Specs",
+        "/dashboard/specs",
+        "Specs de módulos aprobadas, pendientes de construir; cada cambio es una versión nueva.",
+        ("fiscal.specs",),
+    ),
 )
 
 _COLUMNAS = (
@@ -77,15 +86,46 @@ SCHEMAS: list[dict[str, Any]] = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "proponer_spec",
+        "description": "Propone guardar la spec formal de un módulo cuando el usuario aceptó el borrador. No guarda "
+        "nada: el usuario ve la propuesta y decide. Si el módulo ya tiene una spec guardada, se guarda como versión "
+        "nueva. La spec tiene que incluir los criterios de aceptación en Gherkin.",
+        "strict": True,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "modulo": {"type": "string", "description": "Nombre del módulo, p. ej. Proyectos."},
+                "contenido": {
+                    "type": "string",
+                    "description": "La spec completa en texto: modelo de datos, pantallas y criterios en Gherkin "
+                    "(Característica, Escenario, Dado, Cuando, Entonces).",
+                },
+            },
+            "required": ["modulo", "contenido"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 
 class BuilderTools:
-    def __init__(self, reader: NeoReader | None) -> None:
+    def __init__(
+        self,
+        reader: NeoReader | None,
+        specs: SpecService | None = None,
+        new_id: Callable[[], str] = lambda: uuid4().hex,
+    ) -> None:
         self._reader = reader
+        self._specs = specs
+        self._new_id = new_id
 
     def handlers(self) -> dict[str, Handler]:
-        return {"ver_modulos": self._ver_modulos, "consultar_bd": self._consultar_bd}
+        return {
+            "ver_modulos": self._ver_modulos,
+            "consultar_bd": self._consultar_bd,
+            "proponer_spec": self._proponer_spec,
+        }
 
     async def _ver_modulos(self, _owner_id: str, _args: Mapping[str, Any]) -> ToolOutput:
         modulos = [
@@ -108,3 +148,15 @@ class BuilderTools:
         if result.truncado:
             data["aviso"] = "Hay más filas de las que se muestran: acotá la consulta con WHERE o agregá con COUNT/SUM."
         return ToolOutput(to_json(data))
+
+    async def _proponer_spec(self, owner_id: str, args: Mapping[str, Any]) -> ToolOutput:
+        if self._specs is None:
+            return ToolOutput("Guardar specs no está disponible en este entorno.", is_error=True)
+        spec = self._specs.check(str(args.get("modulo", "")), str(args.get("contenido", "")))
+        current = await self._specs.current(owner_id, spec.modulo)
+        if current is not None and current.contenido == spec.contenido:
+            return ToolOutput("La spec es igual a la versión guardada: no hay nada que cambiar.", is_error=True)
+        version = f"reemplaza la versión {current.version}" if current else "nueva"
+        detalle = (f"módulo: {spec.modulo}", f"escenarios: {escenarios(spec.contenido)}", f"versión: {version}")
+        payload = {"modulo": spec.modulo, "contenido": spec.contenido}
+        return ToolOutput(PROPOSED, proposal=Proposal(self._new_id(), "spec", f"Spec: {spec.modulo}", detalle, payload))

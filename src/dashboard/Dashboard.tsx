@@ -16,6 +16,7 @@ import { ImpuestosLayout } from './pages/ImpuestosLayout'
 import { LoginPage } from './pages/LoginPage'
 import { MovementsPage } from './pages/MovementsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { SpecsPage } from './pages/SpecsPage'
 import { markTourSeen, tourSeen } from './remember'
 import { APP, BASE, IMPUESTOS, LOGIN } from './routes'
 import { tourSteps } from './tour'
@@ -110,6 +111,7 @@ export default function Dashboard() {
             </Route>
             <Route path="clientes" element={<ClientsPage />} />
             <Route path="ingresos-y-gastos" element={<MovementsPage />} />
+            <Route path="specs" element={<SpecsPage />} />
             <Route path="*" element={<Navigate to={BASE} replace />} />
           </Route>
         </Routes>
