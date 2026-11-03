@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -34,6 +35,7 @@ def parse(argv: Sequence[str] | None) -> argparse.Namespace:
     p.add_argument("--budget", type=float, default=20.0, help="Tope de gasto del agente en USD (default 20).")
     p.add_argument("--model", default=MODEL)
     p.add_argument("--builds", type=Path, help="Carpeta de los worktrees (default: ../random-neo-builds).")
+    p.add_argument("--status-file", type=Path, help="Dónde escribir el resultado en JSON (lo lee el dashboard).")
     return p.parse_args(argv)
 
 
@@ -66,6 +68,11 @@ def report(result: BuildResult) -> str:
     return "\n".join(lines)
 
 
+def write_status(path: Path | None, data: dict[str, object]) -> None:
+    if path is not None:
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
 def main(argv: Sequence[str] | None = None, log: Callable[[str], None] = print) -> int:
     args = parse(argv)
     try:
@@ -75,8 +82,20 @@ def main(argv: Sequence[str] | None = None, log: Callable[[str], None] = print) 
         result = asyncio.run(service.build(args.modulo, args.base))
     except (BuildError, CommandFailed, ValueError) as exc:
         log(f"Error: {exc}")
+        write_status(args.status_file, {"estado": "error", "detalle": str(exc)})
         return 2
     log(report(result))
+    write_status(
+        args.status_file,
+        {
+            "estado": result.outcome,
+            "rama": result.branch,
+            "intentos": result.attempts,
+            "costo_usd": result.cost_usd,
+            "pr_url": result.pr_url,
+            "detalle": result.detail,
+        },
+    )
     return 0 if result.outcome == "pr_abierto" else 1
 
 

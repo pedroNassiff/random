@@ -66,6 +66,7 @@ from accounts.infrastructure.wiring import build_session_service
 from fiscal.infrastructure.api import router as fiscal_router
 from fiscal.infrastructure.wiring import (
     build_agent as build_fiscal_agent,
+    build_builds as build_fiscal_builds,
     build_clients as build_fiscal_clients,
     build_documents as build_fiscal_documents,
     build_invoices as build_fiscal_invoices,
@@ -246,6 +247,7 @@ async def startup():
     app.state.fiscal_clients = build_fiscal_clients(app.state.db_pool)
     app.state.fiscal_movements = build_fiscal_movements(app.state.db_pool)
     app.state.fiscal_specs = build_fiscal_specs(app.state.db_pool)
+    app.state.fiscal_builds = build_fiscal_builds(app.state.fiscal_specs)
     app.state.neo_pool = await build_neo_pool()
     app.state.fiscal_agent = build_fiscal_agent(
         app.state.fiscal,

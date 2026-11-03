@@ -7,7 +7,10 @@ from pathlib import Path
 
 import asyncpg
 
+import sys
+
 from fiscal.application.agent import FiscalAgent
+from fiscal.application.builds import BuildService
 from fiscal.application.clients import ClientService
 from fiscal.application.documents import DocumentService, DocumentStore
 from fiscal.application.invoices import InvoiceService
@@ -19,6 +22,7 @@ from fiscal.infrastructure.pg import PgFiscalRepository
 from fiscal.infrastructure.pg_clients import PgClientRepository
 from fiscal.infrastructure.pg_invoices import PgInvoiceRepository
 from fiscal.infrastructure.pg_movements import PgMovementRepository
+from fiscal.infrastructure.local_builds import LocalBuildLauncher
 from fiscal.infrastructure.pg_neo import PgNeoReader
 from fiscal.infrastructure.pg_specs import PgSpecRepository
 from fiscal.infrastructure.vies import ViesClient
@@ -52,6 +56,23 @@ def build_clients(pool: asyncpg.Pool) -> ClientService:
 
 def build_specs(pool: asyncpg.Pool) -> SpecService:
     return SpecService(PgSpecRepository(pool))
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
+
+def build_builds(specs: SpecService) -> BuildService:
+    """Botón Construir: solo con NEO_BUILDER=1 (local). En Cloud Run el builder será un Cloud Run Job."""
+    if os.getenv("NEO_BUILDER") != "1":
+        return BuildService(specs, None)
+    launcher = LocalBuildLauncher(
+        BACKEND_DIR / "data" / "neo_builds",
+        cwd=BACKEND_DIR,
+        base=os.getenv("NEO_BUILDER_BASE", "main"),
+        budget_usd=float(os.getenv("NEO_BUILDER_BUDGET", "20")),
+        command=[sys.executable, "-u", "-m", "builder"],
+    )
+    return BuildService(specs, launcher)
 
 
 def build_movements(pool: asyncpg.Pool) -> MovementService:

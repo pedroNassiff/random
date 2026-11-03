@@ -308,6 +308,26 @@ def test_cli_failures(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cli.main(["Finanzas"], log.append) == 2 and log[-1] == "Error: No hay spec"
 
 
+def test_cli_writes_the_result_for_the_dashboard(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import json
+
+    status = tmp_path / "x.result.json"
+    ok = BuildResult("pr_abierto", "neo/x", 1, 2.0, "Gauntlet en verde.", "https://pr/2")
+    monkeypatch.setattr(cli, "service_from", lambda args, repo, log: FakeService(ok))
+    assert cli.main(["X", "--status-file", str(status)], lambda _: None) == 0
+    assert json.loads(status.read_text()) == {
+        "estado": "pr_abierto",
+        "rama": "neo/x",
+        "intentos": 1,
+        "costo_usd": 2.0,
+        "pr_url": "https://pr/2",
+        "detalle": "Gauntlet en verde.",
+    }
+    monkeypatch.setattr(cli, "service_from", lambda args, repo, log: FakeService(BuildError("No hay spec")))
+    assert cli.main(["X", "--status-file", str(status)], lambda _: None) == 2
+    assert json.loads(status.read_text()) == {"estado": "error", "detalle": "No hay spec"}
+
+
 def test_cli_needs_the_database_and_the_api_key(tmp_path: Path) -> None:
     (tmp_path / BACKEND).mkdir(parents=True)
     (tmp_path / BACKEND / ".env").write_text("DATABASE_URL=postgresql://x\n")

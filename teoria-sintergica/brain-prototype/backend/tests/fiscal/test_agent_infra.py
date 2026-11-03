@@ -17,6 +17,7 @@ from accounts.application.session_service import SessionService
 from accounts.infrastructure.api import router as auth_router
 from fiscal.application.agent import FiscalAgent, ModelTurn, ToolCall
 from fiscal.application.agent_tools import SYSTEM_PROMPT, TOOLS
+from fiscal.application.builds import BuildService
 from fiscal.application.errors import AgentUnavailable
 from fiscal.application.service import FiscalService
 from fiscal.infrastructure.api import router
@@ -190,6 +191,7 @@ class World:
         self.app.state.fiscal_clients = self.clients
         self.specs, self.spec_repo = fake_specs(lambda: datetime(2026, 10, 1, 10, tzinfo=UTC))
         self.app.state.fiscal_specs = self.specs
+        self.app.state.fiscal_builds = BuildService(self.specs, None)
         self.app.state.fiscal_agent = FiscalAgent(
             service, self.model, self.documents, self.invoices, self.clients, specs=self.specs, id_factory=lambda: "p1"
         )
