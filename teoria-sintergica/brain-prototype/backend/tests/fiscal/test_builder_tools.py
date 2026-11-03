@@ -136,5 +136,6 @@ def test_prompt_makes_neo_the_dashboard_builder() -> None:
     # Spec cerrada → Gherkin para aprobar; nunca dice que construyó algo.
     assert "Gherkin" in SYSTEM_PROMPT and "nunca digas que" in SYSTEM_PROMPT
     assert "`proponer_spec`" in SYSTEM_PROMPT and "versión nueva" in SYSTEM_PROMPT
+    assert "botón Construir" in SYSTEM_PROMPT and "cuando esté el builder" not in SYSTEM_PROMPT
     # Lee él mismo antes de mandar al usuario a revisar.
     assert "`consultar_bd`" in SYSTEM_PROMPT

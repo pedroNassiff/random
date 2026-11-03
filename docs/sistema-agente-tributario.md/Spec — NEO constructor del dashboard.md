@@ -225,6 +225,41 @@ Característica: Builder local
     Entonces termina con error y no crea la rama
 ```
 
+### Botón Construir (solo local)
+
+El backend local lanza el mismo builder (`python -m builder`) como proceso aparte. Solo existe con
+`NEO_BUILDER=1` en el `.env`: en Cloud Run no está, y el builder de producción será el Cloud Run Job.
+
+```gherkin
+Característica: Construir desde la sección Specs
+
+  Escenario: Lanzar
+    Dado que el backend corre con NEO_BUILDER=1
+    Cuando pulso Construir en una spec y confirmo el costo máximo
+    Entonces el builder arranca en segundo plano con la última versión de la spec
+    Y la tarjeta muestra "Construyendo…" con las últimas líneas del progreso
+
+  Escenario: Termina
+    Cuando el builder termina
+    Entonces la tarjeta muestra el link del PR en draft, o el motivo por el que se detuvo, con el costo
+
+  Escenario: Cancelar
+    Cuando pulso Cancelar mientras construye
+    Entonces el proceso se detiene y la tarjeta lo dice
+
+  Escenario: Uno por módulo
+    Cuando ya hay una construcción en curso para ese módulo
+    Entonces Construir no lanza otra
+
+  Escenario: Sin builder
+    Dado que NEO_BUILDER no está activo
+    Entonces la sección Specs no muestra Construir y el endpoint responde 404
+
+  Escenario: NEO lo indica
+    Cuando una spec queda guardada
+    Entonces NEO dice que se construye con Construir en la sección Specs, no que el builder no existe
+```
+
 ## Producción
 
 ```gherkin

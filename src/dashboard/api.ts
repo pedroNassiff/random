@@ -1,5 +1,7 @@
 import { ApiError } from '../vaca-futbolera/api'
 import type {
+  Build,
+  BuildsView,
   Spec,
   SpecInput,
   AgentModel,
@@ -126,6 +128,11 @@ export const api = {
     request<ImportResult>(`${FISCAL}/movements/import`, 'POST', { name, data }),
   specs: () => request<Spec[]>(`${FISCAL}/specs`),
   saveSpec: (spec: SpecInput) => request<Spec>(`${FISCAL}/specs`, 'POST', spec),
+  builds: () => request<BuildsView>(`${FISCAL}/builds`),
+  startBuild: (modulo: string) => request<Build>(`${FISCAL}/builds`, 'POST', { modulo }),
+  cancelBuild: async (slug: string) => {
+    await send(`${FISCAL}/builds/${encodeURIComponent(slug)}/cancel`, 'POST')
+  },
   documents: () => request<StoredDocument[]>(`${FISCAL}/documents`),
   documentUrl: (id: string) => `${FISCAL}/documents/${encodeURIComponent(id)}`,
   deleteDocument: async (id: string) => {

@@ -148,6 +148,26 @@ export interface SpecInput {
   contenido: string
 }
 
+/** Una construcción del builder lanzada desde Specs (solo local). */
+export interface Build {
+  slug: string
+  modulo: string
+  estado: string
+  inicio: string
+  log: string[]
+  rama: string | null
+  intentos: number | null
+  costo_usd: number | null
+  pr_url: string | null
+  detalle: string | null
+}
+
+export interface BuildsView {
+  disponible: boolean
+  presupuesto_usd: number
+  builds: Build[]
+}
+
 export interface Spec extends SpecInput {
   id: string
   version: number

@@ -24,6 +24,7 @@ from fiscal.application.service import CalendarItem, DeadlineKind, FiscalService
 from fiscal.domain.profile import RegimenIrpf, RegimenIva, TaxProfile
 from fiscal.infrastructure.api_chat import router as chat_router
 from fiscal.infrastructure.api_clients import router as clients_router
+from fiscal.infrastructure.api_builds import router as builds_router
 from fiscal.infrastructure.api_specs import router as specs_router
 from fiscal.infrastructure.claude import model_label
 from fiscal.infrastructure.api_invoices import router as invoices_router
@@ -269,3 +270,4 @@ router.include_router(chat_router)
 router.include_router(clients_router)
 router.include_router(movements_router)
 router.include_router(specs_router)
+router.include_router(builds_router)
