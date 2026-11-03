@@ -25,9 +25,21 @@ describe('readAttachment', () => {
     })
   })
 
+  it('acepta Markdown por extensión aunque el navegador no le ponga tipo', async () => {
+    const cases: [string, string][] = [
+      ['spec.md', ''],
+      ['notas.markdown', 'text/x-markdown'],
+      ['README.MD', 'text/markdown'],
+    ]
+    for (const [name, type] of cases) {
+      const read = await readAttachment(new File(['# Hola'], name, { type }))
+      expect(read).toEqual({ name, media_type: 'text/markdown', data: btoa('# Hola') })
+    }
+  })
+
   it('rechaza tipos no admitidos, archivos vacíos y los que pesan más de 5 MB', async () => {
     await expect(readAttachment(new File(['x'], 'a.zip', { type: 'application/zip' }))).rejects.toThrow(
-      'a.zip: solo se aceptan PDF e imágenes',
+      'a.zip: solo se aceptan PDF, Markdown e imágenes',
     )
     await expect(readAttachment(pdf('vacio.pdf', ''))).rejects.toThrow('vacio.pdf: el archivo está vacío.')
     const big = new File([new Uint8Array(MAX_BYTES + 1)], 'grande.pdf', { type: 'application/pdf' })
@@ -88,7 +100,7 @@ describe('adjuntos en el chat', () => {
     const chat = await openChat()
     const docs = within(chat).getByLabelText('Adjuntar documento')
     const images = within(chat).getByLabelText('Adjuntar imagen')
-    expect(docs).toHaveAttribute('accept', 'application/pdf')
+    expect(docs).toHaveAttribute('accept', 'application/pdf,.md,.markdown,text/markdown')
     expect(images).toHaveAttribute('accept', 'image/png,image/jpeg,image/webp')
     expect(docs.closest('label')).toHaveTextContent('D+')
     expect(images.closest('label')).toHaveTextContent('I+')

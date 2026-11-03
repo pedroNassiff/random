@@ -47,6 +47,27 @@ def test_pdf_becomes_a_document_block_and_images_get_a_name_label() -> None:
     ]
 
 
+def test_markdown_goes_as_a_plain_text_document() -> None:
+    text = "# Spec\n\nCaracterística: Finanzas — ñandú\n"
+    md = att("spec.md", "text/markdown", text.encode())
+    assert content_blocks([md]) == [
+        {"type": "document", "source": {"type": "text", "media_type": "text/plain", "data": text}, "title": "spec.md"}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("raw", "message"),
+    [
+        (b"\xff\xfe no es utf-8", "no es texto UTF-8"),
+        (b"texto\x00binario", "no es texto UTF-8"),
+        (b"%PDF-1.4\x00\x01", "no es texto UTF-8"),
+    ],
+)
+def test_markdown_must_be_utf8_text(raw: bytes, message: str) -> None:
+    with pytest.raises(Invalid, match=message):
+        content_blocks([att("x.md", "text/markdown", raw)])
+
+
 def test_blank_name_gets_a_default() -> None:
     assert content_blocks([att("  ", "application/pdf", PDF)])[0]["title"] == "documento"
 
@@ -54,7 +75,7 @@ def test_blank_name_gets_a_default() -> None:
 @pytest.mark.parametrize(
     ("attachment", "message"),
     [
-        (att("a.exe", "application/x-msdownload", b"MZ"), "a.exe: solo se aceptan PDF e imágenes"),
+        (att("a.exe", "application/x-msdownload", b"MZ"), "a.exe: solo se aceptan PDF, Markdown e imágenes"),
         (att("a.docx", "application/msword", PDF), "solo se aceptan PDF"),
         (Attachment("roto.pdf", "application/pdf", "%%%no-es-base64"), "roto.pdf: el archivo llegó dañado"),
         (Attachment("vacio.pdf", "application/pdf", ""), "vacio.pdf: el archivo está vacío"),

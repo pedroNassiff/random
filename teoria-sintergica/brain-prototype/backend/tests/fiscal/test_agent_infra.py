@@ -327,7 +327,7 @@ def test_chat_passes_attachments_to_the_model_and_rejects_bad_ones() -> None:
 
     bad = {"message": "x", "attachments": [{"name": "a.zip", "media_type": "application/zip", "data": pdf}]}
     r = c.post("/fiscal/agent/chat", json=bad)
-    assert r.status_code == 422 and "solo se aceptan PDF" in r.json()["detail"]
+    assert r.status_code == 422 and "solo se aceptan PDF, Markdown" in r.json()["detail"]
     four = {"message": "x", "attachments": files * 4}
     assert c.post("/fiscal/agent/chat", json=four).status_code == 422
     assert len(world.model.calls) == 1
