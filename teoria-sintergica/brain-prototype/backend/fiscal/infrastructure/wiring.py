@@ -18,6 +18,7 @@ from fiscal.infrastructure.pg import PgFiscalRepository
 from fiscal.infrastructure.pg_clients import PgClientRepository
 from fiscal.infrastructure.pg_invoices import PgInvoiceRepository
 from fiscal.infrastructure.pg_movements import PgMovementRepository
+from fiscal.infrastructure.pg_neo import PgNeoReader
 from fiscal.infrastructure.vies import ViesClient
 from fiscal.infrastructure.xlsx import read_xlsx
 from fiscal.infrastructure.storage import GcsDocumentStore, LocalDocumentStore
@@ -51,7 +52,24 @@ def build_movements(pool: asyncpg.Pool) -> MovementService:
     return MovementService(PgMovementRepository(pool), read_xlsx)
 
 
+async def build_neo_pool() -> asyncpg.Pool | None:
+    """Pool de NEO con el usuario `neo_reader` (fiscal/009). Sin NEO_DATABASE_URL, NEO no lee la base directo."""
+    dsn = os.getenv("NEO_DATABASE_URL")
+    if not dsn:
+        return None
+    # neo_reader tiene CONNECTION LIMIT 5: el pool se queda por debajo.
+    pool: asyncpg.Pool = await asyncpg.create_pool(dsn, min_size=0, max_size=2)
+    return pool
+
+
 def build_agent(
-    service: FiscalService, documents: DocumentService, invoices: InvoiceService, clients: ClientService
+    service: FiscalService,
+    documents: DocumentService,
+    invoices: InvoiceService,
+    clients: ClientService,
+    *,
+    app_pool: asyncpg.Pool,
+    neo_pool: asyncpg.Pool | None,
 ) -> FiscalAgent:
-    return FiscalAgent(service, ClaudeChatModel(), documents, invoices, clients)
+    reader = PgNeoReader(app_pool, neo_pool) if neo_pool is not None else None
+    return FiscalAgent(service, ClaudeChatModel(), documents, invoices, clients, reader=reader)

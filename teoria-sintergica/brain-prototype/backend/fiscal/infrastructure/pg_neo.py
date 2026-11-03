@@ -6,18 +6,10 @@ RLS por dueño. Envolver la consulta en un subselect además rechaza varias sent
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import asyncpg
 
+from fiscal.application.builder_tools import QueryResult
 from fiscal.application.errors import Invalid
-
-
-@dataclass(frozen=True)
-class QueryResult:
-    columnas: tuple[str, ...]
-    filas: tuple[tuple[object, ...], ...]
-    truncado: bool
 
 
 class PgNeoReader:
